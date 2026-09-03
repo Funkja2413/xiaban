@@ -1,0 +1,941 @@
+{
+  "image_size": [
+    1024,
+    1024
+  ],
+  "uv_layer": "UVMap",
+  "uv_unwrapped": false,
+  "pixel_bbox_note": "pixel_bbox is x0,y0,x1,y1 with y=0 at TOP (PNG). pixel_bbox_uv_origin has y=0 at BOTTOM (matches Blender UV v).",
+  "head_island_index": 1,
+  "face_skin_tone_rgba": [
+    0.960784375667572,
+    0.5803921818733215,
+    0.4549019932746887,
+    1.0
+  ],
+  "islands": [
+    {
+      "island": 0,
+      "n_faces": 208,
+      "n_tris": 404,
+      "n_verts": 220,
+      "uv_bbox": [
+        0.0309,
+        0.0182,
+        0.5957,
+        0.5127
+      ],
+      "uv_center": [
+        0.3136,
+        0.2713
+      ],
+      "world_center": [
+        0.0001,
+        -0.0112,
+        0.9971
+      ],
+      "world_z": [
+        0.631,
+        1.1546
+      ],
+      "top_vg": [
+        [
+          "RightArm",
+          31.5
+        ],
+        [
+          "LeftArm",
+          31.5
+        ],
+        [
+          "UpperChest",
+          30.0
+        ],
+        [
+          "RightShoulder",
+          29.5
+        ],
+        [
+          "LeftShoulder",
+          29.5
+        ]
+      ],
+      "base_region": "torso"
+    },
+    {
+      "island": 1,
+      "n_faces": 144,
+      "n_tris": 288,
+      "n_verts": 151,
+      "uv_bbox": [
+        0.0081,
+        0.5349,
+        0.6216,
+        0.9938
+      ],
+      "uv_center": [
+        0.315,
+        0.7671
+      ],
+      "world_center": [
+        0.0001,
+        -0.0008,
+        1.4269
+      ],
+      "world_z": [
+        1.1337,
+        1.7
+      ],
+      "top_vg": [
+        [
+          "Head",
+          139.0
+        ],
+        [
+          "Neck",
+          12.0
+        ],
+        [
+          "LeftShoulder",
+          5.0
+        ],
+        [
+          "RightShoulder",
+          5.0
+        ],
+        [
+          "Chest",
+          2.0
+        ]
+      ],
+      "base_region": "head_split"
+    },
+    {
+      "island": 2,
+      "n_faces": 93,
+      "n_tris": 180,
+      "n_verts": 105,
+      "uv_bbox": [
+        0.6359,
+        0.6899,
+        0.7949,
+        0.8483
+      ],
+      "uv_center": [
+        0.7109,
+        0.7887
+      ],
+      "world_center": [
+        0.1516,
+        0.0101,
+        0.063
+      ],
+      "world_z": [
+        0.0,
+        0.1185
+      ],
+      "top_vg": [
+        [
+          "LeftFoot",
+          67.0
+        ],
+        [
+          "LeftToes",
+          25.0
+        ],
+        [
+          "LeftLeg",
+          4.0
+        ]
+      ],
+      "base_region": "shoes"
+    },
+    {
+      "island": 3,
+      "n_faces": 93,
+      "n_tris": 180,
+      "n_verts": 105,
+      "uv_bbox": [
+        0.6359,
+        0.5187,
+        0.7949,
+        0.677
+      ],
+      "uv_center": [
+        0.711,
+        0.6175
+      ],
+      "world_center": [
+        -0.1513,
+        0.0101,
+        0.063
+      ],
+      "world_z": [
+        0.0,
+        0.1185
+      ],
+      "top_vg": [
+        [
+          "RightFoot",
+          67.0
+        ],
+        [
+          "RightToes",
+          25.0
+        ],
+        [
+          "RightLeg",
+          4.0
+        ]
+      ],
+      "base_region": "shoes"
+    },
+    {
+      "island": 4,
+      "n_faces": 64,
+      "n_tris": 110,
+      "n_verts": 76,
+      "uv_bbox": [
+        0.8064,
+        0.0163,
+        0.9856,
+        0.2321
+      ],
+      "uv_center": [
+        0.8959,
+        0.124
+      ],
+      "world_center": [
+        0.0001,
+        0.0609,
+        0.4031
+      ],
+      "world_z": [
+        0.1164,
+        0.6606
+      ],
+      "top_vg": [
+        [
+          "LeftUpLeg",
+          18.25
+        ],
+        [
+          "RightLeg",
+          16.5
+        ],
+        [
+          "LeftLeg",
+          16.5
+        ],
+        [
+          "RightUpLeg",
+          15.75
+        ],
+        [
+          "Hips",
+          11.0
+        ]
+      ],
+      "base_region": "legs"
+    },
+    {
+      "island": 5,
+      "n_faces": 60,
+      "n_tris": 114,
+      "n_verts": 78,
+      "uv_bbox": [
+        0.6205,
+        0.0163,
+        0.7997,
+        0.2321
+      ],
+      "uv_center": [
+        0.71,
+        0.1242
+      ],
+      "world_center": [
+        0.0001,
+        -0.0331,
+        0.394
+      ],
+      "world_z": [
+        0.1163,
+        0.6384
+      ],
+      "top_vg": [
+        [
+          "LeftUpLeg",
+          19.0
+        ],
+        [
+          "RightLeg",
+          17.5
+        ],
+        [
+          "LeftLeg",
+          17.5
+        ],
+        [
+          "RightUpLeg",
+          16.5
+        ],
+        [
+          "Hips",
+          11.0
+        ]
+      ],
+      "base_region": "legs"
+    },
+    {
+      "island": 6,
+      "n_faces": 49,
+      "n_tris": 98,
+      "n_verts": 63,
+      "uv_bbox": [
+        0.8124,
+        0.6866,
+        0.9484,
+        0.8389
+      ],
+      "uv_center": [
+        0.8766,
+        0.7747
+      ],
+      "world_center": [
+        0.7027,
+        -0.0362,
+        1.0118
+      ],
+      "world_z": [
+        0.9568,
+        1.0697
+      ],
+      "top_vg": [
+        [
+          "LeftHandIndex3",
+          19.5
+        ],
+        [
+          "LeftHandIndex1",
+          14.0
+        ],
+        [
+          "LeftHandThumb2",
+          10.0
+        ],
+        [
+          "LeftHand",
+          7.0
+        ],
+        [
+          "LeftHandIndex2",
+          7.0
+        ]
+      ],
+      "base_region": "hands"
+    },
+    {
+      "island": 7,
+      "n_faces": 49,
+      "n_tris": 98,
+      "n_verts": 63,
+      "uv_bbox": [
+        0.8126,
+        0.5161,
+        0.9487,
+        0.6685
+      ],
+      "uv_center": [
+        0.8768,
+        0.6042
+      ],
+      "world_center": [
+        -0.7025,
+        -0.0362,
+        1.0118
+      ],
+      "world_z": [
+        0.9568,
+        1.0697
+      ],
+      "top_vg": [
+        [
+          "RightHandIndex3",
+          19.5
+        ],
+        [
+          "RightHandIndex1",
+          14.0
+        ],
+        [
+          "RightHandThumb2",
+          10.0
+        ],
+        [
+          "RightHand",
+          7.0
+        ],
+        [
+          "RightHandIndex2",
+          7.0
+        ]
+      ],
+      "base_region": "hands"
+    },
+    {
+      "island": 8,
+      "n_faces": 18,
+      "n_tris": 36,
+      "n_verts": 30,
+      "uv_bbox": [
+        0.6507,
+        0.883,
+        0.7742,
+        0.9417
+      ],
+      "uv_center": [
+        0.7167,
+        0.9121
+      ],
+      "world_center": [
+        0.1578,
+        -0.0002,
+        0.0
+      ],
+      "world_z": [
+        0.0,
+        0.0
+      ],
+      "top_vg": [
+        [
+          "LeftFoot",
+          18.0
+        ],
+        [
+          "LeftToes",
+          9.0
+        ]
+      ],
+      "base_region": "shoes"
+    },
+    {
+      "island": 9,
+      "n_faces": 18,
+      "n_tris": 36,
+      "n_verts": 30,
+      "uv_bbox": [
+        0.8181,
+        0.8871,
+        0.9416,
+        0.9457
+      ],
+      "uv_center": [
+        0.8841,
+        0.9167
+      ],
+      "world_center": [
+        -0.1576,
+        -0.0002,
+        0.0
+      ],
+      "world_z": [
+        0.0,
+        0.0
+      ],
+      "top_vg": [
+        [
+          "RightFoot",
+          18.0
+        ],
+        [
+          "RightToes",
+          9.0
+        ]
+      ],
+      "base_region": "shoes"
+    },
+    {
+      "island": 10,
+      "n_faces": 15,
+      "n_tris": 30,
+      "n_verts": 27,
+      "uv_bbox": [
+        0.8523,
+        0.3166,
+        0.9436,
+        0.4277
+      ],
+      "uv_center": [
+        0.9083,
+        0.3692
+      ],
+      "world_center": [
+        0.6881,
+        -0.0401,
+        0.9871
+      ],
+      "world_z": [
+        0.9568,
+        1.0057
+      ],
+      "top_vg": [
+        [
+          "LeftHandIndex3",
+          7.5
+        ],
+        [
+          "LeftHandIndex1",
+          6.0
+        ],
+        [
+          "LeftHandThumb2",
+          5.0
+        ],
+        [
+          "LeftHandThumb1",
+          3.5
+        ],
+        [
+          "LeftHand",
+          3.0
+        ]
+      ],
+      "base_region": "hands"
+    },
+    {
+      "island": 11,
+      "n_faces": 15,
+      "n_tris": 30,
+      "n_verts": 27,
+      "uv_bbox": [
+        0.7379,
+        0.3162,
+        0.8292,
+        0.4273
+      ],
+      "uv_center": [
+        0.7939,
+        0.3688
+      ],
+      "world_center": [
+        -0.6879,
+        -0.0401,
+        0.9871
+      ],
+      "world_z": [
+        0.9568,
+        1.0057
+      ],
+      "top_vg": [
+        [
+          "RightHandIndex3",
+          7.5
+        ],
+        [
+          "RightHandIndex1",
+          6.0
+        ],
+        [
+          "RightHandThumb2",
+          5.0
+        ],
+        [
+          "RightHandThumb1",
+          3.5
+        ],
+        [
+          "RightHand",
+          3.0
+        ]
+      ],
+      "base_region": "hands"
+    }
+  ],
+  "regions": {
+    "ears_or_head_sides": {
+      "islands": [
+        {
+          "island": 1,
+          "uv_bbox": [
+            0.0081,
+            0.5349,
+            0.6216,
+            0.9938
+          ],
+          "n_faces_island": 144,
+          "n_verts_island": 151,
+          "note": "head island is color-split across face/scalp_hair/ears"
+        }
+      ],
+      "island_indices": [
+        1
+      ],
+      "uv_bbox": [
+        0.1251,
+        0.741,
+        0.5024,
+        0.7957
+      ],
+      "pixel_bbox": [
+        128,
+        209,
+        514,
+        265
+      ],
+      "pixel_bbox_uv_origin": [
+        128,
+        758,
+        514,
+        814
+      ],
+      "pixel_count": 4497,
+      "pixel_coverage_fraction": 0.004289,
+      "vertex_count": 8,
+      "face_count": 2,
+      "tri_count": 4
+    },
+    "face": {
+      "islands": [
+        {
+          "island": 1,
+          "uv_bbox": [
+            0.0081,
+            0.5349,
+            0.6216,
+            0.9938
+          ],
+          "n_faces_island": 144,
+          "n_verts_island": 151,
+          "note": "head island is color-split across face/scalp_hair/ears"
+        }
+      ],
+      "island_indices": [
+        1
+      ],
+      "uv_bbox": [
+        0.0127,
+        0.5337,
+        0.6168,
+        0.8534
+      ],
+      "pixel_bbox": [
+        13,
+        150,
+        631,
+        477
+      ],
+      "pixel_bbox_uv_origin": [
+        13,
+        546,
+        631,
+        873
+      ],
+      "pixel_count": 140787,
+      "pixel_coverage_fraction": 0.134265,
+      "vertex_count": 83,
+      "face_count": 64,
+      "tri_count": 128
+    },
+    "scalp_hair": {
+      "islands": [
+        {
+          "island": 1,
+          "uv_bbox": [
+            0.0081,
+            0.5349,
+            0.6216,
+            0.9938
+          ],
+          "n_faces_island": 144,
+          "n_verts_island": 151,
+          "note": "head island is color-split across face/scalp_hair/ears"
+        }
+      ],
+      "island_indices": [
+        1
+      ],
+      "uv_bbox": [
+        0.0068,
+        0.696,
+        0.6217,
+        0.9941
+      ],
+      "pixel_bbox": [
+        7,
+        6,
+        636,
+        311
+      ],
+      "pixel_bbox_uv_origin": [
+        7,
+        712,
+        636,
+        1017
+      ],
+      "pixel_count": 113321,
+      "pixel_coverage_fraction": 0.108071,
+      "vertex_count": 94,
+      "face_count": 78,
+      "tri_count": 156
+    },
+    "hands": {
+      "islands": [
+        {
+          "island": 6,
+          "uv_bbox": [
+            0.8124,
+            0.6866,
+            0.9484,
+            0.8389
+          ],
+          "n_faces_island": 49,
+          "n_verts_island": 63,
+          "note": "hands"
+        },
+        {
+          "island": 7,
+          "uv_bbox": [
+            0.8126,
+            0.5161,
+            0.9487,
+            0.6685
+          ],
+          "n_faces_island": 49,
+          "n_verts_island": 63,
+          "note": "hands"
+        },
+        {
+          "island": 10,
+          "uv_bbox": [
+            0.8523,
+            0.3166,
+            0.9436,
+            0.4277
+          ],
+          "n_faces_island": 15,
+          "n_verts_island": 27,
+          "note": "hands"
+        },
+        {
+          "island": 11,
+          "uv_bbox": [
+            0.7379,
+            0.3162,
+            0.8292,
+            0.4273
+          ],
+          "n_faces_island": 15,
+          "n_verts_island": 27,
+          "note": "hands"
+        }
+      ],
+      "island_indices": [
+        6,
+        7,
+        10,
+        11
+      ],
+      "uv_bbox": [
+        0.737,
+        0.3148,
+        0.9482,
+        0.8387
+      ],
+      "pixel_bbox": [
+        754,
+        165,
+        970,
+        701
+      ],
+      "pixel_bbox_uv_origin": [
+        754,
+        322,
+        970,
+        858
+      ],
+      "pixel_count": 39626,
+      "pixel_coverage_fraction": 0.03779,
+      "vertex_count": 138,
+      "face_count": 128,
+      "tri_count": 256
+    },
+    "shoes": {
+      "islands": [
+        {
+          "island": 2,
+          "uv_bbox": [
+            0.6359,
+            0.6899,
+            0.7949,
+            0.8483
+          ],
+          "n_faces_island": 93,
+          "n_verts_island": 105,
+          "note": "shoes"
+        },
+        {
+          "island": 3,
+          "uv_bbox": [
+            0.6359,
+            0.5187,
+            0.7949,
+            0.677
+          ],
+          "n_faces_island": 93,
+          "n_verts_island": 105,
+          "note": "shoes"
+        },
+        {
+          "island": 8,
+          "uv_bbox": [
+            0.6507,
+            0.883,
+            0.7742,
+            0.9417
+          ],
+          "n_faces_island": 18,
+          "n_verts_island": 30,
+          "note": "shoes"
+        },
+        {
+          "island": 9,
+          "uv_bbox": [
+            0.8181,
+            0.8871,
+            0.9416,
+            0.9457
+          ],
+          "n_faces_island": 18,
+          "n_verts_island": 30,
+          "note": "shoes"
+        }
+      ],
+      "island_indices": [
+        2,
+        3,
+        8,
+        9
+      ],
+      "uv_bbox": [
+        0.6344,
+        0.5181,
+        0.9413,
+        0.9462
+      ],
+      "pixel_bbox": [
+        649,
+        55,
+        963,
+        493
+      ],
+      "pixel_bbox_uv_origin": [
+        649,
+        530,
+        963,
+        968
+      ],
+      "pixel_count": 51980,
+      "pixel_coverage_fraction": 0.049572,
+      "vertex_count": 226,
+      "face_count": 222,
+      "tri_count": 432
+    },
+    "legs": {
+      "islands": [
+        {
+          "island": 4,
+          "uv_bbox": [
+            0.8064,
+            0.0163,
+            0.9856,
+            0.2321
+          ],
+          "n_faces_island": 64,
+          "n_verts_island": 76,
+          "note": "legs"
+        },
+        {
+          "island": 5,
+          "uv_bbox": [
+            0.6205,
+            0.0163,
+            0.7997,
+            0.2321
+          ],
+          "n_faces_island": 60,
+          "n_verts_island": 78,
+          "note": "legs"
+        }
+      ],
+      "island_indices": [
+        4,
+        5
+      ],
+      "uv_bbox": [
+        0.6197,
+        0.0147,
+        0.9853,
+        0.2326
+      ],
+      "pixel_bbox": [
+        634,
+        785,
+        1008,
+        1008
+      ],
+      "pixel_bbox_uv_origin": [
+        634,
+        15,
+        1008,
+        238
+      ],
+      "pixel_count": 71966,
+      "pixel_coverage_fraction": 0.068632,
+      "vertex_count": 125,
+      "face_count": 124,
+      "tri_count": 224
+    },
+    "torso": {
+      "islands": [
+        {
+          "island": 0,
+          "uv_bbox": [
+            0.0309,
+            0.0182,
+            0.5957,
+            0.5127
+          ],
+          "n_faces_island": 208,
+          "n_verts_island": 220,
+          "note": "torso"
+        }
+      ],
+      "island_indices": [
+        0
+      ],
+      "uv_bbox": [
+        0.0293,
+        0.0166,
+        0.5963,
+        0.5132
+      ],
+      "pixel_bbox": [
+        30,
+        498,
+        610,
+        1006
+      ],
+      "pixel_bbox_uv_origin": [
+        30,
+        17,
+        610,
+        525
+      ],
+      "pixel_count": 164942,
+      "pixel_coverage_fraction": 0.157301,
+      "vertex_count": 220,
+      "face_count": 208,
+      "tri_count": 404
+    }
+  }
+}

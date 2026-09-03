@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>场景编辑器</title>
+  <style>
+    :root {
+      --bg: #1c1d22;
+      --panel: #25262c;
+      --panel2: #2d2f36;
+      --line: #3a3b44;
+      --text: #e6e6ea;
+      --muted: #9aa0ad;
+      --accent: #6ea8ff;
+      --warn: #e8b85c;
+      --ok: #6dcaa0;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font: 12.5px/1.45 ui-sans-serif, system-ui, "PingFang SC", sans-serif; }
+    button, input, select { font: inherit; color: inherit; }
+    button {
+      background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+      padding: 6px 10px; cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: #2d4a78; border-color: #4d78c2; }
+    button.active { background: #2d4a78; border-color: var(--accent); }
+    input[type="number"], input[type="text"] {
+      background: #1a1b20; border: 1px solid var(--line); border-radius: 5px;
+      padding: 5px 8px; width: 100%;
+    }
+    input[type="color"] { width: 100%; height: 28px; border: 1px solid var(--line); border-radius: 5px; background: #1a1b20; padding: 2px; }
+    label.field { display: flex; flex-direction: column; gap: 3px; color: var(--muted); margin-bottom: 8px; }
+    .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    h1 { font-size: 13px; font-weight: 700; margin: 0; letter-spacing: 0.04em; }
+    h2 { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.08em; margin: 14px 0 8px; }
+    .hint { color: var(--muted); font-size: 11.5px; margin: 0 0 8px; }
+    a { color: var(--accent); text-decoration: none; }
+    #app { display: grid; grid-template-rows: 42px 1fr; height: 100%; }
+    #top {
+      display: flex; align-items: center; gap: 16px; padding: 0 14px;
+      border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    #top .sub { color: var(--muted); }
+    #layout {
+      display: grid;
+      grid-template-columns: 250px minmax(380px, 1fr) 290px;
+      min-height: 0;
+    }
+    .pane { overflow: auto; padding: 12px 14px 24px; border-right: 1px solid var(--line); }
+    .pane:last-child { border-right: none; border-left: 1px solid var(--line); }
+    #center { display: flex; flex-direction: column; padding: 0; min-width: 0; border-right: none; }
+    #viewport { flex: 1; min-height: 280px; position: relative; background: #2a2c33; }
+    #viewport canvas { display: block; width: 100%; height: 100%; }
+    #toolbar {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      padding: 8px 10px; border-top: 1px solid var(--line); background: var(--panel);
+    }
+    #status { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .tools button { font-size: 12px; padding: 7px 6px; }
+    .list { display: flex; flex-direction: column; gap: 4px; }
+    .item {
+      display: flex; justify-content: space-between; gap: 8px; align-items: center;
+      padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2);
+      cursor: pointer; width: 100%; text-align: left;
+    }
+    .item:hover, .item.on { border-color: var(--accent); }
+    .item .tag {
+      font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--muted); flex-shrink: 0;
+    }
+    .item .tag.ok { color: var(--ok); border-color: #3d6b55; }
+    .slider {
+      display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: 6px;
+      color: var(--muted); margin-bottom: 5px;
+    }
+    .slider input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+    .slider .v { font-variant-numeric: tabular-nums; text-align: right; font-size: 11px; }
+    .drop {
+      border: 1px dashed var(--line); border-radius: 8px; padding: 12px 8px;
+      text-align: center; color: var(--muted); background: #1a1b20; margin-bottom: 8px;
+    }
+    .drop.over { border-color: var(--accent); color: var(--accent); }
+    .toast {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: #16171b; border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px;
+      z-index: 20; display: none;
+    }
+    #loading {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: var(--bg); z-index: 30; flex-direction: column; gap: 8px;
+    }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .yaw-wrap { display: flex; align-items: center; gap: 14px; margin: 8px 0 10px; }
+    .yaw-dial {
+      width: 96px; height: 96px; border-radius: 50%;
+      border: 2px solid var(--line); background: radial-gradient(circle at 50% 50%, #32343c, #1a1b20);
+      position: relative; cursor: grab; flex-shrink: 0;
+    }
+    .yaw-dial:active { cursor: grabbing; }
+    .yaw-dial .tick {
+      position: absolute; width: 2px; height: 8px; background: var(--muted);
+      left: 50%; top: 4px; margin-left: -1px; transform-origin: 50% 44px;
+    }
+    .yaw-knob {
+      position: absolute; width: 14px; height: 14px; border-radius: 50%;
+      background: var(--accent); left: 50%; top: 50%; margin: -7px 0 0 -7px;
+      box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.25);
+    }
+    .yaw-deg { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 52px; }
+    .move-tag { color: var(--warn); font-size: 11.5px; margin: 0 0 8px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <h1>场景编辑器</h1>
+      <span class="sub">手机预算：点光最多 6 盏 · 无阴影无追光 · 写入 public/levels</span>
+      <span style="margin-left:auto">
+        <a href="http://localhost:5173/">游戏 :5173</a>
+        &nbsp;·&nbsp;
+        <a href="http://localhost:5174/">角色 :5174</a>
+        &nbsp;·&nbsp;
+        <a href="http://localhost:5176/">特效 :5176</a>
+      </span>
+    </header>
+    <div id="layout">
+      <aside class="pane" id="left">
+        <h2>关卡槽</h2>
+        <p class="hint">周一到周五各一关。游戏只加载 catalog 里标成「当前」的那一关，或 URL ?day=tuesday。</p>
+        <div class="list" id="dayList"></div>
+
+        <h2>摆放工具</h2>
+        <p class="hint">左键拖出墙/桌/电梯。点放置家具、椅子、点光。选中后右侧圆盘转朝向，四键正交吸附。右键旋转视角，Shift+拖平移。</p>
+        <div class="tools" id="tools"></div>
+        <p class="hint" id="lightBudget">点光 0/6</p>
+        <div class="row" style="margin-top:8px">
+          <button type="button" id="btnDelete">删除选中</button>
+        </div>
+
+        <h2>地面（可编辑）</h2>
+        <p class="hint">程序材质或上传图片。改完记得保存本关。发布只带被引用的图。</p>
+        <div class="tools" id="floorKinds">
+          <button type="button" data-kind="carpet">程序地毯</button>
+          <button type="button" data-kind="wood">程序木纹</button>
+          <button type="button" data-kind="tile">程序地砖</button>
+          <button type="button" data-kind="image">自定义图</button>
+        </div>
+        <label class="slider" style="margin-top:8px">重复 <input type="range" id="floorRepeat" min="1" max="24" step="1" value="8"><span class="v" data-for="floorRepeat">8</span></label>
+        <div class="drop" id="floorDrop">拖入地面 PNG / JPG
+          <input id="floorFile" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+        </div>
+        <div class="row">
+          <button type="button" id="btnClearFloor">回到程序地面</button>
+        </div>
+        <p class="hint" id="texInfo"></p>
+
+        <h2>墙体贴图</h2>
+        <div class="drop" id="wallDrop">拖入墙面 PNG
+          <input id="wallFile" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+        </div>
+        <div class="row">
+          <button type="button" id="btnClearWall">清墙面图</button>
+        </div>
+      </aside>
+
+      <section id="center">
+        <div id="viewport"></div>
+        <div id="toolbar">
+          <button type="button" id="camOrbit" class="active">环绕</button>
+          <button type="button" id="camTop">俯视摆放</button>
+          <button type="button" id="camPlay">游戏相机</button>
+          <span id="status"></span>
+        </div>
+      </section>
+
+      <aside class="pane" id="right">
+        <h2>本关氛围</h2>
+        <p class="hint">只有一层底光。地面亮斑靠点光（最多 6 盏）。侧窗只换玻璃自发光，不朝屋里打灯。</p>
+        <div class="hint" style="margin-bottom:4px">窗外</div>
+        <div class="tools" id="skyKinds">
+          <button type="button" data-sky="day">白光</button>
+          <button type="button" data-sky="dusk">晚霞</button>
+          <button type="button" data-sky="night">夜晚</button>
+        </div>
+        <p class="hint">白光冷玻璃，晚霞暖橙，夜晚玻璃发冷光。不再每扇窗加 3 盏灯。</p>
+        <div class="pair">
+          <label class="field">背景<input type="color" id="bg"></label>
+          <label class="field">雾<input type="color" id="fog"></label>
+        </div>
+        <label class="slider">雾近 <input type="range" id="fogNear" min="4" max="60" step="1"><span class="v" data-for="fogNear"></span></label>
+        <label class="slider">雾远 <input type="range" id="fogFar" min="10" max="90" step="1"><span class="v" data-for="fogFar"></span></label>
+        <label class="slider">曝光 <input type="range" id="exposure" min="0.4" max="2.2" step="0.02"><span class="v" data-for="exposure"></span></label>
+
+        <div class="pair">
+          <label class="field">环境光色<input type="color" id="ambColor"></label>
+        </div>
+        <label class="slider">环境光 <input type="range" id="ambI" min="0" max="0.85" step="0.005"><span class="v" data-for="ambI"></span></label>
+        <p class="hint">整屋均匀垫一层。暗处看不清就拧这里；太大点光斑会变平。建议 0.08～0.2。</p>
+        <div class="pair">
+          <label class="field">地光·天<input type="color" id="hemiSky"></label>
+          <label class="field">地光·地<input type="color" id="hemiGround"></label>
+        </div>
+        <label class="slider">地光 <input type="range" id="hemiI" min="0" max="1.2" step="0.01"><span class="v" data-for="hemiI"></span></label>
+        <p class="hint">半球光：头顶偏天空色，地面偏反弹色。暗处更耐看，比死拧环境光不容易把斑冲掉。建议 0.25～0.55。</p>
+
+        <h2>新点光默认值</h2>
+        <p class="hint">只影响下一盏。已摆的灯：点黄色标记再改。</p>
+        <div class="pair">
+          <label class="field">默认色<input type="color" id="lampColor"></label>
+          <label class="field">电梯色<input type="color" id="elevGlow"></label>
+        </div>
+        <label class="slider">默认强度 <input type="range" id="lampI" min="8" max="80" step="1"><span class="v" data-for="lampI"></span></label>
+        <label class="slider">默认高度 <input type="range" id="ohY" min="1.4" max="3.2" step="0.05"><span class="v" data-for="ohY"></span></label>
+        <label class="slider">默认半径 <input type="range" id="lampDist" min="2" max="10" step="0.1"><span class="v" data-for="lampDist"></span></label>
+
+        <div class="pair">
+          <label class="field">墙底色<input type="color" id="wallColor"></label>
+          <label class="field">地面色<input type="color" id="floorColor"></label>
+        </div>
+        <label class="slider">墙高光 <input type="range" id="wallShine" min="0" max="80" step="1"><span class="v" data-for="wallShine"></span></label>
+        <label class="slider">地高光 <input type="range" id="floorShine" min="0" max="80" step="1"><span class="v" data-for="floorShine"></span></label>
+        <p class="hint">墙底色只给还没单独上色的面。要改某一面：用选择工具点那一面，右侧取色。</p>
+        <div class="hint" style="margin:8px 0 4px">家具默认色（深灰地板配亮色）</div>
+        <div class="tools" id="furnTones">
+          <button type="button" data-tone="light">亮色</button>
+          <button type="button" data-tone="dark">暗色</button>
+        </div>
+        <p class="hint">没单独指定颜色的桌、椅、柜都跟这套。只换材质颜色，不加点光。</p>
+
+        <h2>地图范围</h2>
+        <div class="pair">
+          <label class="field">minX <input type="number" id="minX" step="1"></label>
+          <label class="field">maxX <input type="number" id="maxX" step="1"></label>
+          <label class="field">minZ <input type="number" id="minZ" step="1"></label>
+          <label class="field">maxZ <input type="number" id="maxZ" step="1"></label>
+        </div>
+
+        <h2>选中</h2>
+        <p class="hint" id="selInfo">未选中。点物体，或用「点光」点在要亮的地方（最多 6 盏）。</p>
+        <p class="move-tag" id="moveHint"></p>
+        <div id="yawEdit" hidden>
+          <p class="hint">朝向。圆盘任意转，四键对齐正交。工位桌转的是人坐的方向，桌面仍贴拖出的矩形。</p>
+          <div class="yaw-wrap">
+            <div id="yawDial" class="yaw-dial">
+              <span class="tick" style="transform:rotate(0deg)"></span>
+              <span class="tick" style="transform:rotate(90deg)"></span>
+              <span class="tick" style="transform:rotate(180deg)"></span>
+              <span class="tick" style="transform:rotate(270deg)"></span>
+              <div id="yawKnob" class="yaw-knob"></div>
+            </div>
+            <div id="yawDeg" class="yaw-deg">0°</div>
+          </div>
+          <div class="tools" id="yawSnaps">
+            <button type="button" data-deg="0">+Z</button>
+            <button type="button" data-deg="-90">+X</button>
+            <button type="button" data-deg="180">-Z</button>
+            <button type="button" data-deg="90">-X</button>
+          </div>
+        </div>
+        <div id="deskEdit" hidden>
+          <p class="hint">这一张桌子的样式。换完立刻重画。</p>
+          <div class="hint" style="margin-bottom:4px">桌面</div>
+          <div class="tools" id="deskTops">
+            <button type="button" data-top="oak">橡木</button>
+            <button type="button" data-top="walnut">胡桃</button>
+            <button type="button" data-top="dark">深色</button>
+            <button type="button" data-top="white">白桌</button>
+            <button type="button" data-top="steel">钢桌</button>
+            <button type="button" data-top="bench">长台</button>
+          </div>
+          <div class="hint" style="margin:8px 0 4px">桌上（由简到繁）</div>
+          <div class="tools" id="deskKits">
+            <button type="button" data-kit="simple">单屏</button>
+            <button type="button" data-kit="dual">双屏</button>
+            <button type="button" data-kit="clutter">杂物</button>
+            <button type="button" data-kit="packed">堆满</button>
+          </div>
+          <div class="hint" style="margin:8px 0 4px">坐哪一侧（也可上面圆盘任意转）</div>
+          <div class="tools" id="deskFaces">
+            <button type="button" data-face="pz">坐 +Z</button>
+            <button type="button" data-face="nz">坐 -Z</button>
+            <button type="button" data-face="px">坐 +X</button>
+            <button type="button" data-face="nx">坐 -X</button>
+          </div>
+        </div>
+        <div id="chairEdit" hidden>
+          <p class="hint">这一把椅子的款式。游戏里都能撞人。</p>
+          <div class="tools" id="chairStyles">
+            <button type="button" data-style="task">转椅</button>
+            <button type="button" data-style="mesh">网椅</button>
+            <button type="button" data-style="guest">客椅</button>
+            <button type="button" data-style="stool">圆凳</button>
+            <button type="button" data-style="exec">高背</button>
+          </div>
+        </div>
+        <div id="plantEdit" hidden>
+          <p class="hint">这一组绿植。由简到繁，同款每盆高低和叶色也会不一样。</p>
+          <div class="tools" id="plantKits">
+            <button type="button" data-kit="pot">单盆</button>
+            <button type="button" data-kit="pair">双盆</button>
+            <button type="button" data-kit="trio">三盆</button>
+            <button type="button" data-kit="cluster">多盆</button>
+            <button type="button" data-kit="grove">树丛</button>
+          </div>
+        </div>
+        <div id="toneEdit" hidden>
+          <p class="hint">这件的成套色。亮色=白/米，暗色=木/炭灰。桌上键鼠也会跟着变。</p>
+          <div class="tools" id="itemTones">
+            <button type="button" data-tone="light">亮色</button>
+            <button type="button" data-tone="dark">暗色</button>
+          </div>
+        </div>
+        <div id="wallEdit" hidden>
+          <p class="hint" id="wallFaceHint">点到的这一面。取色只改这一面，其它墙不动。</p>
+          <div class="tools" id="wallItemTones">
+            <button type="button" data-tone="inherit">跟随底色</button>
+            <button type="button" data-tone="light">亮色</button>
+            <button type="button" data-tone="dark">暗色</button>
+          </div>
+          <label class="field" style="margin-top:8px">这一面的颜色<input type="color" id="wallItemColor"></label>
+        </div>
+        <div id="lightEdit" hidden>
+          <p class="hint">灯越低、半径越小，地上的斑越硬。强度上限 80，半径上限 10。</p>
+          <label class="field">颜色<input type="color" id="plColor"></label>
+          <label class="slider">高度 <input type="range" id="plY" min="1.4" max="3.2" step="0.05"><span class="v" data-for="plY"></span></label>
+          <label class="slider">强度 <input type="range" id="plI" min="8" max="80" step="1"><span class="v" data-for="plI"></span></label>
+          <label class="slider">照亮半径 <input type="range" id="plDist" min="2" max="10" step="0.1"><span class="v" data-for="plDist"></span></label>
+        </div>
+
+        <h2>写入游戏</h2>
+        <div class="row">
+          <button type="button" class="primary" id="btnSave">保存本关</button>
+          <button type="button" id="btnActive">设为游戏当前关</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button type="button" id="btnFromMon">从周一带入布局</button>
+          <button type="button" id="btnReset">恢复原型</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button type="button" id="btnPack">下载 catalog</button>
+        </div>
+        <p class="hint" id="saveHint">保存后刷新游戏即可。npm run build 不含本编辑器。</p>
+      </aside>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+  <div id="loading"><div>加载场景编辑器…</div><div class="hint">预览走同一套关卡网格与氛围</div></div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,1111 @@
+{
+  "version": 1,
+  "active": "monday",
+  "base": {
+    "mesh": "/models/kit/character_kit.glb",
+    "idle": "/models/kenney/idle.fbx",
+    "run": "/models/kenney/run.fbx",
+    "height": 1.72
+  },
+  "hairs": [],
+  "props": [
+    {
+      "id": "prop-laptop",
+      "file": "/models/colleagues/props/prop-laptop.glb",
+      "preRotation": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "prop-cup",
+      "file": "/models/colleagues/props/prop-cup.glb",
+      "preRotation": [
+        -0.24,
+        -1.45,
+        -0.2
+      ]
+    },
+    {
+      "id": "prop-cap",
+      "file": "/models/colleagues/props/prop-cap.glb",
+      "preRotation": [
+        -0.06,
+        0,
+        0
+      ]
+    }
+  ],
+  "skins": [
+    {
+      "id": "kenney-male-a",
+      "file": "/models/kenney/humanMaleA.png",
+      "flipY": false
+    },
+    {
+      "id": "kenney-female-a",
+      "file": "/models/kenney/humanFemaleA.png",
+      "flipY": false
+    },
+    {
+      "id": "skin-colleague-a-f",
+      "file": "/models/colleagues/skins/skin-colleague-a-f.png",
+      "flipY": false
+    },
+    {
+      "id": "skin-heavy",
+      "file": "/models/colleagues/skins/skin-heavy.png",
+      "flipY": false
+    },
+    {
+      "id": "skin-interceptor",
+      "file": "/models/colleagues/skins/skin-interceptor.png",
+      "flipY": false
+    }
+  ],
+  "days": [
+    {
+      "id": "monday",
+      "label": "周一",
+      "variants": [
+        {
+          "id": "player",
+          "label": "玩家",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": "/models/colleagues/thumbs/monday-player.png",
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-f",
+          "label": "普通同事·女",
+          "gender": "female",
+          "skin": "skin-colleague-a-f",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [
+            {
+              "id": "prop-cap",
+              "anchor": "head",
+              "transform": {
+                "position": [
+                  0,
+                  0.0172,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            },
+            {
+              "id": "prop-cup",
+              "anchor": "hand",
+              "transform": {
+                "position": [
+                  -0.0384,
+                  0.1644,
+                  -0.0468
+                ],
+                "rotation": [
+                  0.58,
+                  0.38,
+                  1.96
+                ],
+                "scale": [
+                  1.25,
+                  2.08,
+                  1.62
+                ]
+              }
+            }
+          ],
+          "bodyMorph": 0.62,
+          "kitHair": "hair_tail",
+          "kitHairMap": "/models/colleagues/skins/skin-colleague-a-f-hair.png",
+          "kitSkirt": null,
+          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "thumb": "/models/colleagues/thumbs/monday-colleague-a-f.png"
+        },
+        {
+          "id": "colleague-a-m",
+          "label": "普通同事·男",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [
+            {
+              "id": "prop-laptop",
+              "anchor": "hand",
+              "transform": {
+                "position": [
+                  0,
+                  0.13,
+                  0
+                ],
+                "rotation": [
+                  3,
+                  0.94,
+                  0
+                ],
+                "scale": [
+                  1.62,
+                  1.6,
+                  1.61
+                ]
+              }
+            }
+          ],
+          "bodyMorph": -0.86,
+          "kitHair": null,
+          "thumb": "/models/colleagues/thumbs/monday-colleague-a-m.png",
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "heavy",
+          "label": "重量级主管",
+          "gender": "male",
+          "skin": "skin-heavy",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0.6,
+          "kitHair": "hair_bob",
+          "kitHairMap": "/models/colleagues/skins/skin-heavy-hair.png",
+          "kitSkirt": "skirt_pencil",
+          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-skirt.png",
+          "thumb": "/models/colleagues/thumbs/monday-heavy.png"
+        },
+        {
+          "id": "interceptor",
+          "label": "拦截者",
+          "gender": "female",
+          "skin": "skin-interceptor",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0.9,
+          "kitHair": null,
+          "kitHairMap": "/models/colleagues/skins/skin-interceptor-hair.png",
+          "kitSkirt": null,
+          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "thumb": "/models/colleagues/thumbs/monday-interceptor.png"
+        }
+      ]
+    },
+    {
+      "id": "tuesday",
+      "label": "周二",
+      "variants": [
+        {
+          "id": "player",
+          "label": "玩家",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-f",
+          "label": "普通同事·女",
+          "gender": "female",
+          "skin": "skin-colleague-a-f",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [
+            {
+              "id": "prop-cap",
+              "anchor": "head",
+              "transform": {
+                "position": [
+                  0,
+                  0.0172,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            },
+            {
+              "id": "prop-cup",
+              "anchor": "hand",
+              "transform": {
+                "position": [
+                  -0.0872,
+                  0.1753,
+                  -0.011
+                ],
+                "rotation": [
+                  0.58,
+                  1.14,
+                  2.14
+                ],
+                "scale": [
+                  1.25,
+                  2.08,
+                  1.62
+                ]
+              }
+            }
+          ],
+          "bodyMorph": 0.62,
+          "kitHair": "hair_bob",
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-m",
+          "label": "普通同事·男",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "heavy",
+          "label": "重量级主管",
+          "gender": "male",
+          "skin": "skin-heavy",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              -0.0532,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              5,
+              5,
+              5
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "interceptor",
+          "label": "拦截者",
+          "gender": "female",
+          "skin": "kenney-female-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        }
+      ]
+    },
+    {
+      "id": "wednesday",
+      "label": "周三",
+      "variants": [
+        {
+          "id": "player",
+          "label": "玩家",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-f",
+          "label": "普通同事·女",
+          "gender": "female",
+          "skin": "skin-colleague-a-f",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [
+            {
+              "id": "prop-cap",
+              "anchor": "head",
+              "transform": {
+                "position": [
+                  0,
+                  0.0172,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            },
+            {
+              "id": "prop-cup",
+              "anchor": "hand",
+              "transform": {
+                "position": [
+                  -0.0872,
+                  0.1753,
+                  -0.011
+                ],
+                "rotation": [
+                  0.58,
+                  1.14,
+                  2.14
+                ],
+                "scale": [
+                  1.25,
+                  2.08,
+                  1.62
+                ]
+              }
+            }
+          ],
+          "bodyMorph": 0.62,
+          "kitHair": "hair_bob",
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-m",
+          "label": "普通同事·男",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "heavy",
+          "label": "重量级主管",
+          "gender": "male",
+          "skin": "skin-heavy",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              -0.0532,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              5,
+              5,
+              5
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "interceptor",
+          "label": "拦截者",
+          "gender": "female",
+          "skin": "kenney-female-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        }
+      ]
+    },
+    {
+      "id": "thursday",
+      "label": "周四",
+      "variants": [
+        {
+          "id": "player",
+          "label": "玩家",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-f",
+          "label": "普通同事·女",
+          "gender": "female",
+          "skin": "skin-colleague-a-f",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [
+            {
+              "id": "prop-cap",
+              "anchor": "head",
+              "transform": {
+                "position": [
+                  0,
+                  0.0172,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            },
+            {
+              "id": "prop-cup",
+              "anchor": "hand",
+              "transform": {
+                "position": [
+                  -0.0872,
+                  0.1753,
+                  -0.011
+                ],
+                "rotation": [
+                  0.58,
+                  1.14,
+                  2.14
+                ],
+                "scale": [
+                  1.25,
+                  2.08,
+                  1.62
+                ]
+              }
+            }
+          ],
+          "bodyMorph": 0.62,
+          "kitHair": "hair_bob",
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-m",
+          "label": "普通同事·男",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "heavy",
+          "label": "重量级主管",
+          "gender": "male",
+          "skin": "skin-heavy",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              -0.0532,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              5,
+              5,
+              5
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "interceptor",
+          "label": "拦截者",
+          "gender": "female",
+          "skin": "kenney-female-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        }
+      ]
+    },
+    {
+      "id": "friday",
+      "label": "周五",
+      "variants": [
+        {
+          "id": "player",
+          "label": "玩家",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-f",
+          "label": "普通同事·女",
+          "gender": "female",
+          "skin": "skin-colleague-a-f",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [
+            {
+              "id": "prop-cap",
+              "anchor": "head",
+              "transform": {
+                "position": [
+                  0,
+                  0.0172,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0
+                ],
+                "scale": [
+                  1,
+                  1,
+                  1
+                ]
+              }
+            },
+            {
+              "id": "prop-cup",
+              "anchor": "hand",
+              "transform": {
+                "position": [
+                  -0.0872,
+                  0.1753,
+                  -0.011
+                ],
+                "rotation": [
+                  0.58,
+                  1.14,
+                  2.14
+                ],
+                "scale": [
+                  1.25,
+                  2.08,
+                  1.62
+                ]
+              }
+            }
+          ],
+          "bodyMorph": 0.62,
+          "kitHair": "hair_bob",
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "colleague-a-m",
+          "label": "普通同事·男",
+          "gender": "male",
+          "skin": "kenney-male-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0.043,
+              -0.014
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "heavy",
+          "label": "重量级主管",
+          "gender": "male",
+          "skin": "skin-heavy",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              -0.0532,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              5,
+              5,
+              5
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        },
+        {
+          "id": "interceptor",
+          "label": "拦截者",
+          "gender": "female",
+          "skin": "kenney-female-a",
+          "hair": null,
+          "hairTransform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "props": [],
+          "bodyMorph": 0,
+          "kitHair": null,
+          "thumb": null,
+          "kitHairMap": null,
+          "kitSkirt": null,
+          "kitSkirtMap": null
+        }
+      ]
+    }
+  ]
+}

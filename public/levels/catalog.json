@@ -1,0 +1,3413 @@
+{
+  "version": 1,
+  "active": "monday",
+  "levels": [
+    {
+      "id": "monday",
+      "label": "周一",
+      "map": {
+        "minX": -12,
+        "maxX": 12,
+        "minZ": -28,
+        "maxZ": 28
+      },
+      "playerStart": {
+        "x": -6.243146685719204,
+        "z": 25.50445595260285
+      },
+      "elevator": {
+        "minX": -2,
+        "maxX": 2,
+        "minZ": -28,
+        "maxZ": -26,
+        "point": {
+          "x": 0,
+          "z": -27
+        }
+      },
+      "atmosphere": {
+        "background": "#3a322b",
+        "fogColor": "#3a322b",
+        "fogNear": 56,
+        "fogFar": 71,
+        "exposure": 1.38,
+        "ambient": {
+          "color": "#f5c542",
+          "intensity": 0.175
+        },
+        "hemisphere": {
+          "sky": "#fff4e4",
+          "ground": "#8a7a66",
+          "intensity": 0.75
+        },
+        "sun": {
+          "color": "#fff2dc",
+          "intensity": 0,
+          "position": [
+            11,
+            26,
+            8
+          ],
+          "castShadow": false
+        },
+        "fill": {
+          "color": "#b8d4f0",
+          "intensity": 0,
+          "position": [
+            -12,
+            12,
+            -8
+          ]
+        },
+        "lampColor": "#fff1b8",
+        "lampIntensity": 72,
+        "overheadHeight": 2.3,
+        "lampDistance": 4.9,
+        "overheadSpacing": 8,
+        "followEnabled": false,
+        "followColor": "#fff2dc",
+        "followIntensity": 1.2,
+        "followHeight": 7.2,
+        "floor": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "bumpScale": 1.2,
+          "map": "/levels/textures/monday-floor.png",
+          "kind": "image",
+          "repeat": 1
+        },
+        "wall": {
+          "color": "#ffffff",
+          "shininess": 13,
+          "map": null
+        },
+        "elevatorGlow": "#7ef0a0",
+        "sky": "day",
+        "furnitureTone": "light"
+      },
+      "walls": [
+        {
+          "id": "maze-1",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 11.6,
+          "maxX": 5,
+          "maxZ": 12.1,
+          "h": 1.7,
+          "faces": {
+            "pz": "#3d94ff"
+          }
+        },
+        {
+          "id": "maze-2",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 8.1,
+          "maxX": -6.5,
+          "maxZ": 11.6,
+          "h": 1.7,
+          "faces": {
+            "px": "#4d82ff"
+          }
+        },
+        {
+          "id": "maze-3",
+          "kind": "wall",
+          "minX": -9.5,
+          "minZ": 7.6,
+          "maxX": -3,
+          "maxZ": 8.1,
+          "h": 1.7,
+          "faces": {
+            "pz": "#428bff"
+          }
+        },
+        {
+          "id": "maze-4",
+          "kind": "wall",
+          "minX": 0,
+          "minZ": 7.6,
+          "maxX": 9,
+          "maxZ": 8.1,
+          "h": 1.7,
+          "faces": {
+            "pz": "#4785ff"
+          }
+        },
+        {
+          "id": "maze-5",
+          "kind": "wall",
+          "minX": -9,
+          "minZ": 3.6,
+          "maxX": 1,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-6",
+          "kind": "wall",
+          "minX": 4.5,
+          "minZ": 3.6,
+          "maxX": 12,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "meet-1",
+          "kind": "wall",
+          "minX": -12,
+          "minZ": -4.4,
+          "maxX": -8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-2",
+          "kind": "wall",
+          "minX": -6.5,
+          "minZ": -4.4,
+          "maxX": -1,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-3",
+          "kind": "wall",
+          "minX": 1,
+          "minZ": -4.4,
+          "maxX": 8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-1",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -18.4,
+          "maxX": -6.1,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-2",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -18.4,
+          "maxX": 6.9,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-3",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -24.4,
+          "maxX": -6.1,
+          "maxZ": -23.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-4",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -24.4,
+          "maxX": 6.9,
+          "maxZ": -23.6,
+          "h": 1.7
+        },
+        {
+          "id": "wall-ypdncl",
+          "kind": "wall",
+          "minX": 8.478233815493292,
+          "minZ": -4.408731582950764,
+          "maxX": 8.978233815493292,
+          "maxZ": 0.5912684170492364,
+          "h": 1.7
+        },
+        {
+          "id": "wall-fxrxuc",
+          "kind": "wall",
+          "minX": -4.5,
+          "minZ": -20.5,
+          "maxX": 7,
+          "maxZ": -20,
+          "h": 1.7
+        },
+        {
+          "id": "wall-8nt1tg",
+          "kind": "wall",
+          "minX": 4.5,
+          "minZ": -23.5,
+          "maxX": 10.5,
+          "maxZ": -23,
+          "h": 1.7
+        },
+        {
+          "id": "wall-yocbjx",
+          "kind": "wall",
+          "minX": -10.333793307435332,
+          "minZ": -23.758335953137056,
+          "maxX": -3.3337933074353296,
+          "maxZ": -23.258335953137056,
+          "h": 1.7
+        }
+      ],
+      "desks": [
+        {
+          "id": "d1",
+          "minX": -11.88440665069297,
+          "minZ": 22.696460685201565,
+          "maxX": -7.384406650692971,
+          "maxZ": 24.296460685201563,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d2",
+          "minX": -11.820004640669985,
+          "minZ": 18.997621876973625,
+          "maxX": -7.320004640669982,
+          "maxZ": 20.597621876973623,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d3",
+          "minX": 7.286063250288518,
+          "minZ": 23.241362871070468,
+          "maxX": 11.78606325028852,
+          "maxZ": 24.841362871070466,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d4",
+          "minX": -9.114112393137994,
+          "minZ": 14.898803869742842,
+          "maxX": -4.614112393137999,
+          "maxZ": 16.498803869742844,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d5",
+          "minX": -1.9569139661402777,
+          "minZ": 15.19771673797052,
+          "maxX": 2.5430860338597228,
+          "maxZ": 16.79771673797052,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d6",
+          "minX": 5.160083236966118,
+          "minZ": 15.174131340197562,
+          "maxX": 9.660083236966118,
+          "maxZ": 16.774131340197563,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": -0.008474373402970617
+        },
+        {
+          "id": "d8",
+          "minX": 1.9607522292635693,
+          "minZ": -11.061121263714993,
+          "maxX": 6.960752229263569,
+          "maxZ": -9.061121263714993,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "desk-a5ceqw",
+          "minX": 10.5,
+          "minZ": -3,
+          "maxX": 12,
+          "maxZ": 2,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz",
+          "rotY": -0.7011067194207721
+        },
+        {
+          "id": "desk-7y2pmt",
+          "minX": -9.864184935861802,
+          "minZ": -8.0289543643442,
+          "maxX": -5.364184935861809,
+          "maxZ": -6.5289543643442,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": 0.003368088089786877
+        },
+        {
+          "id": "desk-7pqvp4",
+          "minX": -11.808724615237969,
+          "minZ": -11.622765005064268,
+          "maxX": -4.308724615237969,
+          "maxZ": -10.122765005064268,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": 0,
+          "tone": "light"
+        },
+        {
+          "id": "desk-t788rv",
+          "minX": -6,
+          "minZ": -11,
+          "maxX": -5,
+          "maxZ": -10.5,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": 0,
+          "tone": "light"
+        },
+        {
+          "id": "desk-of5fza",
+          "minX": -11.883981173633794,
+          "minZ": -15.301263240959,
+          "maxX": -4.383981173633794,
+          "maxZ": -13.801263240959,
+          "top": "white",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": 0,
+          "tone": "light"
+        }
+      ],
+      "props": [
+        {
+          "id": "plant-1",
+          "kind": "plant",
+          "x": -10.8,
+          "z": 25.5,
+          "plantKit": "grove"
+        },
+        {
+          "id": "plant-2",
+          "kind": "plant",
+          "x": 10.8,
+          "z": 25.5,
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-3",
+          "kind": "plant",
+          "x": -10.6,
+          "z": -25.5,
+          "plantKit": "trio"
+        },
+        {
+          "id": "plant-4",
+          "kind": "plant",
+          "x": 10.6,
+          "z": -25.5,
+          "plantKit": "pair"
+        },
+        {
+          "id": "plant-5",
+          "kind": "plant",
+          "x": -10.8,
+          "z": -6.5,
+          "plantKit": "pot"
+        },
+        {
+          "id": "cooler-1",
+          "kind": "cooler",
+          "x": 10.6,
+          "z": 13.5
+        },
+        {
+          "id": "cooler-2",
+          "kind": "cooler",
+          "x": -11.350990479150191,
+          "z": -15.916151943286573
+        },
+        {
+          "id": "win-w-0",
+          "kind": "window",
+          "x": -11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-0",
+          "kind": "window",
+          "x": 11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-1",
+          "kind": "window",
+          "x": -11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-1",
+          "kind": "window",
+          "x": 11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-2",
+          "kind": "window",
+          "x": -11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-2",
+          "kind": "window",
+          "x": 11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-3",
+          "kind": "window",
+          "x": -11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-3",
+          "kind": "window",
+          "x": 11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-wrbku9",
+          "kind": "window",
+          "x": -11.98,
+          "z": 11.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-7llrms",
+          "kind": "window",
+          "x": -11.98,
+          "z": 12.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-81z35b",
+          "kind": "window",
+          "x": -11.98,
+          "z": 13,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-iuoc6h",
+          "kind": "window",
+          "x": -11.98,
+          "z": 13.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-rr1twm",
+          "kind": "window",
+          "x": -11.98,
+          "z": 14,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-7o7dlo",
+          "kind": "window",
+          "x": -11.98,
+          "z": 17.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-ueimxz",
+          "kind": "window",
+          "x": -11.98,
+          "z": 18,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-zfhk14",
+          "kind": "window",
+          "x": -11.98,
+          "z": 19.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-smawg2",
+          "kind": "window",
+          "x": -11.98,
+          "z": 20,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-ju0cv5",
+          "kind": "window",
+          "x": -11.98,
+          "z": 20,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-ohxa5q",
+          "kind": "window",
+          "x": -11.98,
+          "z": 20.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "coffee-l6fnrn",
+          "kind": "coffee",
+          "x": -5,
+          "z": 20
+        },
+        {
+          "id": "coffee-sim5uj",
+          "kind": "coffee",
+          "x": -5,
+          "z": 20
+        },
+        {
+          "id": "coffee-01g189",
+          "kind": "coffee",
+          "x": -3.160086680111179,
+          "z": 12.959073554264624
+        },
+        {
+          "id": "sofa-dxt9dw",
+          "kind": "sofa",
+          "x": 1.331729207912782,
+          "z": 23.233695175725078,
+          "rotY": -0.7011067194207721
+        },
+        {
+          "id": "sofa-64yhse",
+          "kind": "sofa",
+          "x": 2.419354870589898,
+          "z": 22.036582989713935
+        },
+        {
+          "id": "bar-sauq2g",
+          "kind": "bar",
+          "x": 1.1190802066744858,
+          "z": 8.6854883920516,
+          "rotY": -0.008474373402970617
+        },
+        {
+          "id": "cabinet-ja1e6t",
+          "kind": "cabinet",
+          "x": 10.727019263001704,
+          "z": 20.784457317918505,
+          "rotY": -0.008474373402970617
+        },
+        {
+          "id": "printer-fp5c93",
+          "kind": "printer",
+          "x": 11.43325043681939,
+          "z": 20.806407661163544,
+          "rotY": -0.008474373402970617
+        },
+        {
+          "id": "bin-2ps95q",
+          "kind": "bin",
+          "x": 6.485808099136797,
+          "z": 24.358284648935694,
+          "rotY": -0.008474373402970617
+        },
+        {
+          "id": "whiteboard-rf4jbw",
+          "kind": "whiteboard",
+          "x": 10.839309216287951,
+          "z": 16.868891708392795,
+          "rotY": -0.008474373402970617
+        },
+        {
+          "id": "whiteboard-z08gpj",
+          "kind": "whiteboard",
+          "x": 2.7675345928338277,
+          "z": 12.541256660392673,
+          "rotY": -0.008474373402970617
+        },
+        {
+          "id": "plant-vhxx9f",
+          "kind": "plant",
+          "x": 11.372263913824774,
+          "z": 17.93715294423141,
+          "rotY": -0.008474373402970617,
+          "plantKit": "grove"
+        },
+        {
+          "id": "plant-t4t07r",
+          "kind": "plant",
+          "x": 8.5,
+          "z": 22,
+          "rotY": -0.008474373402970617,
+          "plantKit": "trio"
+        },
+        {
+          "id": "bin-ne5zlw",
+          "kind": "bin",
+          "x": -1.5,
+          "z": 25,
+          "rotY": 0
+        },
+        {
+          "id": "bin-luk9ln",
+          "kind": "bin",
+          "x": -0.5,
+          "z": 23,
+          "rotY": 0
+        },
+        {
+          "id": "bin-oor9ql",
+          "kind": "bin",
+          "x": 1,
+          "z": 22.5,
+          "rotY": 0
+        },
+        {
+          "id": "bin-f2684j",
+          "kind": "bin",
+          "x": 3.5,
+          "z": 19,
+          "rotY": 0
+        },
+        {
+          "id": "bin-fzi9rt",
+          "kind": "bin",
+          "x": -2,
+          "z": 7.5,
+          "rotY": 0
+        },
+        {
+          "id": "bin-rvt3m6",
+          "kind": "bin",
+          "x": 2,
+          "z": -2,
+          "rotY": 0
+        },
+        {
+          "id": "bin-rexp1v",
+          "kind": "bin",
+          "x": -10.5,
+          "z": -13.5,
+          "rotY": 0
+        },
+        {
+          "id": "bin-2fjizd",
+          "kind": "bin",
+          "x": -3,
+          "z": -21.5,
+          "rotY": 0
+        },
+        {
+          "id": "bin-ad8ths",
+          "kind": "bin",
+          "x": 7.5,
+          "z": -15,
+          "rotY": 0
+        },
+        {
+          "id": "bin-s36z02",
+          "kind": "bin",
+          "x": 9.5,
+          "z": -3,
+          "rotY": 0
+        },
+        {
+          "id": "cooler-b8er1t",
+          "kind": "cooler",
+          "x": 11.5,
+          "z": 3,
+          "rotY": 1.1574773369554188
+        },
+        {
+          "id": "plant-6fal7v",
+          "kind": "plant",
+          "x": 10.878132019757391,
+          "z": 2.5002158818483085,
+          "rotY": 1.1574773369554188,
+          "plantKit": "pair"
+        },
+        {
+          "id": "sofa-2cbluf",
+          "kind": "sofa",
+          "x": -2.5,
+          "z": -1,
+          "rotY": 0,
+          "tone": "light"
+        },
+        {
+          "id": "sofa-oo31jb",
+          "kind": "sofa",
+          "x": 1,
+          "z": -1,
+          "rotY": 2.6145463660737307,
+          "tone": "light"
+        },
+        {
+          "id": "sofa-7123u7",
+          "kind": "sofa",
+          "x": -4.247913167233051,
+          "z": -1.3455591761714594,
+          "rotY": 2.6145463660737307,
+          "tone": "light"
+        },
+        {
+          "id": "whiteboard-2cne36",
+          "kind": "whiteboard",
+          "x": -6.5,
+          "z": -13,
+          "rotY": 0,
+          "tone": "light"
+        },
+        {
+          "id": "shelf-o7x2kg",
+          "kind": "shelf",
+          "x": 4.610041710325338,
+          "z": -19.46581446636728,
+          "rotY": 0,
+          "tone": "light"
+        },
+        {
+          "id": "plant-qbkqsr",
+          "kind": "plant",
+          "x": 10.5,
+          "z": -17.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-79yu2d",
+          "kind": "plant",
+          "x": 10.5,
+          "z": -15.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "pot"
+        },
+        {
+          "id": "plant-o0gnwg",
+          "kind": "plant",
+          "x": -11.5,
+          "z": 6.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-stgw3e",
+          "kind": "plant",
+          "x": -7.5,
+          "z": 5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-u16egs",
+          "kind": "plant",
+          "x": -6.5,
+          "z": 1.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-e01y7v",
+          "kind": "plant",
+          "x": 7.5,
+          "z": -9.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-nn8oax",
+          "kind": "plant",
+          "x": -4,
+          "z": -10.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-b1thbi",
+          "kind": "plant",
+          "x": -4,
+          "z": -14.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-gplznn",
+          "kind": "plant",
+          "x": 7.5,
+          "z": -17.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-h6d1g4",
+          "kind": "plant",
+          "x": 10.5,
+          "z": -16.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-a69y9d",
+          "kind": "plant",
+          "x": 11,
+          "z": -3.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-d02kkg",
+          "kind": "plant",
+          "x": 11,
+          "z": -4.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-ixj3gb",
+          "kind": "plant",
+          "x": 11.5,
+          "z": 22,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-0uf4ea",
+          "kind": "plant",
+          "x": 11.5,
+          "z": 13.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-93xsyp",
+          "kind": "plant",
+          "x": 11.5,
+          "z": 12,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-p8tgnx",
+          "kind": "plant",
+          "x": 11,
+          "z": 11.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-oz6066",
+          "kind": "plant",
+          "x": 11.5,
+          "z": 10.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-8bh4a2",
+          "kind": "plant",
+          "x": -7,
+          "z": 20,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-eiwmop",
+          "kind": "plant",
+          "x": -7,
+          "z": 23.5,
+          "rotY": 0,
+          "tone": "light",
+          "plantKit": "cluster"
+        }
+      ],
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": -4.234676058276596,
+          "z": 18.26809729780337,
+          "y": 3.2,
+          "intensity": 58,
+          "distance": 9.6,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0,
+          "z": -24.2,
+          "y": 2.5,
+          "intensity": 80,
+          "distance": 5.8,
+          "color": "#c8ffd8"
+        },
+        {
+          "id": "pl-d2",
+          "x": -1.7509283224869852,
+          "z": -4.965807043406528,
+          "y": 2.4,
+          "intensity": 70,
+          "distance": 10,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-d6",
+          "x": 6.901716023169635,
+          "z": 8.684096483501488,
+          "y": 3.2,
+          "intensity": 66,
+          "distance": 8.9,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-d3",
+          "x": 8.113752012202367,
+          "z": 24.522095147123576,
+          "y": 3.2,
+          "intensity": 41,
+          "distance": 9.9,
+          "color": "#fff6cc"
+        },
+        {
+          "id": "pl-meet-r",
+          "x": 8.091936444837803,
+          "z": -16.78289996386036,
+          "y": 2.2,
+          "intensity": 41,
+          "distance": 10,
+          "color": "#fff1b8"
+        }
+      ],
+      "chairSpawns": [
+        {
+          "id": "ch1",
+          "x": -3.703684415285675,
+          "z": 18.44560861522328,
+          "style": "task"
+        },
+        {
+          "id": "ch2",
+          "x": 0.48594184901759263,
+          "z": 19.34907877164523,
+          "style": "mesh"
+        },
+        {
+          "id": "ch3",
+          "x": 8,
+          "z": 19.3,
+          "style": "guest"
+        },
+        {
+          "id": "ch4",
+          "x": -3.313302365971047,
+          "z": 14.448841122007028,
+          "style": "stool"
+        },
+        {
+          "id": "ch5",
+          "x": 6.7522881483789465,
+          "z": 12.219799215523357,
+          "style": "exec"
+        },
+        {
+          "id": "ch6",
+          "x": -9.667020603969128,
+          "z": 12.397107676865637,
+          "style": "task"
+        },
+        {
+          "id": "ch7",
+          "x": -4.5,
+          "z": -6.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch8",
+          "x": 4.5,
+          "z": -6.5,
+          "style": "guest"
+        },
+        {
+          "id": "ch9",
+          "x": 0,
+          "z": -10.8,
+          "style": "stool"
+        },
+        {
+          "id": "ch10",
+          "x": 5,
+          "z": -16.5,
+          "style": "exec"
+        },
+        {
+          "id": "ch11",
+          "x": -5,
+          "z": -19,
+          "style": "task"
+        }
+      ],
+      "enemySpawns": [],
+      "heavyAnchors": [],
+      "interceptorSpawns": [],
+      "menuChase": [
+        {
+          "x": -4.6,
+          "z": 25.2
+        },
+        {
+          "x": 0.4,
+          "z": 21.6
+        },
+        {
+          "x": 3.8,
+          "z": 18.2
+        },
+        {
+          "x": 10.4,
+          "z": 18.4
+        },
+        {
+          "x": 10.2,
+          "z": 10.2
+        },
+        {
+          "x": 10.2,
+          "z": 6
+        },
+        {
+          "x": 2.9,
+          "z": 5.4
+        },
+        {
+          "x": 2.8,
+          "z": 1.6
+        },
+        {
+          "x": 0.2,
+          "z": -6.2
+        },
+        {
+          "x": -6.2,
+          "z": -12.4
+        },
+        {
+          "x": -6.4,
+          "z": -19.2
+        },
+        {
+          "x": 0.2,
+          "z": -22
+        },
+        {
+          "x": -6.8,
+          "z": -16.4
+        },
+        {
+          "x": -10.2,
+          "z": -2.2
+        },
+        {
+          "x": -10.4,
+          "z": 6.2
+        },
+        {
+          "x": -10.2,
+          "z": 12.8
+        },
+        {
+          "x": -6.4,
+          "z": 18.4
+        },
+        {
+          "x": -6.2,
+          "z": 23.6
+        }
+      ]
+    },
+    {
+      "id": "tuesday",
+      "label": "周二",
+      "map": {
+        "minX": -12,
+        "maxX": 12,
+        "minZ": -28,
+        "maxZ": 28
+      },
+      "playerStart": {
+        "x": 0,
+        "z": 25.5
+      },
+      "elevator": {
+        "minX": -2,
+        "maxX": 2,
+        "minZ": -28,
+        "maxZ": -26,
+        "point": {
+          "x": 0,
+          "z": -27
+        }
+      },
+      "atmosphere": {
+        "background": "#2c3238",
+        "fogColor": "#2c3238",
+        "fogNear": 16,
+        "fogFar": 46,
+        "exposure": 1,
+        "ambient": {
+          "color": "#d8e6f4",
+          "intensity": 0.04
+        },
+        "hemisphere": {
+          "sky": "#fff4e4",
+          "ground": "#8a7a66",
+          "intensity": 0.4
+        },
+        "sun": {
+          "color": "#fff2dc",
+          "intensity": 0,
+          "position": [
+            11,
+            26,
+            8
+          ],
+          "castShadow": false
+        },
+        "fill": {
+          "color": "#b8d4f0",
+          "intensity": 0,
+          "position": [
+            -12,
+            12,
+            -8
+          ]
+        },
+        "lampColor": "#e8f2ff",
+        "lampIntensity": 72,
+        "overheadHeight": 2.3,
+        "lampDistance": 5.2,
+        "overheadSpacing": 8,
+        "followEnabled": false,
+        "followColor": "#fff2dc",
+        "followIntensity": 1.2,
+        "followHeight": 7.2,
+        "floor": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "bumpScale": 1.2,
+          "map": null,
+          "kind": "carpet",
+          "repeat": 8
+        },
+        "wall": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "map": null
+        },
+        "elevatorGlow": "#7ef0a0",
+        "sky": "day",
+        "furnitureTone": "dark"
+      },
+      "walls": [
+        {
+          "id": "maze-1",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 11.6,
+          "maxX": 5,
+          "maxZ": 12.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-2",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 8.1,
+          "maxX": -6.5,
+          "maxZ": 11.6,
+          "h": 1.7
+        },
+        {
+          "id": "maze-3",
+          "kind": "wall",
+          "minX": -9.5,
+          "minZ": 7.6,
+          "maxX": -3,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-4",
+          "kind": "wall",
+          "minX": 0,
+          "minZ": 7.6,
+          "maxX": 9,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-5",
+          "kind": "wall",
+          "minX": -9,
+          "minZ": 3.6,
+          "maxX": 1,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-6",
+          "kind": "wall",
+          "minX": 4.5,
+          "minZ": 3.6,
+          "maxX": 12,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "meet-1",
+          "kind": "wall",
+          "minX": -12,
+          "minZ": -4.4,
+          "maxX": -8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-2",
+          "kind": "wall",
+          "minX": -6.5,
+          "minZ": -4.4,
+          "maxX": -1,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-3",
+          "kind": "wall",
+          "minX": 1,
+          "minZ": -4.4,
+          "maxX": 8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "hall-desk",
+          "kind": "wood",
+          "minX": -3,
+          "minZ": -15.8,
+          "maxX": 3,
+          "maxZ": -14.6,
+          "h": 1
+        },
+        {
+          "id": "pillar-1",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -18.4,
+          "maxX": -6.1,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-2",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -18.4,
+          "maxX": 6.9,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-3",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -24.4,
+          "maxX": -6.1,
+          "maxZ": -23.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-4",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -24.4,
+          "maxX": 6.9,
+          "maxZ": -23.6,
+          "h": 1.7
+        }
+      ],
+      "desks": [
+        {
+          "id": "d1",
+          "minX": -11,
+          "minZ": 20.8,
+          "maxX": -6.5,
+          "maxZ": 22.4,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d2",
+          "minX": -4,
+          "minZ": 20.8,
+          "maxX": 0.5,
+          "maxZ": 22.4,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d3",
+          "minX": 3,
+          "minZ": 20.8,
+          "maxX": 7.5,
+          "maxZ": 22.4,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d4",
+          "minX": -9,
+          "minZ": 16.2,
+          "maxX": -4.5,
+          "maxZ": 17.8,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d5",
+          "minX": -2,
+          "minZ": 16.2,
+          "maxX": 2.5,
+          "maxZ": 17.8,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d6",
+          "minX": 5,
+          "minZ": 16.2,
+          "maxX": 9.5,
+          "maxZ": 17.8,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d7",
+          "minX": -7,
+          "minZ": -9.6,
+          "maxX": -2,
+          "maxZ": -7.6,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d8",
+          "minX": 2,
+          "minZ": -9.6,
+          "maxX": 7,
+          "maxZ": -7.6,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        }
+      ],
+      "props": [
+        {
+          "id": "plant-1",
+          "kind": "plant",
+          "x": -10.8,
+          "z": 25.5,
+          "plantKit": "grove"
+        },
+        {
+          "id": "plant-2",
+          "kind": "plant",
+          "x": 10.8,
+          "z": 25.5,
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-3",
+          "kind": "plant",
+          "x": -10.6,
+          "z": -25.5,
+          "plantKit": "trio"
+        },
+        {
+          "id": "plant-4",
+          "kind": "plant",
+          "x": 10.6,
+          "z": -25.5,
+          "plantKit": "pair"
+        },
+        {
+          "id": "plant-5",
+          "kind": "plant",
+          "x": -10.8,
+          "z": -6.5,
+          "plantKit": "pot"
+        },
+        {
+          "id": "cooler-1",
+          "kind": "cooler",
+          "x": 10.6,
+          "z": 13.5
+        },
+        {
+          "id": "cooler-2",
+          "kind": "cooler",
+          "x": -10.6,
+          "z": -12.2
+        },
+        {
+          "id": "win-w-0",
+          "kind": "window",
+          "x": -11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-0",
+          "kind": "window",
+          "x": 11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-1",
+          "kind": "window",
+          "x": -11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-1",
+          "kind": "window",
+          "x": 11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-2",
+          "kind": "window",
+          "x": -11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-2",
+          "kind": "window",
+          "x": 11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-3",
+          "kind": "window",
+          "x": -11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-3",
+          "kind": "window",
+          "x": 11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        }
+      ],
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": 0,
+          "z": 24.8,
+          "y": 2.3,
+          "intensity": 80,
+          "distance": 5.6,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0,
+          "z": -24.2,
+          "y": 2.5,
+          "intensity": 80,
+          "distance": 5.8,
+          "color": "#c8ffd8"
+        },
+        {
+          "id": "pl-meet-l",
+          "x": -4.5,
+          "z": -8.6,
+          "y": 2.3,
+          "intensity": 76,
+          "distance": 5.4,
+          "color": "#ffe0a8"
+        },
+        {
+          "id": "pl-d6",
+          "x": 7.2,
+          "z": 17,
+          "y": 2.15,
+          "intensity": 66,
+          "distance": 4.7,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-d4",
+          "x": -6.6,
+          "z": 17,
+          "y": 2.25,
+          "intensity": 60,
+          "distance": 4.5,
+          "color": "#ffd889"
+        },
+        {
+          "id": "pl-meet-r",
+          "x": 4.5,
+          "z": -8.6,
+          "y": 2.2,
+          "intensity": 62,
+          "distance": 4.8,
+          "color": "#fff1b8"
+        }
+      ],
+      "chairSpawns": [
+        {
+          "id": "ch1",
+          "x": -5.2,
+          "z": 19.5,
+          "style": "task"
+        },
+        {
+          "id": "ch2",
+          "x": 1.5,
+          "z": 19.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch3",
+          "x": 8,
+          "z": 19.3,
+          "style": "guest"
+        },
+        {
+          "id": "ch4",
+          "x": -3,
+          "z": 15,
+          "style": "stool"
+        },
+        {
+          "id": "ch5",
+          "x": 4,
+          "z": 15.2,
+          "style": "exec"
+        },
+        {
+          "id": "ch6",
+          "x": -10,
+          "z": 14.5,
+          "style": "task"
+        },
+        {
+          "id": "ch7",
+          "x": -4.5,
+          "z": -6.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch8",
+          "x": 4.5,
+          "z": -6.5,
+          "style": "guest"
+        },
+        {
+          "id": "ch9",
+          "x": 0,
+          "z": -10.8,
+          "style": "stool"
+        },
+        {
+          "id": "ch10",
+          "x": 5,
+          "z": -16.5,
+          "style": "exec"
+        },
+        {
+          "id": "ch11",
+          "x": -5,
+          "z": -19,
+          "style": "task"
+        }
+      ],
+      "enemySpawns": [],
+      "heavyAnchors": [],
+      "interceptorSpawns": []
+    },
+    {
+      "id": "wednesday",
+      "label": "周三",
+      "map": {
+        "minX": -12,
+        "maxX": 12,
+        "minZ": -28,
+        "maxZ": 28
+      },
+      "playerStart": {
+        "x": 0,
+        "z": 25.5
+      },
+      "elevator": {
+        "minX": -2,
+        "maxX": 2,
+        "minZ": -28,
+        "maxZ": -26,
+        "point": {
+          "x": 0,
+          "z": -27
+        }
+      },
+      "atmosphere": {
+        "background": "#2a1c14",
+        "fogColor": "#2a1c14",
+        "fogNear": 16,
+        "fogFar": 46,
+        "exposure": 1,
+        "ambient": {
+          "color": "#ffc080",
+          "intensity": 0.03
+        },
+        "hemisphere": {
+          "sky": "#fff4e4",
+          "ground": "#8a7a66",
+          "intensity": 0.4
+        },
+        "sun": {
+          "color": "#fff2dc",
+          "intensity": 0,
+          "position": [
+            11,
+            26,
+            8
+          ],
+          "castShadow": false
+        },
+        "fill": {
+          "color": "#b8d4f0",
+          "intensity": 0,
+          "position": [
+            -12,
+            12,
+            -8
+          ]
+        },
+        "lampColor": "#ffd089",
+        "lampIntensity": 80,
+        "overheadHeight": 2.3,
+        "lampDistance": 5.2,
+        "overheadSpacing": 8,
+        "followEnabled": false,
+        "followColor": "#fff2dc",
+        "followIntensity": 1.2,
+        "followHeight": 7.2,
+        "floor": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "bumpScale": 1.2,
+          "map": null,
+          "kind": "carpet",
+          "repeat": 8
+        },
+        "wall": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "map": null
+        },
+        "elevatorGlow": "#7ef0a0",
+        "sky": "dusk",
+        "furnitureTone": "dark"
+      },
+      "walls": [
+        {
+          "id": "maze-1",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 11.6,
+          "maxX": 5,
+          "maxZ": 12.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-2",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 8.1,
+          "maxX": -6.5,
+          "maxZ": 11.6,
+          "h": 1.7
+        },
+        {
+          "id": "maze-3",
+          "kind": "wall",
+          "minX": -9.5,
+          "minZ": 7.6,
+          "maxX": -3,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-4",
+          "kind": "wall",
+          "minX": 0,
+          "minZ": 7.6,
+          "maxX": 9,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-5",
+          "kind": "wall",
+          "minX": -9,
+          "minZ": 3.6,
+          "maxX": 1,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-6",
+          "kind": "wall",
+          "minX": 4.5,
+          "minZ": 3.6,
+          "maxX": 12,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "meet-1",
+          "kind": "wall",
+          "minX": -12,
+          "minZ": -4.4,
+          "maxX": -8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-2",
+          "kind": "wall",
+          "minX": -6.5,
+          "minZ": -4.4,
+          "maxX": -1,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-3",
+          "kind": "wall",
+          "minX": 1,
+          "minZ": -4.4,
+          "maxX": 8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "hall-desk",
+          "kind": "wood",
+          "minX": -3,
+          "minZ": -15.8,
+          "maxX": 3,
+          "maxZ": -14.6,
+          "h": 1
+        },
+        {
+          "id": "pillar-1",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -18.4,
+          "maxX": -6.1,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-2",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -18.4,
+          "maxX": 6.9,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-3",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -24.4,
+          "maxX": -6.1,
+          "maxZ": -23.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-4",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -24.4,
+          "maxX": 6.9,
+          "maxZ": -23.6,
+          "h": 1.7
+        }
+      ],
+      "desks": [
+        {
+          "id": "d1",
+          "minX": -11,
+          "minZ": 20.8,
+          "maxX": -6.5,
+          "maxZ": 22.4,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d2",
+          "minX": -4,
+          "minZ": 20.8,
+          "maxX": 0.5,
+          "maxZ": 22.4,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d3",
+          "minX": 3,
+          "minZ": 20.8,
+          "maxX": 7.5,
+          "maxZ": 22.4,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d4",
+          "minX": -9,
+          "minZ": 16.2,
+          "maxX": -4.5,
+          "maxZ": 17.8,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d5",
+          "minX": -2,
+          "minZ": 16.2,
+          "maxX": 2.5,
+          "maxZ": 17.8,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d6",
+          "minX": 5,
+          "minZ": 16.2,
+          "maxX": 9.5,
+          "maxZ": 17.8,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d7",
+          "minX": -7,
+          "minZ": -9.6,
+          "maxX": -2,
+          "maxZ": -7.6,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d8",
+          "minX": 2,
+          "minZ": -9.6,
+          "maxX": 7,
+          "maxZ": -7.6,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        }
+      ],
+      "props": [
+        {
+          "id": "plant-1",
+          "kind": "plant",
+          "x": -10.8,
+          "z": 25.5,
+          "plantKit": "grove"
+        },
+        {
+          "id": "plant-2",
+          "kind": "plant",
+          "x": 10.8,
+          "z": 25.5,
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-3",
+          "kind": "plant",
+          "x": -10.6,
+          "z": -25.5,
+          "plantKit": "trio"
+        },
+        {
+          "id": "plant-4",
+          "kind": "plant",
+          "x": 10.6,
+          "z": -25.5,
+          "plantKit": "pair"
+        },
+        {
+          "id": "plant-5",
+          "kind": "plant",
+          "x": -10.8,
+          "z": -6.5,
+          "plantKit": "pot"
+        },
+        {
+          "id": "cooler-1",
+          "kind": "cooler",
+          "x": 10.6,
+          "z": 13.5
+        },
+        {
+          "id": "cooler-2",
+          "kind": "cooler",
+          "x": -10.6,
+          "z": -12.2
+        },
+        {
+          "id": "win-w-0",
+          "kind": "window",
+          "x": -11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-0",
+          "kind": "window",
+          "x": 11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-1",
+          "kind": "window",
+          "x": -11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-1",
+          "kind": "window",
+          "x": 11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-2",
+          "kind": "window",
+          "x": -11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-2",
+          "kind": "window",
+          "x": 11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-3",
+          "kind": "window",
+          "x": -11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-3",
+          "kind": "window",
+          "x": 11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        }
+      ],
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": 0,
+          "z": 24.8,
+          "y": 2.3,
+          "intensity": 80,
+          "distance": 5.6,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0,
+          "z": -24.2,
+          "y": 2.5,
+          "intensity": 80,
+          "distance": 5.8,
+          "color": "#c8ffd8"
+        },
+        {
+          "id": "pl-meet-l",
+          "x": -4.5,
+          "z": -8.6,
+          "y": 2.3,
+          "intensity": 76,
+          "distance": 5.4,
+          "color": "#ffe0a8"
+        },
+        {
+          "id": "pl-d6",
+          "x": 7.2,
+          "z": 17,
+          "y": 2.15,
+          "intensity": 66,
+          "distance": 4.7,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-d4",
+          "x": -6.6,
+          "z": 17,
+          "y": 2.25,
+          "intensity": 60,
+          "distance": 4.5,
+          "color": "#ffd889"
+        },
+        {
+          "id": "pl-meet-r",
+          "x": 4.5,
+          "z": -8.6,
+          "y": 2.2,
+          "intensity": 62,
+          "distance": 4.8,
+          "color": "#fff1b8"
+        }
+      ],
+      "chairSpawns": [
+        {
+          "id": "ch1",
+          "x": -5.2,
+          "z": 19.5,
+          "style": "task"
+        },
+        {
+          "id": "ch2",
+          "x": 1.5,
+          "z": 19.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch3",
+          "x": 8,
+          "z": 19.3,
+          "style": "guest"
+        },
+        {
+          "id": "ch4",
+          "x": -3,
+          "z": 15,
+          "style": "stool"
+        },
+        {
+          "id": "ch5",
+          "x": 4,
+          "z": 15.2,
+          "style": "exec"
+        },
+        {
+          "id": "ch6",
+          "x": -10,
+          "z": 14.5,
+          "style": "task"
+        },
+        {
+          "id": "ch7",
+          "x": -4.5,
+          "z": -6.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch8",
+          "x": 4.5,
+          "z": -6.5,
+          "style": "guest"
+        },
+        {
+          "id": "ch9",
+          "x": 0,
+          "z": -10.8,
+          "style": "stool"
+        },
+        {
+          "id": "ch10",
+          "x": 5,
+          "z": -16.5,
+          "style": "exec"
+        },
+        {
+          "id": "ch11",
+          "x": -5,
+          "z": -19,
+          "style": "task"
+        }
+      ],
+      "enemySpawns": [],
+      "heavyAnchors": [],
+      "interceptorSpawns": []
+    },
+    {
+      "id": "thursday",
+      "label": "周四",
+      "map": {
+        "minX": -12,
+        "maxX": 12,
+        "minZ": -28,
+        "maxZ": 28
+      },
+      "playerStart": {
+        "x": 0,
+        "z": 25.5
+      },
+      "elevator": {
+        "minX": -2,
+        "maxX": 2,
+        "minZ": -28,
+        "maxZ": -26,
+        "point": {
+          "x": 0,
+          "z": -27
+        }
+      },
+      "atmosphere": {
+        "background": "#2a3036",
+        "fogColor": "#2a3036",
+        "fogNear": 12,
+        "fogFar": 38,
+        "exposure": 1,
+        "ambient": {
+          "color": "#c5d4de",
+          "intensity": 0.035
+        },
+        "hemisphere": {
+          "sky": "#fff4e4",
+          "ground": "#8a7a66",
+          "intensity": 0.4
+        },
+        "sun": {
+          "color": "#fff2dc",
+          "intensity": 0,
+          "position": [
+            11,
+            26,
+            8
+          ],
+          "castShadow": false
+        },
+        "fill": {
+          "color": "#b8d4f0",
+          "intensity": 0,
+          "position": [
+            -12,
+            12,
+            -8
+          ]
+        },
+        "lampColor": "#dce8f2",
+        "lampIntensity": 72,
+        "overheadHeight": 2.3,
+        "lampDistance": 5.2,
+        "overheadSpacing": 8,
+        "followEnabled": false,
+        "followColor": "#fff2dc",
+        "followIntensity": 1.2,
+        "followHeight": 7.2,
+        "floor": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "bumpScale": 1.2,
+          "map": null,
+          "kind": "carpet",
+          "repeat": 8
+        },
+        "wall": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "map": null
+        },
+        "elevatorGlow": "#7ef0a0",
+        "sky": "night",
+        "furnitureTone": "dark"
+      },
+      "walls": [
+        {
+          "id": "maze-1",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 11.6,
+          "maxX": 5,
+          "maxZ": 12.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-2",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 8.1,
+          "maxX": -6.5,
+          "maxZ": 11.6,
+          "h": 1.7
+        },
+        {
+          "id": "maze-3",
+          "kind": "wall",
+          "minX": -9.5,
+          "minZ": 7.6,
+          "maxX": -3,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-4",
+          "kind": "wall",
+          "minX": 0,
+          "minZ": 7.6,
+          "maxX": 9,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-5",
+          "kind": "wall",
+          "minX": -9,
+          "minZ": 3.6,
+          "maxX": 1,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-6",
+          "kind": "wall",
+          "minX": 4.5,
+          "minZ": 3.6,
+          "maxX": 12,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "meet-1",
+          "kind": "wall",
+          "minX": -12,
+          "minZ": -4.4,
+          "maxX": -8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-2",
+          "kind": "wall",
+          "minX": -6.5,
+          "minZ": -4.4,
+          "maxX": -1,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-3",
+          "kind": "wall",
+          "minX": 1,
+          "minZ": -4.4,
+          "maxX": 8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "hall-desk",
+          "kind": "wood",
+          "minX": -3,
+          "minZ": -15.8,
+          "maxX": 3,
+          "maxZ": -14.6,
+          "h": 1
+        },
+        {
+          "id": "pillar-1",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -18.4,
+          "maxX": -6.1,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-2",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -18.4,
+          "maxX": 6.9,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-3",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -24.4,
+          "maxX": -6.1,
+          "maxZ": -23.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-4",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -24.4,
+          "maxX": 6.9,
+          "maxZ": -23.6,
+          "h": 1.7
+        }
+      ],
+      "desks": [
+        {
+          "id": "d1",
+          "minX": -11,
+          "minZ": 20.8,
+          "maxX": -6.5,
+          "maxZ": 22.4,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d2",
+          "minX": -4,
+          "minZ": 20.8,
+          "maxX": 0.5,
+          "maxZ": 22.4,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d3",
+          "minX": 3,
+          "minZ": 20.8,
+          "maxX": 7.5,
+          "maxZ": 22.4,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d4",
+          "minX": -9,
+          "minZ": 16.2,
+          "maxX": -4.5,
+          "maxZ": 17.8,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d5",
+          "minX": -2,
+          "minZ": 16.2,
+          "maxX": 2.5,
+          "maxZ": 17.8,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d6",
+          "minX": 5,
+          "minZ": 16.2,
+          "maxX": 9.5,
+          "maxZ": 17.8,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d7",
+          "minX": -7,
+          "minZ": -9.6,
+          "maxX": -2,
+          "maxZ": -7.6,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d8",
+          "minX": 2,
+          "minZ": -9.6,
+          "maxX": 7,
+          "maxZ": -7.6,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        }
+      ],
+      "props": [
+        {
+          "id": "plant-1",
+          "kind": "plant",
+          "x": -10.8,
+          "z": 25.5,
+          "plantKit": "grove"
+        },
+        {
+          "id": "plant-2",
+          "kind": "plant",
+          "x": 10.8,
+          "z": 25.5,
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-3",
+          "kind": "plant",
+          "x": -10.6,
+          "z": -25.5,
+          "plantKit": "trio"
+        },
+        {
+          "id": "plant-4",
+          "kind": "plant",
+          "x": 10.6,
+          "z": -25.5,
+          "plantKit": "pair"
+        },
+        {
+          "id": "plant-5",
+          "kind": "plant",
+          "x": -10.8,
+          "z": -6.5,
+          "plantKit": "pot"
+        },
+        {
+          "id": "cooler-1",
+          "kind": "cooler",
+          "x": 10.6,
+          "z": 13.5
+        },
+        {
+          "id": "cooler-2",
+          "kind": "cooler",
+          "x": -10.6,
+          "z": -12.2
+        },
+        {
+          "id": "win-w-0",
+          "kind": "window",
+          "x": -11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-0",
+          "kind": "window",
+          "x": 11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-1",
+          "kind": "window",
+          "x": -11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-1",
+          "kind": "window",
+          "x": 11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-2",
+          "kind": "window",
+          "x": -11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-2",
+          "kind": "window",
+          "x": 11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-3",
+          "kind": "window",
+          "x": -11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-3",
+          "kind": "window",
+          "x": 11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        }
+      ],
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": 0,
+          "z": 24.8,
+          "y": 2.3,
+          "intensity": 80,
+          "distance": 5.6,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0,
+          "z": -24.2,
+          "y": 2.5,
+          "intensity": 80,
+          "distance": 5.8,
+          "color": "#c8ffd8"
+        },
+        {
+          "id": "pl-meet-l",
+          "x": -4.5,
+          "z": -8.6,
+          "y": 2.3,
+          "intensity": 76,
+          "distance": 5.4,
+          "color": "#ffe0a8"
+        },
+        {
+          "id": "pl-d6",
+          "x": 7.2,
+          "z": 17,
+          "y": 2.15,
+          "intensity": 66,
+          "distance": 4.7,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-d4",
+          "x": -6.6,
+          "z": 17,
+          "y": 2.25,
+          "intensity": 60,
+          "distance": 4.5,
+          "color": "#ffd889"
+        },
+        {
+          "id": "pl-meet-r",
+          "x": 4.5,
+          "z": -8.6,
+          "y": 2.2,
+          "intensity": 62,
+          "distance": 4.8,
+          "color": "#fff1b8"
+        }
+      ],
+      "chairSpawns": [
+        {
+          "id": "ch1",
+          "x": -5.2,
+          "z": 19.5,
+          "style": "task"
+        },
+        {
+          "id": "ch2",
+          "x": 1.5,
+          "z": 19.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch3",
+          "x": 8,
+          "z": 19.3,
+          "style": "guest"
+        },
+        {
+          "id": "ch4",
+          "x": -3,
+          "z": 15,
+          "style": "stool"
+        },
+        {
+          "id": "ch5",
+          "x": 4,
+          "z": 15.2,
+          "style": "exec"
+        },
+        {
+          "id": "ch6",
+          "x": -10,
+          "z": 14.5,
+          "style": "task"
+        },
+        {
+          "id": "ch7",
+          "x": -4.5,
+          "z": -6.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch8",
+          "x": 4.5,
+          "z": -6.5,
+          "style": "guest"
+        },
+        {
+          "id": "ch9",
+          "x": 0,
+          "z": -10.8,
+          "style": "stool"
+        },
+        {
+          "id": "ch10",
+          "x": 5,
+          "z": -16.5,
+          "style": "exec"
+        },
+        {
+          "id": "ch11",
+          "x": -5,
+          "z": -19,
+          "style": "task"
+        }
+      ],
+      "enemySpawns": [],
+      "heavyAnchors": [],
+      "interceptorSpawns": []
+    },
+    {
+      "id": "friday",
+      "label": "周五",
+      "map": {
+        "minX": -12,
+        "maxX": 12,
+        "minZ": -28,
+        "maxZ": 28
+      },
+      "playerStart": {
+        "x": 0,
+        "z": 25.5
+      },
+      "elevator": {
+        "minX": -2,
+        "maxX": 2,
+        "minZ": -28,
+        "maxZ": -26,
+        "point": {
+          "x": 0,
+          "z": -27
+        }
+      },
+      "atmosphere": {
+        "background": "#3d2e1c",
+        "fogColor": "#3d2e1c",
+        "fogNear": 16,
+        "fogFar": 46,
+        "exposure": 1,
+        "ambient": {
+          "color": "#ffd089",
+          "intensity": 0.05
+        },
+        "hemisphere": {
+          "sky": "#fff4e4",
+          "ground": "#8a7a66",
+          "intensity": 0.4
+        },
+        "sun": {
+          "color": "#fff2dc",
+          "intensity": 0,
+          "position": [
+            11,
+            26,
+            8
+          ],
+          "castShadow": false
+        },
+        "fill": {
+          "color": "#b8d4f0",
+          "intensity": 0,
+          "position": [
+            -12,
+            12,
+            -8
+          ]
+        },
+        "lampColor": "#ffe7c4",
+        "lampIntensity": 78,
+        "overheadHeight": 2.3,
+        "lampDistance": 5.2,
+        "overheadSpacing": 8,
+        "followEnabled": false,
+        "followColor": "#fff2dc",
+        "followIntensity": 1.2,
+        "followHeight": 7.2,
+        "floor": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "bumpScale": 1.2,
+          "map": null,
+          "kind": "carpet",
+          "repeat": 8
+        },
+        "wall": {
+          "color": "#ffffff",
+          "shininess": 8,
+          "map": null
+        },
+        "elevatorGlow": "#7ef0a0",
+        "sky": "dusk",
+        "furnitureTone": "dark"
+      },
+      "walls": [
+        {
+          "id": "maze-1",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 11.6,
+          "maxX": 5,
+          "maxZ": 12.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-2",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": 8.1,
+          "maxX": -6.5,
+          "maxZ": 11.6,
+          "h": 1.7
+        },
+        {
+          "id": "maze-3",
+          "kind": "wall",
+          "minX": -9.5,
+          "minZ": 7.6,
+          "maxX": -3,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-4",
+          "kind": "wall",
+          "minX": 0,
+          "minZ": 7.6,
+          "maxX": 9,
+          "maxZ": 8.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-5",
+          "kind": "wall",
+          "minX": -9,
+          "minZ": 3.6,
+          "maxX": 1,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "maze-6",
+          "kind": "wall",
+          "minX": 4.5,
+          "minZ": 3.6,
+          "maxX": 12,
+          "maxZ": 4.1,
+          "h": 1.7
+        },
+        {
+          "id": "meet-1",
+          "kind": "wall",
+          "minX": -12,
+          "minZ": -4.4,
+          "maxX": -8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-2",
+          "kind": "wall",
+          "minX": -6.5,
+          "minZ": -4.4,
+          "maxX": -1,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "meet-3",
+          "kind": "wall",
+          "minX": 1,
+          "minZ": -4.4,
+          "maxX": 8.5,
+          "maxZ": -3.9,
+          "h": 1.7
+        },
+        {
+          "id": "hall-desk",
+          "kind": "wood",
+          "minX": -3,
+          "minZ": -15.8,
+          "maxX": 3,
+          "maxZ": -14.6,
+          "h": 1
+        },
+        {
+          "id": "pillar-1",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -18.4,
+          "maxX": -6.1,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-2",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -18.4,
+          "maxX": 6.9,
+          "maxZ": -17.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-3",
+          "kind": "pillar",
+          "minX": -6.9,
+          "minZ": -24.4,
+          "maxX": -6.1,
+          "maxZ": -23.6,
+          "h": 1.7
+        },
+        {
+          "id": "pillar-4",
+          "kind": "pillar",
+          "minX": 6.1,
+          "minZ": -24.4,
+          "maxX": 6.9,
+          "maxZ": -23.6,
+          "h": 1.7
+        }
+      ],
+      "desks": [
+        {
+          "id": "d1",
+          "minX": -11,
+          "minZ": 20.8,
+          "maxX": -6.5,
+          "maxZ": 22.4,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d2",
+          "minX": -4,
+          "minZ": 20.8,
+          "maxX": 0.5,
+          "maxZ": 22.4,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d3",
+          "minX": 3,
+          "minZ": 20.8,
+          "maxX": 7.5,
+          "maxZ": 22.4,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d4",
+          "minX": -9,
+          "minZ": 16.2,
+          "maxX": -4.5,
+          "maxZ": 17.8,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        },
+        {
+          "id": "d5",
+          "minX": -2,
+          "minZ": 16.2,
+          "maxX": 2.5,
+          "maxZ": 17.8,
+          "top": "oak",
+          "kit": "simple",
+          "face": "pz"
+        },
+        {
+          "id": "d6",
+          "minX": 5,
+          "minZ": 16.2,
+          "maxX": 9.5,
+          "maxZ": 17.8,
+          "top": "dark",
+          "kit": "dual",
+          "face": "pz"
+        },
+        {
+          "id": "d7",
+          "minX": -7,
+          "minZ": -9.6,
+          "maxX": -2,
+          "maxZ": -7.6,
+          "top": "white",
+          "kit": "clutter",
+          "face": "pz"
+        },
+        {
+          "id": "d8",
+          "minX": 2,
+          "minZ": -9.6,
+          "maxX": 7,
+          "maxZ": -7.6,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz"
+        }
+      ],
+      "props": [
+        {
+          "id": "plant-1",
+          "kind": "plant",
+          "x": -10.8,
+          "z": 25.5,
+          "plantKit": "grove"
+        },
+        {
+          "id": "plant-2",
+          "kind": "plant",
+          "x": 10.8,
+          "z": 25.5,
+          "plantKit": "cluster"
+        },
+        {
+          "id": "plant-3",
+          "kind": "plant",
+          "x": -10.6,
+          "z": -25.5,
+          "plantKit": "trio"
+        },
+        {
+          "id": "plant-4",
+          "kind": "plant",
+          "x": 10.6,
+          "z": -25.5,
+          "plantKit": "pair"
+        },
+        {
+          "id": "plant-5",
+          "kind": "plant",
+          "x": -10.8,
+          "z": -6.5,
+          "plantKit": "pot"
+        },
+        {
+          "id": "cooler-1",
+          "kind": "cooler",
+          "x": 10.6,
+          "z": 13.5
+        },
+        {
+          "id": "cooler-2",
+          "kind": "cooler",
+          "x": -10.6,
+          "z": -12.2
+        },
+        {
+          "id": "win-w-0",
+          "kind": "window",
+          "x": -11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-0",
+          "kind": "window",
+          "x": 11.98,
+          "z": -20,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-1",
+          "kind": "window",
+          "x": -11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-1",
+          "kind": "window",
+          "x": 11.98,
+          "z": -8,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-2",
+          "kind": "window",
+          "x": -11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-2",
+          "kind": "window",
+          "x": 11.98,
+          "z": 4,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-3",
+          "kind": "window",
+          "x": -11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-3",
+          "kind": "window",
+          "x": 11.98,
+          "z": 16,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        }
+      ],
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": 0,
+          "z": 24.8,
+          "y": 2.3,
+          "intensity": 80,
+          "distance": 5.6,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0,
+          "z": -24.2,
+          "y": 2.5,
+          "intensity": 80,
+          "distance": 5.8,
+          "color": "#c8ffd8"
+        },
+        {
+          "id": "pl-meet-l",
+          "x": -4.5,
+          "z": -8.6,
+          "y": 2.3,
+          "intensity": 76,
+          "distance": 5.4,
+          "color": "#ffe0a8"
+        },
+        {
+          "id": "pl-d6",
+          "x": 7.2,
+          "z": 17,
+          "y": 2.15,
+          "intensity": 66,
+          "distance": 4.7,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-d4",
+          "x": -6.6,
+          "z": 17,
+          "y": 2.25,
+          "intensity": 60,
+          "distance": 4.5,
+          "color": "#ffd889"
+        },
+        {
+          "id": "pl-meet-r",
+          "x": 4.5,
+          "z": -8.6,
+          "y": 2.2,
+          "intensity": 62,
+          "distance": 4.8,
+          "color": "#fff1b8"
+        }
+      ],
+      "chairSpawns": [
+        {
+          "id": "ch1",
+          "x": -5.2,
+          "z": 19.5,
+          "style": "task"
+        },
+        {
+          "id": "ch2",
+          "x": 1.5,
+          "z": 19.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch3",
+          "x": 8,
+          "z": 19.3,
+          "style": "guest"
+        },
+        {
+          "id": "ch4",
+          "x": -3,
+          "z": 15,
+          "style": "stool"
+        },
+        {
+          "id": "ch5",
+          "x": 4,
+          "z": 15.2,
+          "style": "exec"
+        },
+        {
+          "id": "ch6",
+          "x": -10,
+          "z": 14.5,
+          "style": "task"
+        },
+        {
+          "id": "ch7",
+          "x": -4.5,
+          "z": -6.5,
+          "style": "mesh"
+        },
+        {
+          "id": "ch8",
+          "x": 4.5,
+          "z": -6.5,
+          "style": "guest"
+        },
+        {
+          "id": "ch9",
+          "x": 0,
+          "z": -10.8,
+          "style": "stool"
+        },
+        {
+          "id": "ch10",
+          "x": 5,
+          "z": -16.5,
+          "style": "exec"
+        },
+        {
+          "id": "ch11",
+          "x": -5,
+          "z": -19,
+          "style": "task"
+        }
+      ],
+      "enemySpawns": [],
+      "heavyAnchors": [],
+      "interceptorSpawns": []
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "off-work-escape",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host --port 5173",
+    "editor": "vite --config vite.editor.config.ts --port 5174",
+    "scene": "vite --config vite.scene.config.ts --port 5175",
+    "fx": "vite --config vite.fx.config.ts --port 5176",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host --port 4173"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

@@ -1,0 +1,940 @@
+import { CharacterPreview } from './preview';
+import { drawSkinPreview, imageFromUrl, loadSkinMap, skinFromFile } from './skin';
+import { HairRig, countTris, loadHairFile } from './hair';
+import {
+  BUDGET,
+  IDENTITY_TRANSFORM,
+  OFFICIAL_SKINS,
+  budgetReport,
+  downloadJson,
+  loadCatalog,
+  saveAsset,
+  saveCatalog,
+  slug,
+  upsertProp,
+  upsertSkin,
+  upsertVariant,
+  ensureRosterLooks,
+  lookForSlot,
+  officialSkinForGender,
+  slotSkinId,
+  isOfficialSkinId,
+  selectCatalogDay,
+  serializeCatalog,
+  type ColleagueCatalog,
+} from './variants';
+import { PROP_PRESETS } from './props';
+import { KIT_HAIR_ALBEDO, KIT_HAIR_MAPS, KIT_HAIR_UV_ISLANDS, KIT_SKIRT_ALBEDO, KIT_SKIRT_MAPS, KIT_SKIRT_UV_ISLANDS, KIT_SKINS, KIT_UV_ISLANDS, isKitHairId, isKitSkinId, isKitSkirtId, type KitHairId, type KitSkirtId } from './kit';
+import { ROSTER as ROSTER_INIT, type RosterSlot } from '../../../src/roster';
+import type { AttachAnchor, HairTransform, PropUse } from '../../../src/catalog';
+import { WEEKDAYS, type WeekdayId } from '../../../src/levels';
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+function toast(msg: string) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  window.clearTimeout((el as HTMLElement & { t?: number }).t);
+  (el as HTMLElement & { t?: number }).t = window.setTimeout(() => {
+    el.style.display = 'none';
+  }, 2400);
+}
+
+function num(id: string, v: number) {
+  const el = $(id) as HTMLInputElement;
+  const min = Number(el.min);
+  const max = Number(el.max);
+  const n = Number.isFinite(v) ? v : 0;
+  if (Number.isFinite(min) && Number.isFinite(max)) el.value = String(Math.min(max, Math.max(min, n)));
+  else el.value = String(n);
+  const lab = document.querySelector(`[data-for="${id}"]`);
+  if (lab) lab.textContent = n.toFixed(2);
+}
+
+function readNum(id: string): number {
+  return Number(($(id) as HTMLInputElement).value) || 0;
+}
+
+function bindDrop(zone: HTMLElement, input: HTMLInputElement, onFile: (f: File) => void) {
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) onFile(f);
+    input.value = '';
+  });
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('over');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('over');
+    const f = e.dataTransfer?.files[0];
+    if (f) onFile(f);
+  });
+}
+
+async function boot() {
+  const preview = new CharacterPreview($('viewport'));
+  await preview.load();
+  $('loading').remove();
+  $('status').textContent = preview.statusLine();
+
+  const hat = new HairRig();
+  const held = new HairRig();
+  type EditTarget = 'hat' | 'held';
+  let editTarget: EditTarget = 'hat';
+  let propAnchor: AttachAnchor = 'head';
+  let catalog = await loadCatalog();
+  let currentDay: WeekdayId = selectCatalogDay(catalog);
+  let roster = ROSTER_INIT;
+  let selectedSlot = roster[0]?.id ?? '';
+  let officialSkin = OFFICIAL_SKINS[0];
+  let customSkin: { id: string; file: string; map: import('three').Texture; bytes?: ArrayBuffer; name?: string } | null = null;
+  let customPreviewUrl = officialSkin.file;
+  let customHair: { file: string; map: import('three').Texture; bytes?: ArrayBuffer } | null = null;
+  let customSkirtTex: { file: string; map: import('three').Texture; bytes?: ArrayBuffer } | null = null;
+  let hairPreviewUrl = KIT_HAIR_ALBEDO;
+  let skirtPreviewUrl = KIT_SKIRT_ALBEDO;
+  let atlasTab: 'body' | 'hair' | 'skirt' = 'body';
+  let islands = false;
+  let hatBytes: ArrayBuffer | null = null;
+  let hatFileName = '';
+  let heldBytes: ArrayBuffer | null = null;
+  let heldFileName = '';
+  let syncingInputs = false;
+  let thumbNonce = 0;
+
+  function atlasIslands() {
+    if (atlasTab === 'hair') return KIT_HAIR_UV_ISLANDS;
+    if (atlasTab === 'skirt') return KIT_SKIRT_UV_ISLANDS;
+    return KIT_UV_ISLANDS;
+  }
+
+  function atlasPreviewUrl() {
+    if (atlasTab === 'hair') return hairPreviewUrl;
+    if (atlasTab === 'skirt') return skirtPreviewUrl;
+    return customPreviewUrl;
+  }
+
+  async function redrawSkinView() {
+    const canvas = $('skinView') as HTMLCanvasElement;
+    let warn = '';
+    const url = atlasPreviewUrl();
+    try {
+      const img = await imageFromUrl(url);
+      if (img.width !== img.height) warn = `非正方形 ${img.width}×${img.height}，保存会被拒绝`;
+      drawSkinPreview(canvas, img, { islands, warn: warn || undefined, islandList: atlasIslands() });
+      const kind = atlasTab === 'body' ? '身体' : atlasTab === 'hair' ? '头发' : '裙子';
+      $('skinInfo').textContent = `${kind} ${img.width}×${img.height}${warn ? ' · ' + warn : ''}`;
+    } catch {
+      drawSkinPreview(canvas, null, { islands, islandList: atlasIslands() });
+      $('skinInfo').textContent = atlasTab === 'body' ? '尚未上传身体图集。' : atlasTab === 'hair' ? '头发默认棕点平铺贴图。' : '裙子默认黑裙布。';
+    }
+  }
+
+  function highlightAtlasTab() {
+    $('atlasTabBody').classList.toggle('active', atlasTab === 'body');
+    $('atlasTabHair').classList.toggle('active', atlasTab === 'hair');
+    $('atlasTabSkirt').classList.toggle('active', atlasTab === 'skirt');
+    const box = $('atlasPresets');
+    box.replaceChildren();
+    if (atlasTab === 'hair') {
+      for (const def of KIT_HAIR_MAPS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = def.label;
+        btn.classList.toggle('active', (customHair?.file ?? preview.hairMapFile) === def.file);
+        btn.addEventListener('click', () => void pickHairMap(def.file));
+        box.appendChild(btn);
+      }
+    } else if (atlasTab === 'skirt') {
+      for (const def of KIT_SKIRT_MAPS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = def.label;
+        btn.classList.toggle('active', (customSkirtTex?.file ?? preview.skirtMapFile) === def.file);
+        btn.addEventListener('click', () => void pickSkirtMap(def.file));
+        box.appendChild(btn);
+      }
+    }
+  }
+
+  async function pickHairMap(file: string, silent = false) {
+    const map = await loadSkinMap(file, false);
+    customHair = { file, map };
+    hairPreviewUrl = file;
+    preview.setKitHairMap(map, file);
+    if (atlasTab === 'hair') highlightAtlasTab();
+    await redrawSkinView();
+    if (!silent) toast('已换头发贴图');
+  }
+
+  async function pickSkirtMap(file: string, silent = false) {
+    const map = await loadSkinMap(file, false);
+    customSkirtTex = { file, map };
+    skirtPreviewUrl = file;
+    preview.setKitSkirtMap(map, file);
+    if (atlasTab === 'skirt') highlightAtlasTab();
+    await redrawSkinView();
+    if (!silent) {
+      if (!preview.kitSkirt) pickKitSkirt('skirt_pencil');
+      toast('已换裙布');
+    }
+  }
+
+  function readTransform(): HairTransform {
+    return {
+      position: [readNum('px'), readNum('py'), readNum('pz')],
+      rotation: [readNum('rx'), readNum('ry'), readNum('rz')],
+      scale: [readNum('sx') || 1, readNum('sy') || 1, readNum('sz') || 1],
+    };
+  }
+
+  function writeTransform(t: HairTransform) {
+    syncingInputs = true;
+    num('px', t.position[0]);
+    num('py', t.position[1]);
+    num('pz', t.position[2]);
+    num('rx', t.rotation[0]);
+    num('ry', t.rotation[1]);
+    num('rz', t.rotation[2]);
+    num('sx', t.scale[0]);
+    num('sy', t.scale[1]);
+    num('sz', t.scale[2]);
+    syncingInputs = false;
+  }
+
+  function writePre(e: [number, number, number]) {
+    syncingInputs = true;
+    num('prx', e[0]);
+    num('pry', e[1]);
+    num('prz', e[2]);
+    syncingInputs = false;
+  }
+
+  function slotOf(id: string): RosterSlot | undefined {
+    return roster.find((s) => s.id === id);
+  }
+
+  function bindSlotFields(slot: RosterSlot) {
+    ($('varId') as HTMLInputElement).value = slot.id;
+    ($('varLabel') as HTMLInputElement).value = slot.label;
+    ($('varGender') as HTMLInputElement).value = slot.gender;
+    officialSkin = slot.gender === 'female' ? OFFICIAL_SKINS[1] : OFFICIAL_SKINS[0];
+    $('btnMale').classList.toggle('active', slot.gender === 'male');
+    $('btnFemale').classList.toggle('active', slot.gender === 'female');
+    preview.setOfficialSkin(officialSkin.id);
+    $('slotInfo').textContent = `${slot.label} · ${slot.blurb}`;
+  }
+
+  function refreshBudget() {
+    const b = budgetReport(catalog);
+    const el = $('budget');
+    el.classList.toggle('over', b.over);
+    el.textContent =
+      `${WEEKDAYS.find((d) => d.id === currentDay)?.label ?? currentDay}  ·  规划 ${b.assigned}/${b.slots} 已指定  ·  皮 ${b.skins}/${BUDGET.skins}  ·  道具 ${b.props}/${BUDGET.props}` +
+      (b.over ? '  超预算，合批会变重' : '');
+    $('rosterHint').textContent = `游戏规划 ${roster.length} 个角色。改 src/roster.ts 后点刷新。`;
+  }
+
+  function renderDays() {
+    $('dayList').innerHTML = WEEKDAYS.map((s) => {
+      const on = currentDay === s.id ? 'on' : '';
+      const tag = catalog.active === s.id ? '<span class="tag ok">当前</span>' : '<span class="tag">备份</span>';
+      return `<button type="button" class="item ${on}" data-id="${s.id}"><div><div>${s.label}</div><div class="meta">${s.blurb}</div></div>${tag}</button>`;
+    }).join('');
+    $('dayList').querySelectorAll<HTMLButtonElement>('.item').forEach((el) => {
+      el.addEventListener('click', () => void switchDay(el.dataset.id as WeekdayId));
+    });
+  }
+
+  async function switchDay(id: WeekdayId) {
+    if (!id || id === currentDay) return;
+    currentDay = selectCatalogDay(catalog, id);
+    renderDays();
+    refreshBudget();
+    renderRoster();
+    await openSlot(selectedSlot);
+    toast(`正在编 ${WEEKDAYS.find((d) => d.id === currentDay)?.label}`);
+  }
+
+  function renderRoster() {
+    const box = $('varList');
+    box.innerHTML = '';
+    for (const slot of roster) {
+      const look = lookForSlot(catalog, slot.id);
+      const officialOnly =
+        !!look &&
+        isOfficialSkinId(look.skin) &&
+        !look.kitHair &&
+        !look.kitSkirt &&
+        !(look.props?.length) &&
+        !look.bodyMorph &&
+        (!look.kitHairMap || look.kitHairMap === KIT_HAIR_ALBEDO) &&
+        (!look.kitSkirtMap || look.kitSkirtMap === KIT_SKIRT_ALBEDO);
+      const extras = look?.props.map((p) => p.id).join(' · ');
+      const row = document.createElement('div');
+      row.className = `item${slot.id === selectedSlot ? ' on' : ''}${look ? '' : ' missing'}`;
+      const detail = look
+        ? `${look.skin}${look.kitHair ? ' · ' + look.kitHair : ''}${extras ? ' · ' + extras : ''}${officialOnly ? ' · 游戏默认' : ''}`
+        : '还没有形象';
+      const tag = !look ? '未指定' : officialOnly ? '游戏默认' : '已指定';
+      const thumb = look?.thumb
+        ? `<img class="thumb" alt="" src="${look.thumb}?v=${thumbNonce}">`
+        : `<span class="thumb ph"></span>`;
+      row.innerHTML =
+        `${thumb}<div><div>${slot.label}</div><div class="meta">${slot.id} · ${slot.gender} · ${detail}</div></div>` +
+        `<span class="tag ${look ? 'ok' : 'wait'}">${tag}</span>`;
+      row.addEventListener('click', () => void openSlot(slot.id));
+      box.appendChild(row);
+    }
+  }
+
+  async function openSlot(id: string) {
+    const slot = slotOf(id);
+    if (!slot) return;
+    selectedSlot = id;
+    bindSlotFields(slot);
+    const look = lookForSlot(catalog, id);
+    if (look) await loadVariant(look.id);
+    else {
+      setMorphUi(0);
+      pickKitHair(null);
+      pickKitSkirt(null);
+      void pickHairMap(KIT_HAIR_ALBEDO, true);
+      void pickSkirtMap(KIT_SKIRT_ALBEDO, true);
+      toast(`「${slot.label}」未指定，调完点保存到该角色`);
+    }
+    renderRoster();
+  }
+
+  async function persist(okMsg: string) {
+    const r = await saveCatalog(catalog);
+    if (!r.ok) {
+      toast(`落盘失败：${r.error}。已改为本地下载。`);
+      downloadJson('catalog.json', catalog);
+      return;
+    }
+    toast(okMsg);
+    $('packPaths').textContent = `${WEEKDAYS.find((d) => d.id === currentDay)?.label} · ${budgetReport(catalog).assigned}/${roster.length} 已指定 · 游戏当前 ${WEEKDAYS.find((d) => d.id === catalog.active)?.label}`;
+  }
+
+  function activeRig() {
+    return editTarget === 'hat' ? hat : held;
+  }
+
+  function setEditTarget(next: EditTarget) {
+    editTarget = next;
+    $('btnEditHat').classList.toggle('active', next === 'hat');
+    $('btnEditHeld').classList.toggle('active', next === 'held');
+    const rig = activeRig();
+    const label = next === 'hat' ? '帽子（Head）' : '手持（RightHand）';
+    $('xformHint').textContent = `正在调${label}。拖滑杆即可。`;
+    if (rig.visual) {
+      preview.attachGizmo(rig.root);
+      writeTransform(rig.getTransform());
+      writePre(rig.preRotation);
+    } else {
+      preview.attachGizmo(null);
+      writeTransform(IDENTITY_TRANSFORM);
+      writePre([0, 0, 0]);
+    }
+  }
+
+  async function attachProp(kind: 'hat' | 'held', visual: import('three').Group, source: string, snap: boolean) {
+    const bone = kind === 'hat' ? preview.head : preview.hand;
+    if (!bone) {
+      toast(kind === 'hat' ? '没有 Head 骨，无法挂帽子' : '没有 RightHand 骨，无法挂手持');
+      return;
+    }
+    const rig = kind === 'hat' ? hat : held;
+    rig.mount(bone, visual);
+    rig.source = source;
+    const tris = countTris(visual);
+    $('propInfo').textContent =
+      `${kind === 'hat' ? '帽' : '手持'} · ${source} · ${tris} 三角 · 已挂 ${kind === 'hat' ? 'Head' : 'RightHand'}`;
+    if (snap) rig.snapToHead();
+    setEditTarget(kind);
+    $('status').textContent = preview.statusLine();
+  }
+
+  async function loadVariant(id: string) {
+    const v = catalog.variants.find((x) => x.id === id);
+    if (!v) return;
+    selectedSlot = v.id;
+    ($('varId') as HTMLInputElement).value = v.id;
+    ($('varLabel') as HTMLInputElement).value = v.label;
+    ($('varGender') as HTMLInputElement).value = v.gender;
+    ($('skinId') as HTMLInputElement).value = v.skin;
+    const hatUse = (v.props ?? []).find((p) => p.anchor === 'head');
+    const heldUse = (v.props ?? []).find((p) => p.anchor === 'hand');
+    ($('hatId') as HTMLInputElement).value = hatUse?.id ?? '';
+    ($('heldId') as HTMLInputElement).value = heldUse?.id ?? '';
+
+    const skin = catalog.skins.find((s) => s.id === v.skin) ?? OFFICIAL_SKINS.find((s) => s.id === v.skin);
+    if (skin && preview.skinned) {
+      const map = await loadSkinMap(skin.file, false);
+      customSkin = { id: skin.id, file: skin.file, map };
+      customPreviewUrl = skin.file;
+      preview.setCustomSkin(map);
+      await redrawSkinView();
+    }
+
+    hat.unmount();
+    held.unmount();
+    const restoreProp = async (use: PropUse | undefined, kind: 'hat' | 'held') => {
+      if (!use) return;
+      const def = catalog.props.find((p) => p.id === use.id);
+      if (!def) return;
+      const visual = await loadHairFile(def.file);
+      const rig = kind === 'hat' ? hat : held;
+      rig.setPreRotation(def.preRotation);
+      await attachProp(kind, visual, def.file, false);
+      rig.setTransform(use.transform);
+    };
+    await restoreProp(hatUse, 'hat');
+    await restoreProp(heldUse, 'held');
+    setMorphUi(v.bodyMorph ?? 0);
+    const kh = v.kitHair;
+    pickKitHair(isKitHairId(kh) ? kh : null);
+    pickKitSkirt(isKitSkirtId(v.kitSkirt) ? v.kitSkirt : null);
+    if (v.kitHairMap) await pickHairMap(v.kitHairMap, true);
+    else await pickHairMap(KIT_HAIR_ALBEDO, true);
+    if (v.kitSkirtMap) await pickSkirtMap(v.kitSkirtMap, true);
+    else await pickSkirtMap(KIT_SKIRT_ALBEDO, true);
+    setEditTarget(hatUse ? 'hat' : heldUse ? 'held' : 'hat');
+    toast(`已还原 ${v.label}`);
+  }
+
+  // —— 官方皮 / 对照 ——
+  $('btnMale').addEventListener('click', () => {
+    officialSkin = OFFICIAL_SKINS[0];
+    preview.setOfficialSkin(officialSkin.id);
+    $('btnMale').classList.add('active');
+    $('btnFemale').classList.remove('active');
+    ($('skinId') as HTMLInputElement).value = officialSkin.id;
+    if (!customSkin) {
+      customPreviewUrl = officialSkin.file;
+      void redrawSkinView();
+    }
+  });
+  $('btnFemale').addEventListener('click', () => {
+    officialSkin = OFFICIAL_SKINS[1];
+    preview.setOfficialSkin(officialSkin.id);
+    $('btnFemale').classList.add('active');
+    $('btnMale').classList.remove('active');
+    ($('skinId') as HTMLInputElement).value = officialSkin.id;
+    if (!customSkin) {
+      customPreviewUrl = officialSkin.file;
+      void redrawSkinView();
+    }
+  });
+  $('btnMine').addEventListener('click', () => {
+    preview.setCompareOfficial(false);
+    $('btnMine').classList.add('active');
+    $('btnOfficial').classList.remove('active');
+  });
+  $('btnOfficial').addEventListener('click', () => {
+    preview.setCompareOfficial(true);
+    $('btnOfficial').classList.add('active');
+    $('btnMine').classList.remove('active');
+  });
+  $('islandToggle').addEventListener('change', () => {
+    islands = ($('islandToggle') as HTMLInputElement).checked;
+    void redrawSkinView();
+  });
+
+  function highlightKitHair(id: KitHairId | null) {
+    $('kitHairNone').classList.toggle('active', id === null);
+    $('kitHairOdango').classList.toggle('active', id === 'hair_odango');
+    $('kitHairTail').classList.toggle('active', id === 'hair_tail');
+    $('kitHairBob').classList.toggle('active', id === 'hair_bob');
+  }
+  function pickKitHair(id: KitHairId | null) {
+    preview.setKitHairStyle(id);
+    highlightKitHair(id);
+    $('status').textContent = preview.statusLine();
+  }
+  $('kitHairNone').addEventListener('click', () => pickKitHair(null));
+  $('kitHairOdango').addEventListener('click', () => pickKitHair('hair_odango'));
+  $('kitHairTail').addEventListener('click', () => pickKitHair('hair_tail'));
+  $('kitHairBob').addEventListener('click', () => pickKitHair('hair_bob'));
+
+  function highlightKitSkirt(id: KitSkirtId | null) {
+    $('kitSkirtNone').classList.toggle('active', id === null);
+    $('kitSkirtPencil').classList.toggle('active', id === 'skirt_pencil');
+  }
+  function pickKitSkirt(id: KitSkirtId | null) {
+    preview.setKitSkirtStyle(id);
+    highlightKitSkirt(id);
+    $('status').textContent = preview.statusLine();
+  }
+  $('kitSkirtNone').addEventListener('click', () => pickKitSkirt(null));
+  $('kitSkirtPencil').addEventListener('click', () => pickKitSkirt('skirt_pencil'));
+
+  function setMorphUi(t: number) {
+    const v = Math.max(-1, Math.min(1, t));
+    for (const el of document.querySelectorAll<HTMLInputElement>('.bodyMorphRange')) el.value = String(v);
+    for (const el of document.querySelectorAll('.morphVal')) {
+      el.textContent = v === 0 ? '中' : v > 0 ? `胖 ${v.toFixed(2)}` : `瘦 ${(-v).toFixed(2)}`;
+    }
+    preview.setMorph(v);
+    $('status').textContent = preview.statusLine();
+  }
+  for (const el of document.querySelectorAll('.bodyMorphRange')) {
+    el.addEventListener('input', () => setMorphUi(Number((el as HTMLInputElement).value)));
+  }
+
+  const kitSkinBox = $('kitSkinBtns');
+  for (const def of KIT_SKINS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = def.label.replace('survivor', '').replace('zombie', 'z');
+    btn.title = def.label;
+    btn.dataset.kitSkin = def.id;
+    btn.addEventListener('click', () => {
+      const mat = preview.skinned?.material as { map?: import('three').Texture } | undefined;
+      customSkin = { id: def.id, file: def.file, map: mat?.map ?? (null as unknown as import('three').Texture) };
+      preview.setCustomSkin(null);
+      preview.setOfficialSkin(def.id);
+      preview.setCompareOfficial(false);
+      $('btnMine').classList.add('active');
+      $('btnOfficial').classList.remove('active');
+      ($('skinId') as HTMLInputElement).value = def.id;
+      customPreviewUrl = def.file;
+      void redrawSkinView();
+      for (const b of kitSkinBox.querySelectorAll('button')) {
+        b.classList.toggle('active', b === btn);
+      }
+      toast(`${def.label} · 保存到角色后进战场`);
+    });
+    kitSkinBox.appendChild(btn);
+  }
+  kitSkinBox.querySelector('button')?.classList.add('active');
+
+  $('atlasTabBody').addEventListener('click', () => {
+    atlasTab = 'body';
+    highlightAtlasTab();
+    void redrawSkinView();
+  });
+  $('atlasTabHair').addEventListener('click', () => {
+    atlasTab = 'hair';
+    highlightAtlasTab();
+    void redrawSkinView();
+  });
+  $('atlasTabSkirt').addEventListener('click', () => {
+    atlasTab = 'skirt';
+    highlightAtlasTab();
+    void redrawSkinView();
+  });
+
+  bindDrop($('skinDrop'), $('skinFile') as HTMLInputElement, async (file) => {
+    try {
+      const { map, square, width, height } = await skinFromFile(file, false);
+      const bytes = await file.arrayBuffer();
+      if (atlasTab === 'hair') {
+        const id = `${slotSkinId(selectedSlot || slug(file.name, 'custom'))}-hair`;
+        customHair = { file: `/models/colleagues/skins/${id}.png`, map, bytes };
+        hairPreviewUrl = URL.createObjectURL(file);
+        preview.setKitHairMap(map, customHair.file);
+        highlightAtlasTab();
+        await redrawSkinView();
+        toast(square ? '已换头发贴图（会写入战场）' : `贴图 ${width}×${height} 不是正方形`);
+        return;
+      }
+      if (atlasTab === 'skirt') {
+        const id = `${slotSkinId(selectedSlot || slug(file.name, 'custom'))}-skirt`;
+        customSkirtTex = { file: `/models/colleagues/skins/${id}.png`, map, bytes };
+        skirtPreviewUrl = URL.createObjectURL(file);
+        preview.setKitSkirtMap(map, customSkirtTex.file);
+        pickKitSkirt('skirt_pencil');
+        highlightAtlasTab();
+        await redrawSkinView();
+        toast(square ? '已换裙布（会写入战场）' : `贴图 ${width}×${height} 不是正方形`);
+        return;
+      }
+      const id = slotSkinId(selectedSlot || slug(file.name, 'custom'));
+      ($('skinId') as HTMLInputElement).value = id;
+      customSkin = { id, file: `/models/colleagues/skins/${id}.png`, map, bytes, name: `${id}.png` };
+      customPreviewUrl = URL.createObjectURL(file);
+      preview.setCustomSkin(map);
+      preview.setCompareOfficial(false);
+      $('btnMine').classList.add('active');
+      $('btnOfficial').classList.remove('active');
+      await redrawSkinView();
+      if (!square) toast(`贴图 ${width}×${height} 不是正方形，预览可用但不要保存`);
+      else toast('已换皮（glTF · flipY=false，会写入战场）');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+  function setPropAnchor(next: AttachAnchor) {
+    propAnchor = next;
+    $('btnAnchorHead').classList.toggle('active', next === 'head');
+    $('btnAnchorHand').classList.toggle('active', next === 'hand');
+    setEditTarget(next === 'head' ? 'hat' : 'held');
+  }
+  $('btnAnchorHead').addEventListener('click', () => setPropAnchor('head'));
+  $('btnAnchorHand').addEventListener('click', () => setPropAnchor('hand'));
+  $('btnEditHat').addEventListener('click', () => {
+    setPropAnchor('head');
+  });
+  $('btnEditHeld').addEventListener('click', () => {
+    setPropAnchor('hand');
+  });
+
+  bindDrop($('propDrop'), $('propFile') as HTMLInputElement, async (file) => {
+    try {
+      const bytes = await file.arrayBuffer();
+      const kind = propAnchor === 'head' ? 'hat' : 'held';
+      if (kind === 'hat') {
+        hatBytes = bytes;
+        hatFileName = file.name.replace(/\s+/g, '-');
+        const id = slug(($('hatId') as HTMLInputElement).value || file.name, 'prop-hat');
+        ($('hatId') as HTMLInputElement).value = id;
+      } else {
+        heldBytes = bytes;
+        heldFileName = file.name.replace(/\s+/g, '-');
+        const id = slug(($('heldId') as HTMLInputElement).value || file.name, 'prop-held');
+        ($('heldId') as HTMLInputElement).value = id;
+      }
+      const visual = await loadHairFile(new File([bytes], file.name));
+      await attachProp(kind, visual, file.name, true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err));
+    }
+  });
+
+  for (const preset of PROP_PRESETS) {
+    const btn = $(preset.id === 'prop-cap' ? 'btnPropCap' : preset.id === 'prop-cup' ? 'btnPropCup' : 'btnPropLaptop');
+    btn.addEventListener('click', async () => {
+      setPropAnchor(preset.anchor);
+      const kind = preset.anchor === 'head' ? 'hat' : 'held';
+      const input = kind === 'hat' ? $('hatId') : $('heldId');
+      (input as HTMLInputElement).value = preset.id;
+      if (kind === 'hat') {
+        hatBytes = null;
+        hatFileName = `${preset.id}.glb`;
+      } else {
+        heldBytes = null;
+        heldFileName = `${preset.id}.glb`;
+      }
+      await attachProp(kind, preset.make(), preset.label, true);
+      toast(`${preset.label} 已挂 ${preset.anchor === 'head' ? '头顶' : '右手'}`);
+    });
+  }
+
+  $('btnClearProp').addEventListener('click', () => {
+    const kind = propAnchor === 'head' ? 'hat' : 'held';
+    const rig = kind === 'hat' ? hat : held;
+    rig.unmount();
+    if (kind === 'hat') {
+      hatBytes = null;
+      ($('hatId') as HTMLInputElement).value = '';
+    } else {
+      heldBytes = null;
+      ($('heldId') as HTMLInputElement).value = '';
+    }
+    $('propInfo').textContent = `已卸下${kind === 'hat' ? '帽子' : '手持'}`;
+    if (editTarget === kind) setEditTarget(kind);
+  });
+
+  $('btnIdle').addEventListener('click', () => {
+    preview.play('idle');
+    $('btnIdle').classList.add('active');
+    $('btnRun').classList.remove('active');
+    $('btnJump').classList.remove('active');
+    $('status').textContent = preview.statusLine();
+  });
+  $('btnRun').addEventListener('click', () => {
+    preview.play('run');
+    $('btnRun').classList.add('active');
+    $('btnIdle').classList.remove('active');
+    $('btnJump').classList.remove('active');
+    $('status').textContent = preview.statusLine();
+  });
+  $('btnJump').addEventListener('click', () => {
+    if (!preview.clips.jump) {
+      toast('包内 jump 是静止 rest pose，预览先用 idle/run（Kenney FBX 旋转）');
+      return;
+    }
+    preview.play('jump');
+    $('btnJump').classList.add('active');
+    $('btnIdle').classList.remove('active');
+    $('btnRun').classList.remove('active');
+    $('status').textContent = preview.statusLine();
+  });
+  $('btnCam').addEventListener('click', () => preview.resetCamera());
+  $('gizmoT').addEventListener('click', () => {
+    preview.gizmo.setMode('translate');
+    $('gizmoT').classList.add('active');
+    $('gizmoR').classList.remove('active');
+    $('gizmoS').classList.remove('active');
+  });
+  $('gizmoR').addEventListener('click', () => {
+    preview.gizmo.setMode('rotate');
+    $('gizmoR').classList.add('active');
+    $('gizmoT').classList.remove('active');
+    $('gizmoS').classList.remove('active');
+  });
+  $('gizmoS').addEventListener('click', () => {
+    preview.gizmo.setMode('scale');
+    $('gizmoS').classList.add('active');
+    $('gizmoT').classList.remove('active');
+    $('gizmoR').classList.remove('active');
+  });
+  $('btnSnap').addEventListener('click', () => {
+    const rig = activeRig();
+    rig.snapToHead();
+    writeTransform(rig.getTransform());
+  });
+  $('btnResetXform').addEventListener('click', () => {
+    const rig = activeRig();
+    rig.resetTransform();
+    writeTransform(rig.getTransform());
+  });
+
+  preview.gizmo.addEventListener('objectChange', () => {
+    const rig = activeRig();
+    if (preview.gizmo.object === rig.root) writeTransform(rig.getTransform());
+  });
+
+  for (const id of ['px', 'py', 'pz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz']) {
+    $(id).addEventListener('input', () => {
+      if (syncingInputs) return;
+      num(id, readNum(id));
+      activeRig().setTransform(readTransform());
+    });
+  }
+  for (const id of ['prx', 'pry', 'prz']) {
+    $(id).addEventListener('input', () => {
+      if (syncingInputs) return;
+      num(id, readNum(id));
+      activeRig().setPreRotation([readNum('prx'), readNum('pry'), readNum('prz')]);
+    });
+  }
+
+  $('btnSave').addEventListener('click', async () => {
+    const slot = slotOf(selectedSlot);
+    if (!slot) {
+      toast('先点右侧一个游戏角色');
+      return;
+    }
+    const id = slot.id;
+    const label = slot.label;
+    const gender = slot.gender;
+    ($('varId') as HTMLInputElement).value = id;
+    ($('varLabel') as HTMLInputElement).value = label;
+    ($('varGender') as HTMLInputElement).value = gender;
+
+    const ownSkinId = slotSkinId(slot.id);
+    let skinDef = officialSkinForGender(gender);
+
+    if (customSkin?.bytes) {
+      const put = await saveAsset('skins', `${ownSkinId}.png`, customSkin.bytes);
+      if (!put.ok || !put.file) {
+        toast(`皮肤未写入：${put.error}`);
+        return;
+      }
+      skinDef = { id: ownSkinId, file: put.file, flipY: false };
+      customSkin.file = put.file;
+      customSkin.id = ownSkinId;
+      ($('skinId') as HTMLInputElement).value = ownSkinId;
+    } else if (customSkin && (customSkin.id === ownSkinId || isOfficialSkinId(customSkin.id) || isKitSkinId(customSkin.id))) {
+      skinDef = { id: customSkin.id, file: customSkin.file, flipY: false };
+    } else if (customSkin && !isOfficialSkinId(customSkin.id) && !isKitSkinId(customSkin.id) && customSkin.id !== ownSkinId) {
+      toast('这张皮属于别的角色，已改存为本角色独立皮');
+      skinDef = officialSkinForGender(gender);
+    } else if (customSkin) {
+      skinDef = { id: customSkin.id, file: customSkin.file, flipY: false };
+    } else {
+      const existing = lookForSlot(catalog, slot.id);
+      if (existing?.skin === ownSkinId) {
+        const kept = catalog.skins.find((s) => s.id === ownSkinId);
+        if (kept) skinDef = kept;
+      }
+    }
+
+    const uses: PropUse[] = [];
+    const persistProp = async (kind: 'hat' | 'held'): Promise<boolean> => {
+      const rig = kind === 'hat' ? hat : held;
+      if (!rig.visual) return true;
+      const anchor: AttachAnchor = kind === 'hat' ? 'head' : 'hand';
+      const input = kind === 'hat' ? $('hatId') : $('heldId');
+      const ownId = `prop-${kind}-${id}`;
+      let propId = (input as HTMLInputElement).value.trim() || ownId;
+      const usedByOther = catalog.variants.some(
+        (v) => v.id !== id && v.props.some((p) => p.id === propId)
+      );
+      let file = catalog.props.find((p) => p.id === propId)?.file;
+      if (rig.source.startsWith('/models/colleagues/')) file = rig.source;
+      const bytes = kind === 'hat' ? hatBytes : heldBytes;
+      const fileName = kind === 'hat' ? hatFileName : heldFileName;
+      const willWrite = !!bytes || !file;
+      if (willWrite && usedByOther) {
+        propId = ownId;
+        file = undefined;
+      }
+      (input as HTMLInputElement).value = propId;
+      if (bytes && fileName) {
+        const ext = fileName.toLowerCase().endsWith('.fbx') ? 'fbx' : 'glb';
+        const put = await saveAsset('props', `${propId}.${ext}`, bytes);
+        if (!put.ok || !put.file) {
+          toast(`道具未写入：${put.error}`);
+          return false;
+        }
+        file = put.file;
+      } else if (!file) {
+        const glb = await rig.exportGlb();
+        const put = await saveAsset('props', `${propId}.glb`, glb);
+        if (!put.ok || !put.file) {
+          toast(`占位道具未写入：${put.error}`);
+          return false;
+        }
+        file = put.file;
+      }
+      upsertProp(catalog, { id: propId, file: file!, preRotation: rig.preRotation });
+      uses.push({ id: propId, anchor, transform: rig.getTransform() });
+      return true;
+    };
+    if (!(await persistProp('hat')) || !(await persistProp('held'))) return;
+
+    let thumb: string | null = lookForSlot(catalog, id)?.thumb ?? null;
+    try {
+      const dataUrl = preview.captureThumb();
+      const buf = await (await fetch(dataUrl)).arrayBuffer();
+      const put = await saveAsset('thumbs', `${currentDay}-${id}.png`, buf);
+      if (put.ok && put.file) thumb = put.file;
+    } catch (err) {
+      console.warn('缩略图未写入', err);
+    }
+
+    let hairMapFile = customHair?.file ?? preview.hairMapFile ?? KIT_HAIR_ALBEDO;
+    if (customHair?.bytes) {
+      const put = await saveAsset('skins', `${ownSkinId}-hair.png`, customHair.bytes);
+      if (!put.ok || !put.file) {
+        toast(`头发贴图未写入：${put.error}`);
+        return;
+      }
+      hairMapFile = put.file;
+      customHair = { ...customHair, file: put.file, bytes: undefined };
+      hairPreviewUrl = put.file;
+    }
+    let skirtMapFile = customSkirtTex?.file ?? preview.skirtMapFile ?? KIT_SKIRT_ALBEDO;
+    if (customSkirtTex?.bytes) {
+      const put = await saveAsset('skins', `${ownSkinId}-skirt.png`, customSkirtTex.bytes);
+      if (!put.ok || !put.file) {
+        toast(`裙布未写入：${put.error}`);
+        return;
+      }
+      skirtMapFile = put.file;
+      customSkirtTex = { ...customSkirtTex, file: put.file, bytes: undefined };
+      skirtPreviewUrl = put.file;
+    }
+
+    upsertSkin(catalog, skinDef);
+    upsertVariant(catalog, {
+      id,
+      label,
+      gender,
+      skin: skinDef.id,
+      hair: null,
+      hairTransform: { ...IDENTITY_TRANSFORM },
+      props: uses,
+      bodyMorph: preview.bodyMorph,
+      kitHair: preview.kitHair,
+      kitHairMap: hairMapFile,
+      kitSkirt: preview.kitSkirt,
+      kitSkirtMap: skirtMapFile,
+      thumb,
+    });
+
+    const b = budgetReport(catalog);
+    if (b.over) toast('已保存，但皮肤/道具超预算');
+    await persist(`已保存到「${label}」· ${WEEKDAYS.find((d) => d.id === currentDay)?.label}`);
+    thumbNonce += 1;
+    refreshBudget();
+    renderDays();
+    renderRoster();
+  });
+
+  $('btnActive').addEventListener('click', () => {
+    catalog.active = currentDay;
+    void persist(`游戏当前关 = ${WEEKDAYS.find((d) => d.id === currentDay)?.label}。打开 :5173 即用。`).then(() => renderDays());
+  });
+
+  $('btnFromMon').addEventListener('click', () => {
+    if (currentDay === 'monday') {
+      toast('已经是周一');
+      return;
+    }
+    const mon = catalog.days.find((d) => d.id === 'monday');
+    const cur = catalog.days.find((d) => d.id === currentDay);
+    if (!mon || !cur) return;
+    cur.variants = structuredClone(mon.variants);
+    catalog.variants = cur.variants;
+    void persist('已带入周一形象').then(() => {
+      renderRoster();
+      void openSlot(selectedSlot);
+    });
+  });
+
+  $('btnRefreshRoster').addEventListener('click', async () => {
+    catalog = await loadCatalog();
+    currentDay = selectCatalogDay(catalog, currentDay);
+    if (!roster.some((s) => s.id === selectedSlot)) selectedSlot = roster[0]?.id ?? '';
+    renderDays();
+    refreshBudget();
+    renderRoster();
+    const slot = slotOf(selectedSlot);
+    if (slot) bindSlotFields(slot);
+    toast(`规划 ${roster.length} 个角色 · ${budgetReport(catalog).assigned} 已指定`);
+  });
+
+  $('btnPack').addEventListener('click', () => {
+    downloadJson('catalog.json', serializeCatalog(catalog));
+    toast('已下载 catalog.json（备份用；发布走 npm run build）');
+  });
+
+  if (import.meta.hot) {
+    import.meta.hot.accept('../../../src/roster.ts', (mod) => {
+      if (!mod?.ROSTER) return;
+      roster = mod.ROSTER;
+      if (!roster.some((s) => s.id === selectedSlot)) selectedSlot = roster[0]?.id ?? '';
+      refreshBudget();
+      renderRoster();
+      toast(`规划已更新 · ${roster.length} 个角色`);
+    });
+  }
+
+  if (ensureRosterLooks(catalog)) {
+    await persist('已把游戏默认形象写入 catalog，和游戏同一份数据');
+  }
+
+  writeTransform(IDENTITY_TRANSFORM);
+  writePre([0, 0, 0]);
+  renderDays();
+  refreshBudget();
+  renderRoster();
+  const first = slotOf(selectedSlot);
+  if (first) {
+    bindSlotFields(first);
+    const look = lookForSlot(catalog, first.id);
+    if (look) await loadVariant(look.id);
+  }
+  highlightAtlasTab();
+  await redrawSkinView();
+  setInterval(() => {
+    $('status').textContent = preview.statusLine();
+  }, 500);
+}
+
+boot().catch((err) => {
+  const el = document.querySelector('#loading')!;
+  el.innerHTML = `<div>加载失败</div><div class="hint">${err instanceof Error ? err.message : String(err)}</div>`;
+  console.error(err);
+});

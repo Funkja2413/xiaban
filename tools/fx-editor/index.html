@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>特效编辑器</title>
+  <style>
+    :root {
+      --bg: #1c1d22;
+      --panel: #25262c;
+      --panel2: #2d2f36;
+      --line: #3a3b44;
+      --text: #e6e6ea;
+      --muted: #9aa0ad;
+      --accent: #6ea8ff;
+      --warn: #e8b85c;
+      --ok: #6dcaa0;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font: 12.5px/1.45 ui-sans-serif, system-ui, "PingFang SC", sans-serif; }
+    button, input { font: inherit; color: inherit; }
+    button {
+      background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+      padding: 6px 10px; cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: #2d4a78; border-color: #4d78c2; }
+    button.active { background: #2d4a78; border-color: var(--accent); }
+    input[type="color"] { width: 100%; height: 28px; border: 1px solid var(--line); border-radius: 5px; background: #1a1b20; padding: 2px; }
+    label.field { display: flex; flex-direction: column; gap: 3px; color: var(--muted); margin-bottom: 8px; }
+    label.check { display: flex; align-items: center; gap: 8px; color: var(--text); margin: 8px 0; }
+    h1 { font-size: 13px; font-weight: 700; margin: 0; letter-spacing: 0.04em; }
+    h2 { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.08em; margin: 14px 0 8px; }
+    .hint { color: var(--muted); font-size: 11.5px; margin: 0 0 8px; }
+    a { color: var(--accent); text-decoration: none; }
+    #app { display: grid; grid-template-rows: 42px 1fr; height: 100%; }
+    #top {
+      display: flex; align-items: center; gap: 16px; padding: 0 14px;
+      border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    #top .sub { color: var(--muted); }
+    #layout {
+      display: grid;
+      grid-template-columns: 220px minmax(380px, 1fr) 340px;
+      min-height: 0;
+    }
+    .pane { overflow: auto; padding: 12px 14px 24px; border-right: 1px solid var(--line); }
+    .pane:last-child { border-right: none; border-left: 1px solid var(--line); }
+    #center { display: flex; flex-direction: column; padding: 0; min-width: 0; border-right: none; }
+    #viewport { flex: 1; min-height: 280px; position: relative; background: #2a2c33; }
+    #viewport canvas { display: block; width: 100%; height: 100%; }
+    #toolbar {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      padding: 8px 10px; border-top: 1px solid var(--line); background: var(--panel);
+    }
+    #status { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .list { display: flex; flex-direction: column; gap: 4px; }
+    .group {
+      font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em;
+      text-transform: uppercase; margin: 10px 0 4px;
+    }
+    .group:first-child { margin-top: 0; }
+    h3.sec {
+      font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em;
+      margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--line);
+    }
+    h3.sec:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+    .item {
+      display: flex; justify-content: space-between; gap: 8px; align-items: center;
+      padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2);
+      cursor: pointer; width: 100%; text-align: left;
+    }
+    .item:hover, .item.on { border-color: var(--accent); }
+    .item .tag {
+      font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--muted); flex-shrink: 0;
+    }
+    .slider {
+      display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: 6px;
+      color: var(--muted); margin-bottom: 5px;
+    }
+    .slider input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+    .slider .v { font-variant-numeric: tabular-nums; text-align: right; font-size: 11px; }
+    .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .styleRow {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px;
+    }
+    .styleRow button {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+      padding: 8px 10px; text-align: left;
+    }
+    .styleRow button b { font-size: 12.5px; font-weight: 700; }
+    .styleRow button span { color: var(--muted); font-size: 11px; }
+    .styleRow button.active { background: #2d4a78; border-color: var(--accent); }
+    .tabs { display: flex; gap: 6px; margin: 8px 0 12px; }
+    .tabs button { flex: 1; }
+    label.field select {
+      width: 100%; height: 28px; border: 1px solid var(--line);
+      border-radius: 5px; background: #1a1b20; color: inherit; padding: 0 6px;
+    }
+    .reactCard {
+      border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 10px 6px; margin-bottom: 10px; background: var(--panel2);
+    }
+    .reactCard h3.sec { margin-top: 0; padding-top: 0; border-top: none; font-size: 12px; color: var(--text); text-transform: none; letter-spacing: 0; }
+    .reactCard .tag {
+      font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--muted); margin-left: 6px;
+    }
+    .toast {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: #16171b; border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px;
+      z-index: 20; display: none;
+    }
+    #loading {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: var(--bg); z-index: 30; flex-direction: column; gap: 8px;
+    }
+    @media (max-width: 1080px) {
+      #layout { grid-template-columns: 1fr; grid-template-rows: minmax(360px, 1fr) auto auto; overflow: auto; }
+      #center { order: -1; min-height: 360px; }
+      .pane { border-right: none; border-left: none; border-bottom: 1px solid var(--line); max-height: 70vh; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <h1>特效编辑器</h1>
+      <span class="sub">构筑编冲刺/技能 · 战场角色编被动（光环 / 加时 / 状态样子）</span>
+      <span style="margin-left:auto">
+        <a href="http://localhost:5173/">游戏 :5173</a>
+        &nbsp;·&nbsp;
+        <a href="http://localhost:5174/">角色 :5174</a>
+        &nbsp;·&nbsp;
+        <a href="http://localhost:5175/">场景 :5175</a>
+      </span>
+    </header>
+    <div id="layout">
+      <aside class="pane" id="left">
+        <h2>构筑</h2>
+        <p class="hint">冲刺和技能的群体反馈。各角色被撞后的状态在冲刺右侧「角色反应」。</p>
+        <div class="list" id="fxList"></div>
+        <h2>战场角色</h2>
+        <p class="hint">点角色编被动：玩家光环，同事编加班头顶和倒地/眩晕/减速样子。判定加时不用贴近，选中后头顶会循环飘。</p>
+        <p class="hint" id="castDay"></p>
+        <div class="list" id="castList"></div>
+        <h2>预览状态</h2>
+        <div class="row">
+          <button type="button" id="btnIdle" class="active">待机</button>
+          <button type="button" id="btnRunPose">跑步</button>
+        </div>
+        <h2 id="lvHead">等级</h2>
+        <div class="row" id="lvRow">
+          <button type="button" id="btnLv1" class="active">LV1</button>
+          <button type="button" id="btnLv2">LV2</button>
+          <button type="button" id="btnLv3">LV3</button>
+        </div>
+      </aside>
+
+      <section id="center">
+        <div id="viewport"></div>
+        <div id="toolbar">
+          <button type="button" class="primary" id="btnPlay">播放当前</button>
+          <button type="button" id="btnSave">送进战场</button>
+          <button type="button" id="btnRevert">重载磁盘</button>
+          <button type="button" id="btnReset">恢复默认</button>
+          <span id="status">就绪</span>
+        </div>
+      </section>
+
+      <aside class="pane" id="right">
+        <h2 id="fxTitle">撞物</h2>
+        <p class="hint" id="fxBlurb">冲到家具上的碎片。</p>
+        <div id="panelTabs" class="tabs" style="display:none">
+          <button type="button" id="tabOverall" class="active">整体</button>
+          <button type="button" id="tabReact">角色反应</button>
+        </div>
+        <div id="fields"></div>
+        <h2>写入</h2>
+        <p class="hint">拖滑条会直接送进正在开的游戏页，不用下载 JSON，也不用刷新。纸片/气雾池子大小改完仍要重启游戏（对象池只在启动时建）。</p>
+        <div class="row">
+          <button type="button" id="btnDefaults">套用代码默认</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+  <div id="loading"><div>加载战场角色…</div><div class="hint">kit / 皮肤 / idle·run 与游戏同一套，不进对外包体</div></div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
