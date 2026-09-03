@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-/** 与 humanoid.ts 一致：游戏加载 PNG 也是 flipY + sRGB */
-export async function loadSkinMap(url: string, flipY = true): Promise<THREE.Texture> {
+/** 与战场一致：glTF / Survivors kit 图集 flipY=false */
+export async function loadSkinMap(url: string, flipY = false): Promise<THREE.Texture> {
   const tex = await new THREE.TextureLoader().loadAsync(url);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.flipY = flipY;
@@ -21,7 +21,7 @@ export function applySkin(mesh: THREE.Mesh, map: THREE.Texture) {
 
 export async function skinFromFile(
   file: File,
-  flipY = true
+  flipY = false
 ): Promise<{ map: THREE.Texture; width: number; height: number; square: boolean; url: string }> {
   const url = URL.createObjectURL(file);
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {

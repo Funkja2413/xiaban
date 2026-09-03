@@ -95,8 +95,8 @@ export const IDENTITY_TRANSFORM: HairTransform = {
 };
 
 export const OFFICIAL_SKINS: SkinDef[] = [
-  { id: 'kenney-male-a', file: '/models/kenney/humanMaleA.png', flipY: false },
-  { id: 'kenney-female-a', file: '/models/kenney/humanFemaleA.png', flipY: false },
+  { id: 'kenney-male-a', file: '/models/kit/textures/survivorMaleB.png', flipY: false },
+  { id: 'kenney-female-a', file: '/models/kit/textures/lady_03_purple_vest_skirt.png', flipY: false },
 ];
 
 export function slotSkinId(slotId: string) {

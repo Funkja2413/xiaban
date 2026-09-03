@@ -40,12 +40,12 @@
   "skins": [
     {
       "id": "kenney-male-a",
-      "file": "/models/kenney/humanMaleA.png",
+      "file": "/models/kit/textures/survivorMaleB.png",
       "flipY": false
     },
     {
       "id": "kenney-female-a",
-      "file": "/models/kenney/humanFemaleA.png",
+      "file": "/models/kit/textures/lady_03_purple_vest_skirt.png",
       "flipY": false
     },
     {
@@ -253,7 +253,7 @@
           "props": [],
           "bodyMorph": 0.6,
           "kitHair": "hair_bob",
-          "kitHairMap": "/models/colleagues/skins/skin-heavy-hair.png",
+          "kitHairMap": null,
           "kitSkirt": "skirt_pencil",
           "kitSkirtMap": "/models/colleagues/skins/skin-heavy-skirt.png",
           "thumb": "/models/colleagues/thumbs/monday-heavy.png"
@@ -284,9 +284,9 @@
           "props": [],
           "bodyMorph": 0.9,
           "kitHair": null,
-          "kitHairMap": "/models/colleagues/skins/skin-interceptor-hair.png",
-          "kitSkirt": null,
-          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "kitHairMap": null,
+          "kitSkirt": "skirt_pencil",
+          "kitSkirtMap": "/models/kit/textures/skirt_plum.png",
           "thumb": "/models/colleagues/thumbs/monday-interceptor.png"
         }
       ]
@@ -466,7 +466,7 @@
           "id": "interceptor",
           "label": "拦截者",
           "gender": "female",
-          "skin": "kenney-female-a",
+          "skin": "skin-interceptor",
           "hair": null,
           "hairTransform": {
             "position": [
@@ -490,8 +490,8 @@
           "kitHair": null,
           "thumb": null,
           "kitHairMap": null,
-          "kitSkirt": null,
-          "kitSkirtMap": null
+          "kitSkirt": "skirt_pencil",
+          "kitSkirtMap": "/models/kit/textures/skirt_plum.png"
         }
       ]
     },
@@ -670,7 +670,7 @@
           "id": "interceptor",
           "label": "拦截者",
           "gender": "female",
-          "skin": "kenney-female-a",
+          "skin": "skin-interceptor",
           "hair": null,
           "hairTransform": {
             "position": [
@@ -694,8 +694,8 @@
           "kitHair": null,
           "thumb": null,
           "kitHairMap": null,
-          "kitSkirt": null,
-          "kitSkirtMap": null
+          "kitSkirt": "skirt_pencil",
+          "kitSkirtMap": "/models/kit/textures/skirt_plum.png"
         }
       ]
     },
@@ -874,7 +874,7 @@
           "id": "interceptor",
           "label": "拦截者",
           "gender": "female",
-          "skin": "kenney-female-a",
+          "skin": "skin-interceptor",
           "hair": null,
           "hairTransform": {
             "position": [
@@ -898,8 +898,8 @@
           "kitHair": null,
           "thumb": null,
           "kitHairMap": null,
-          "kitSkirt": null,
-          "kitSkirtMap": null
+          "kitSkirt": "skirt_pencil",
+          "kitSkirtMap": "/models/kit/textures/skirt_plum.png"
         }
       ]
     },
@@ -1078,7 +1078,7 @@
           "id": "interceptor",
           "label": "拦截者",
           "gender": "female",
-          "skin": "kenney-female-a",
+          "skin": "skin-interceptor",
           "hair": null,
           "hairTransform": {
             "position": [
@@ -1102,8 +1102,8 @@
           "kitHair": null,
           "thumb": null,
           "kitHairMap": null,
-          "kitSkirt": null,
-          "kitSkirtMap": null
+          "kitSkirt": "skirt_pencil",
+          "kitSkirtMap": "/models/kit/textures/skirt_plum.png"
         }
       ]
     }
