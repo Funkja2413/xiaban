@@ -40,13 +40,25 @@ function catalogPrunePlugin(): Plugin {
         const cat = JSON.parse(fs.readFileSync(catalogFile, 'utf8')) as {
           skins?: { file?: string }[];
           props?: { file?: string }[];
-          days?: { variants?: { thumb?: string | null }[] }[];
+          hairs?: { file?: string }[];
+          days?: {
+            variants?: {
+              thumb?: string | null;
+              kitHairMap?: string | null;
+              kitSkirtMap?: string | null;
+            }[];
+          }[];
         };
         const toAbs = (p: string) => path.normalize(path.join(dist, p.replace(/^\//, '')));
         for (const s of cat.skins ?? []) if (s.file) collectGltfDeps(toAbs(s.file), keep);
         for (const p of cat.props ?? []) if (p.file) collectGltfDeps(toAbs(p.file), keep);
+        for (const h of cat.hairs ?? []) if (h.file) collectGltfDeps(toAbs(h.file), keep);
         for (const day of cat.days ?? []) {
-          for (const v of day.variants ?? []) if (v.thumb) keep.add(toAbs(v.thumb));
+          for (const v of day.variants ?? []) {
+            if (v.thumb) keep.add(toAbs(v.thumb));
+            if (v.kitHairMap) keep.add(toAbs(v.kitHairMap));
+            if (v.kitSkirtMap) keep.add(toAbs(v.kitSkirtMap));
+          }
         }
       }
       if (fs.existsSync(colleagues)) {

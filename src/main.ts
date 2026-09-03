@@ -38,6 +38,15 @@ game
   .catch((err) => {
     setMode('loading');
     const el = document.querySelector('#loading .sub')!;
-    el.textContent = '启动失败：' + (err?.message ?? err);
+    el.textContent = '启动失败：' + bootError(err);
     console.error(err);
   });
+
+function bootError(err: unknown) {
+  if (err instanceof Event) {
+    const t = err.target as { src?: string } | null;
+    return t?.src || err.type || '资源加载失败';
+  }
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
