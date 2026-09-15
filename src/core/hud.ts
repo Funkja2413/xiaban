@@ -68,20 +68,27 @@ export class Hud {
     }
   }
 
-  /** 开局准备倒计时；null 隐藏，数字显示 3/2/1，'go' 显示「开始！」 */
-  setReadyCount(value: number | 'go' | null) {
+  /** 开局准备倒计时；null 隐藏，数字显示 3/2/1，'go' 显示「开始！」，'tap' 点一下开声 */
+  setReadyCount(value: number | 'go' | 'tap' | null) {
     if (value === null) {
-      this.readyEl.classList.remove('show', 'go');
+      this.readyEl.classList.remove('show', 'go', 'tap');
       this.readyEl.textContent = '';
       return;
     }
     this.readyEl.classList.add('show');
     if (value === 'go') {
       this.readyEl.classList.add('go');
+      this.readyEl.classList.remove('tap');
       this.readyEl.textContent = '开始！';
       return;
     }
-    this.readyEl.classList.remove('go');
+    if (value === 'tap') {
+      this.readyEl.classList.add('tap');
+      this.readyEl.classList.remove('go');
+      this.readyEl.textContent = '点击开始';
+      return;
+    }
+    this.readyEl.classList.remove('go', 'tap');
     this.readyEl.textContent = String(value);
   }
 

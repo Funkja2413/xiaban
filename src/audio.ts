@@ -242,20 +242,50 @@ class SfxPlayer {
   private loopOn = new Set<LoopId>();
   private on = loadSettings().sfx;
   private ready = false;
+  private pending: SfxId[] = [];
+  private resuming = false;
 
   enabled() {
     return this.on;
   }
 
+  /** AudioContext 已跑起来（Safari / 换关刷新后要先点一下）。 */
+  armed() {
+    return !!this.ctx && this.ctx.state === 'running' && this.ready;
+  }
+
   setEnabled(on: boolean) {
     this.on = on;
-    if (!on) this.stopAllLoops();
+    if (!on) {
+      this.pending.length = 0;
+      this.stopAllLoops();
+    }
   }
 
   unlock() {
     this.ensure();
-    if (!this.ready && this.ctx) this.buildAll(this.ctx);
-    void this.ctx?.resume();
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (!this.ready) this.buildAll(ctx);
+    // iOS：静音缓冲 + resume，确保手势后真的开声
+    try {
+      const bump = ctx.createBuffer(1, 1, ctx.sampleRate);
+      const src = ctx.createBufferSource();
+      src.buffer = bump;
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch {
+      /* ignore */
+    }
+    if (ctx.state === 'suspended' && !this.resuming) {
+      this.resuming = true;
+      void ctx.resume().finally(() => {
+        this.resuming = false;
+        this.flushPending();
+      });
+    } else if (ctx.state === 'running') {
+      this.flushPending();
+    }
   }
 
   play(id: SfxId) {
@@ -266,10 +296,17 @@ class SfxPlayer {
     if (!ctx || !master) return;
     if (!this.ready) this.buildAll(ctx);
     if (ctx.state === 'suspended') {
-      void ctx.resume().then(() => this.start(id));
+      if (this.pending.length < 12) this.pending.push(id);
+      this.unlock();
       return;
     }
     this.start(id);
+  }
+
+  private flushPending() {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const batch = this.pending.splice(0, this.pending.length);
+    for (const id of batch) this.start(id);
   }
 
   /** 胜负结算：停 BGM，播更响的结束曲（音乐或音效任一开着就播）。 */
@@ -306,6 +343,7 @@ class SfxPlayer {
       src.start();
     };
     if (ctx.state === 'suspended') {
+      this.unlock();
       void ctx.resume().then(kick);
       return;
     }

@@ -467,6 +467,14 @@ function resultArtFile(kind: 'won' | 'lost', player: PlayerSlotId) {
   return female ? 'result-lose-f.png' : 'result-lose.png';
 }
 
+function preloadResultArt() {
+  for (const file of ['result-win.png', 'result-win-f.png', 'result-lose.png', 'result-lose-f.png']) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = assetUrl(`ui/${file}`);
+  }
+}
+
 export function showResult(
   kind: 'won' | 'lost',
   day: WeekdayId,
@@ -482,9 +490,10 @@ export function showResult(
   const art = overlay.querySelector<HTMLImageElement>('.resultArt');
   const nextBtn = document.getElementById('resultNext') as HTMLButtonElement;
   const retryBtn = document.getElementById('resultRetry') as HTMLButtonElement;
+
+  // 先写好 kind / 文案，但等结算图就绪再露出来，避免默认失败图闪一下
   overlay.dataset.kind = kind;
   overlay.dataset.player = player;
-  if (art) art.src = assetUrl(`ui/${resultArtFile(kind, player)}`);
   stamp.textContent = kind === 'won' ? '成功下班' : '下班失败';
   title.textContent = kind === 'won' ? '成功下班！' : '今晚走不了了…';
   if (kind === 'lost') {
@@ -511,8 +520,40 @@ export function showResult(
     retryBtn.onclick = () => confirmPlay(day, player);
   }
 
-  setMode('result');
-  playResultIn();
+  const reveal = () => {
+    setMode('result');
+    playResultIn();
+  };
+
+  if (!art) {
+    reveal();
+    return;
+  }
+
+  const file = resultArtFile(kind, player);
+  const next = assetUrl(`ui/${file}`);
+  const already =
+    art.complete &&
+    art.naturalWidth > 0 &&
+    (art.currentSrc.endsWith(file) || art.getAttribute('src') === next);
+
+  if (already) {
+    art.style.opacity = '1';
+    reveal();
+    return;
+  }
+
+  art.style.opacity = '0';
+  const done = () => {
+    art.onload = null;
+    art.onerror = null;
+    art.style.opacity = '1';
+    reveal();
+  };
+  art.onload = done;
+  art.onerror = done;
+  art.src = next;
+  if (art.complete && art.naturalWidth > 0) done();
 }
 
 export function initShell() {
@@ -524,6 +565,7 @@ export function initShell() {
   renderLevels();
   bindSettings();
   bindUiClicks();
+  preloadResultArt();
 
   document.getElementById('btnStart')!.addEventListener('click', () => askAvatar(continueDay(), 'home'));
   document.getElementById('btnLevels')!.addEventListener('click', () => openLevels());

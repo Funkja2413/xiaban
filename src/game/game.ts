@@ -130,6 +130,7 @@ export class Game {
   private readyCamTo = new THREE.Vector3();
   private readyLeft = 0;
   private readySecShown = -1;
+  private readyAudioOk = false;
   private readyGoFlash = 0;
 
   get day() {
@@ -404,6 +405,7 @@ export class Game {
     this.readyLeft = READY_DUR;
     this.readySecShown = -1;
     this.readyGoFlash = 0;
+    this.readyAudioOk = false;
     sfx.setChannel(false);
     sfx.setDecoy(false);
     this.hud.resetRun();
@@ -448,6 +450,10 @@ export class Game {
     if (this.phase !== 'ready') {
       if (this.readyGoFlash > 0) this.hud.setReadyCount('go');
       else this.hud.setReadyCount(null);
+      return;
+    }
+    if (!sfx.armed()) {
+      this.hud.setReadyCount('tap');
       return;
     }
     const sec = Math.max(1, Math.ceil(this.readyLeft));
@@ -813,6 +819,22 @@ export class Game {
     this.aiming = false;
     this.wasAiming = false;
     this.player.update(h, 0, 0, false, this.enemies);
+    // 换关整页刷新后浏览器会锁 AudioContext；先点一下再倒计时，否则开局音效全丢
+    if (!sfx.armed()) {
+      this.readyAudioOk = false;
+      sfx.unlock();
+      this.hud.setReadyCount('tap');
+      const tWait = performance.now();
+      this.world.step();
+      this.stepMs = this.stepMs * 0.9 + (performance.now() - tWait) * 0.1;
+      return;
+    }
+    if (!this.readyAudioOk) {
+      this.readyAudioOk = true;
+      this.readyLeft = READY_DUR;
+      this.readySecShown = -1;
+      bgm.play(this.dayId);
+    }
     this.readyLeft -= h;
     this.glideT += h;
     this.syncReadyCount();
