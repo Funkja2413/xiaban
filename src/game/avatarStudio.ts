@@ -29,6 +29,7 @@ function skinnedMinY(mesh: THREE.SkinnedMesh): number {
   const bindMatrix = mesh.bindMatrix;
   const bindMatrixInverse = mesh.bindMatrixInverse;
   const boneMatrices = mesh.skeleton.boneMatrices;
+  if (!boneMatrices) return NaN;
   const world = mesh.matrixWorld;
   const morphs = geo.morphAttributes.position;
   const inf = mesh.morphTargetInfluences;
