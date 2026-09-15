@@ -1,6 +1,6 @@
 import { CharacterPreview } from './preview';
-import { drawSkinPreview, imageFromUrl, loadSkinMap, skinFromFile } from './skin';
-import { HairRig, countTris, loadHairFile } from './hair';
+import { drawSkinPreview, imageFromUrl, loadSkinMap, pngBytesFromUrl, skinFromFile } from './skin';
+import { HairRig, countTris, loadHairFile, loadPropFile } from './hair';
 import {
   BUDGET,
   IDENTITY_TRANSFORM,
@@ -17,6 +17,7 @@ import {
   ensureRosterLooks,
   lookForSlot,
   officialSkinForGender,
+  propFitOf,
   slotSkinId,
   isOfficialSkinId,
   selectCatalogDay,
@@ -26,7 +27,15 @@ import {
 import { PROP_PRESETS } from './props';
 import { KIT_HAIR_ALBEDO, KIT_HAIR_MAPS, KIT_HAIR_UV_ISLANDS, KIT_SKIRT_ALBEDO, KIT_SKIRT_MAPS, KIT_SKIRT_UV_ISLANDS, KIT_SKINS, KIT_UV_ISLANDS, isKitHairId, isKitSkinId, isKitSkirtId, type KitHairId, type KitSkirtId } from './kit';
 import { ROSTER as ROSTER_INIT, type RosterSlot } from '../../../src/roster';
-import type { AttachAnchor, HairTransform, PropUse } from '../../../src/catalog';
+import {
+  clampBodyScale,
+  defaultBodyScale,
+  migrateEnemySkill,
+  type AttachAnchor,
+  type HairTransform,
+  type PropUse,
+} from '../../../src/catalog';
+import { isPlayerSlotId } from '../../../src/roster';
 import { WEEKDAYS, type WeekdayId } from '../../../src/levels';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -84,7 +93,13 @@ async function boot() {
 
   const hat = new HairRig();
   const held = new HairRig();
-  type EditTarget = 'hat' | 'held';
+  const back = new HairRig();
+  type EditTarget = 'hat' | 'held' | 'back';
+  const SLOT_OF: Record<AttachAnchor, EditTarget> = { head: 'hat', hand: 'held', back: 'back' };
+  const ANCHOR_OF: Record<EditTarget, AttachAnchor> = { hat: 'head', held: 'hand', back: 'back' };
+  const SLOT_LABEL: Record<EditTarget, string> = { hat: '头顶', held: '右手', back: '后背' };
+  const BONE_LABEL: Record<EditTarget, string> = { hat: 'Head', held: 'RightHand', back: 'Chest' };
+  const ANCHOR_LABEL: Record<AttachAnchor, string> = { head: '头顶', hand: '右手', back: '后背' };
   let editTarget: EditTarget = 'hat';
   let propAnchor: AttachAnchor = 'head';
   let catalog = await loadCatalog();
@@ -104,6 +119,8 @@ async function boot() {
   let hatFileName = '';
   let heldBytes: ArrayBuffer | null = null;
   let heldFileName = '';
+  let backBytes: ArrayBuffer | null = null;
+  let backFileName = '';
   let syncingInputs = false;
   let thumbNonce = 0;
 
@@ -219,10 +236,25 @@ async function boot() {
     return roster.find((s) => s.id === id);
   }
 
+  function destAssetId(slotId: string) {
+    return isPlayerSlotId(slotId) ? slotSkinId(slotId) : `skin-${slotId}-${currentDay}`;
+  }
+
+  function lookMapUsedByOther(field: 'kitHairMap' | 'kitSkirtMap', file: string, slotId: string) {
+    if (!file || file.startsWith('/models/kit/')) return false;
+    return (catalog.days ?? []).some((d) =>
+      (d.variants ?? []).some((v) => (d.id !== currentDay || v.id !== slotId) && v[field] === file)
+    );
+  }
+
   function bindSlotFields(slot: RosterSlot) {
     ($('varId') as HTMLInputElement).value = slot.id;
-    ($('varLabel') as HTMLInputElement).value = slot.label;
     ($('varGender') as HTMLInputElement).value = slot.gender;
+    $('nickField').hidden = isPlayerSlotId(slot.id);
+    if (!isPlayerSlotId(slot.id)) {
+      const look = lookForSlot(catalog, slot.id);
+      ($('varLabel') as HTMLInputElement).value = look?.label ?? slot.label;
+    }
     officialSkin = slot.gender === 'female' ? OFFICIAL_SKINS[1] : OFFICIAL_SKINS[0];
     $('btnMale').classList.toggle('active', slot.gender === 'male');
     $('btnFemale').classList.toggle('active', slot.gender === 'female');
@@ -237,7 +269,7 @@ async function boot() {
     el.textContent =
       `${WEEKDAYS.find((d) => d.id === currentDay)?.label ?? currentDay}  ·  规划 ${b.assigned}/${b.slots} 已指定  ·  皮 ${b.skins}/${BUDGET.skins}  ·  道具 ${b.props}/${BUDGET.props}` +
       (b.over ? '  超预算，合批会变重' : '');
-    $('rosterHint').textContent = `游戏规划 ${roster.length} 个角色。改 src/roster.ts 后点刷新。`;
+    $('rosterHint').textContent = `玩家五关同一套。同事每关换花名和皮；开局只能带一个玩家进关。`;
   }
 
   function renderDays() {
@@ -273,20 +305,22 @@ async function boot() {
         !look.kitSkirt &&
         !(look.props?.length) &&
         !look.bodyMorph &&
+        (look.bodyScale == null || Math.abs(look.bodyScale - defaultBodyScale(slot.id)) < 1e-3) &&
         (!look.kitHairMap || look.kitHairMap === KIT_HAIR_ALBEDO) &&
         (!look.kitSkirtMap || look.kitSkirtMap === KIT_SKIRT_ALBEDO);
       const extras = look?.props.map((p) => p.id).join(' · ');
       const row = document.createElement('div');
       row.className = `item${slot.id === selectedSlot ? ' on' : ''}${look ? '' : ' missing'}`;
       const detail = look
-        ? `${look.skin}${look.kitHair ? ' · ' + look.kitHair : ''}${extras ? ' · ' + extras : ''}${officialOnly ? ' · 游戏默认' : ''}`
-        : '还没有形象';
+        ? `${look.skin}${look.kitHair ? ' · ' + look.kitHair : ''}${extras ? ' · ' + extras : ''}${officialOnly ? ' · 游戏默认' : ''}${slot.kind === 'player' ? ' · 进关二选一' : ''}`
+        : slot.kind === 'player' ? '还没有形象 · 进关二选一' : '还没有形象';
+      const title = slot.kind === 'player' ? slot.label : look?.label || slot.label;
       const tag = !look ? '未指定' : officialOnly ? '游戏默认' : '已指定';
       const thumb = look?.thumb
         ? `<img class="thumb" alt="" src="${look.thumb}?v=${thumbNonce}">`
         : `<span class="thumb ph"></span>`;
       row.innerHTML =
-        `${thumb}<div><div>${slot.label}</div><div class="meta">${slot.id} · ${slot.gender} · ${detail}</div></div>` +
+        `${thumb}<div><div>${title}</div><div class="meta">${slot.label} · ${slot.id} · ${detail}</div></div>` +
         `<span class="tag ${look ? 'ok' : 'wait'}">${tag}</span>`;
       row.addEventListener('click', () => void openSlot(slot.id));
       box.appendChild(row);
@@ -302,6 +336,7 @@ async function boot() {
     if (look) await loadVariant(look.id);
     else {
       setMorphUi(0);
+      setScaleUi(defaultBodyScale(id));
       pickKitHair(null);
       pickKitSkirt(null);
       void pickHairMap(KIT_HAIR_ALBEDO, true);
@@ -322,16 +357,50 @@ async function boot() {
     $('packPaths').textContent = `${WEEKDAYS.find((d) => d.id === currentDay)?.label} · ${budgetReport(catalog).assigned}/${roster.length} 已指定 · 游戏当前 ${WEEKDAYS.find((d) => d.id === catalog.active)?.label}`;
   }
 
+  function rigOf(kind: EditTarget) {
+    return kind === 'hat' ? hat : kind === 'held' ? held : back;
+  }
+
+  function boneOf(kind: EditTarget) {
+    return kind === 'hat' ? preview.head : kind === 'held' ? preview.hand : preview.back;
+  }
+
+  function idInput(kind: EditTarget) {
+    return $(kind === 'hat' ? 'hatId' : kind === 'held' ? 'heldId' : 'backId') as HTMLInputElement;
+  }
+
+  function setSlotBytes(kind: EditTarget, bytes: ArrayBuffer | null, fileName = '') {
+    if (kind === 'hat') {
+      hatBytes = bytes;
+      if (fileName) hatFileName = fileName;
+    } else if (kind === 'held') {
+      heldBytes = bytes;
+      if (fileName) heldFileName = fileName;
+    } else {
+      backBytes = bytes;
+      if (fileName) backFileName = fileName;
+    }
+  }
+
+  function slotBytes(kind: EditTarget) {
+    return kind === 'hat' ? hatBytes : kind === 'held' ? heldBytes : backBytes;
+  }
+
+  function slotFileName(kind: EditTarget) {
+    return kind === 'hat' ? hatFileName : kind === 'held' ? heldFileName : backFileName;
+  }
+
   function activeRig() {
-    return editTarget === 'hat' ? hat : held;
+    return rigOf(editTarget);
   }
 
   function setEditTarget(next: EditTarget) {
     editTarget = next;
     $('btnEditHat').classList.toggle('active', next === 'hat');
     $('btnEditHeld').classList.toggle('active', next === 'held');
+    $('btnEditBack').classList.toggle('active', next === 'back');
     const rig = activeRig();
-    const label = next === 'hat' ? '帽子（Head）' : '手持（RightHand）';
+    const label = `${SLOT_LABEL[next]}（${BONE_LABEL[next]}）`;
     $('xformHint').textContent = `正在调${label}。拖滑杆即可。`;
     if (rig.visual) {
       preview.attachGizmo(rig.root);
@@ -344,19 +413,18 @@ async function boot() {
     }
   }
 
-  async function attachProp(kind: 'hat' | 'held', visual: import('three').Group, source: string, snap: boolean) {
-    const bone = kind === 'hat' ? preview.head : preview.hand;
+  async function attachProp(kind: EditTarget, visual: import('three').Group, source: string, snap: boolean) {
+    const bone = boneOf(kind);
     if (!bone) {
-      toast(kind === 'hat' ? '没有 Head 骨，无法挂帽子' : '没有 RightHand 骨，无法挂手持');
+      toast(`没有 ${BONE_LABEL[kind]} 骨，无法挂${SLOT_LABEL[kind]}`);
       return;
     }
-    const rig = kind === 'hat' ? hat : held;
+    const rig = rigOf(kind);
     rig.mount(bone, visual);
     rig.source = source;
     const tris = countTris(visual);
-    $('propInfo').textContent =
-      `${kind === 'hat' ? '帽' : '手持'} · ${source} · ${tris} 三角 · 已挂 ${kind === 'hat' ? 'Head' : 'RightHand'}`;
-    if (snap) rig.snapToHead();
+    $('propInfo').textContent = `${SLOT_LABEL[kind]} · ${source} · ${tris} 三角 · 已挂 ${BONE_LABEL[kind]}`;
+    if (snap) rig.snapToAttach(kind === 'back' ? 'back' : 'bottom');
     setEditTarget(kind);
     $('status').textContent = preview.statusLine();
   }
@@ -371,8 +439,13 @@ async function boot() {
     ($('skinId') as HTMLInputElement).value = v.skin;
     const hatUse = (v.props ?? []).find((p) => p.anchor === 'head');
     const heldUse = (v.props ?? []).find((p) => p.anchor === 'hand');
-    ($('hatId') as HTMLInputElement).value = hatUse?.id ?? '';
-    ($('heldId') as HTMLInputElement).value = heldUse?.id ?? '';
+    const backUse = (v.props ?? []).find((p) => p.anchor === 'back');
+    idInput('hat').value = hatUse?.id ?? '';
+    idInput('held').value = heldUse?.id ?? '';
+    idInput('back').value = backUse?.id ?? '';
+    const skillEl = $('enemySkill') as HTMLSelectElement;
+    skillEl.value = v.enemySkill ?? '';
+    $('enemySkillField').hidden = isPlayerSlotId(v.id);
 
     const skin = catalog.skins.find((s) => s.id === v.skin) ?? OFFICIAL_SKINS.find((s) => s.id === v.skin);
     if (skin && preview.skinned) {
@@ -385,19 +458,22 @@ async function boot() {
 
     hat.unmount();
     held.unmount();
-    const restoreProp = async (use: PropUse | undefined, kind: 'hat' | 'held') => {
+    back.unmount();
+    const restoreProp = async (use: PropUse | undefined, kind: EditTarget) => {
       if (!use) return;
       const def = catalog.props.find((p) => p.id === use.id);
       if (!def) return;
-      const visual = await loadHairFile(def.file);
-      const rig = kind === 'hat' ? hat : held;
+      const visual = await loadPropFile(def.file, propFitOf(def.id, def.fit));
+      const rig = rigOf(kind);
       rig.setPreRotation(def.preRotation);
       await attachProp(kind, visual, def.file, false);
       rig.setTransform(use.transform);
     };
     await restoreProp(hatUse, 'hat');
     await restoreProp(heldUse, 'held');
+    await restoreProp(backUse, 'back');
     setMorphUi(v.bodyMorph ?? 0);
+    setScaleUi(v.bodyScale ?? defaultBodyScale(v.id));
     const kh = v.kitHair;
     pickKitHair(isKitHairId(kh) ? kh : null);
     pickKitSkirt(isKitSkirtId(v.kitSkirt) ? v.kitSkirt : null);
@@ -405,33 +481,33 @@ async function boot() {
     else await pickHairMap(KIT_HAIR_ALBEDO, true);
     if (v.kitSkirtMap) await pickSkirtMap(v.kitSkirtMap, true);
     else await pickSkirtMap(KIT_SKIRT_ALBEDO, true);
-    setEditTarget(hatUse ? 'hat' : heldUse ? 'held' : 'hat');
+    setEditTarget(hatUse ? 'hat' : heldUse ? 'held' : backUse ? 'back' : 'hat');
     toast(`已还原 ${v.label}`);
   }
 
   // —— 官方皮 / 对照 ——
   $('btnMale').addEventListener('click', () => {
-    officialSkin = OFFICIAL_SKINS[0];
-    preview.setOfficialSkin(officialSkin.id);
-    $('btnMale').classList.add('active');
-    $('btnFemale').classList.remove('active');
-    ($('skinId') as HTMLInputElement).value = officialSkin.id;
-    if (!customSkin) {
-      customPreviewUrl = officialSkin.file;
-      void redrawSkinView();
-    }
+    void pickOfficialBody(OFFICIAL_SKINS[0]);
   });
   $('btnFemale').addEventListener('click', () => {
-    officialSkin = OFFICIAL_SKINS[1];
-    preview.setOfficialSkin(officialSkin.id);
-    $('btnFemale').classList.add('active');
-    $('btnMale').classList.remove('active');
-    ($('skinId') as HTMLInputElement).value = officialSkin.id;
-    if (!customSkin) {
-      customPreviewUrl = officialSkin.file;
-      void redrawSkinView();
-    }
+    void pickOfficialBody(OFFICIAL_SKINS[1]);
   });
+
+  async function pickOfficialBody(def: (typeof OFFICIAL_SKINS)[number]) {
+    officialSkin = def;
+    const map = await loadSkinMap(def.file, false);
+    customSkin = { id: def.id, file: def.file, map };
+    customPreviewUrl = def.file;
+    preview.setCustomSkin(map);
+    preview.setCompareOfficial(false);
+    preview.setOfficialSkin(def.id);
+    $('btnMale').classList.toggle('active', def.id === OFFICIAL_SKINS[0].id);
+    $('btnFemale').classList.toggle('active', def.id === OFFICIAL_SKINS[1].id);
+    $('btnMine').classList.add('active');
+    $('btnOfficial').classList.remove('active');
+    ($('skinId') as HTMLInputElement).value = def.id;
+    await redrawSkinView();
+  }
   $('btnMine').addEventListener('click', () => {
     preview.setCompareOfficial(false);
     $('btnMine').classList.add('active');
@@ -488,6 +564,17 @@ async function boot() {
     el.addEventListener('input', () => setMorphUi(Number((el as HTMLInputElement).value)));
   }
 
+  function setScaleUi(t: number) {
+    const v = clampBodyScale(t);
+    for (const el of document.querySelectorAll<HTMLInputElement>('.bodyScaleRange')) el.value = String(v);
+    for (const el of document.querySelectorAll('.bodyScaleVal')) el.textContent = v.toFixed(2);
+    preview.setBodyScale(v);
+    $('status').textContent = preview.statusLine();
+  }
+  for (const el of document.querySelectorAll('.bodyScaleRange')) {
+    el.addEventListener('input', () => setScaleUi(Number((el as HTMLInputElement).value)));
+  }
+
   const kitSkinBox = $('kitSkinBtns');
   for (const def of KIT_SKINS) {
     const btn = document.createElement('button');
@@ -496,20 +583,22 @@ async function boot() {
     btn.title = def.label;
     btn.dataset.kitSkin = def.id;
     btn.addEventListener('click', () => {
-      const mat = preview.skinned?.material as { map?: import('three').Texture } | undefined;
-      customSkin = { id: def.id, file: def.file, map: mat?.map ?? (null as unknown as import('three').Texture) };
-      preview.setCustomSkin(null);
-      preview.setOfficialSkin(def.id);
-      preview.setCompareOfficial(false);
-      $('btnMine').classList.add('active');
-      $('btnOfficial').classList.remove('active');
-      ($('skinId') as HTMLInputElement).value = def.id;
-      customPreviewUrl = def.file;
-      void redrawSkinView();
-      for (const b of kitSkinBox.querySelectorAll('button')) {
-        b.classList.toggle('active', b === btn);
-      }
-      toast(`${def.label} · 保存到角色后进战场`);
+      void (async () => {
+        const map = await loadSkinMap(def.file, false);
+        customSkin = { id: def.id, file: def.file, map };
+        customPreviewUrl = def.file;
+        preview.setCustomSkin(map);
+        preview.setCompareOfficial(false);
+        preview.setOfficialSkin(def.id);
+        $('btnMine').classList.add('active');
+        $('btnOfficial').classList.remove('active');
+        ($('skinId') as HTMLInputElement).value = def.id;
+        await redrawSkinView();
+        for (const b of kitSkinBox.querySelectorAll('button')) {
+          b.classList.toggle('active', b === btn);
+        }
+        toast(`${def.label} · 保存后会复制到本角色独立皮`);
+      })();
     });
     kitSkinBox.appendChild(btn);
   }
@@ -536,7 +625,7 @@ async function boot() {
       const { map, square, width, height } = await skinFromFile(file, false);
       const bytes = await file.arrayBuffer();
       if (atlasTab === 'hair') {
-        const id = `${slotSkinId(selectedSlot || slug(file.name, 'custom'))}-hair`;
+        const id = `${destAssetId(selectedSlot || slug(file.name, 'custom'))}-hair`;
         customHair = { file: `/models/colleagues/skins/${id}.png`, map, bytes };
         hairPreviewUrl = URL.createObjectURL(file);
         preview.setKitHairMap(map, customHair.file);
@@ -546,7 +635,7 @@ async function boot() {
         return;
       }
       if (atlasTab === 'skirt') {
-        const id = `${slotSkinId(selectedSlot || slug(file.name, 'custom'))}-skirt`;
+        const id = `${destAssetId(selectedSlot || slug(file.name, 'custom'))}-skirt`;
         customSkirtTex = { file: `/models/colleagues/skins/${id}.png`, map, bytes };
         skirtPreviewUrl = URL.createObjectURL(file);
         preview.setKitSkirtMap(map, customSkirtTex.file);
@@ -576,33 +665,31 @@ async function boot() {
     propAnchor = next;
     $('btnAnchorHead').classList.toggle('active', next === 'head');
     $('btnAnchorHand').classList.toggle('active', next === 'hand');
-    setEditTarget(next === 'head' ? 'hat' : 'held');
+    $('btnAnchorBack').classList.toggle('active', next === 'back');
+    setEditTarget(SLOT_OF[next]);
   }
   $('btnAnchorHead').addEventListener('click', () => setPropAnchor('head'));
   $('btnAnchorHand').addEventListener('click', () => setPropAnchor('hand'));
+  $('btnAnchorBack').addEventListener('click', () => setPropAnchor('back'));
   $('btnEditHat').addEventListener('click', () => {
     setPropAnchor('head');
   });
   $('btnEditHeld').addEventListener('click', () => {
     setPropAnchor('hand');
   });
+  $('btnEditBack').addEventListener('click', () => {
+    setPropAnchor('back');
+  });
 
   bindDrop($('propDrop'), $('propFile') as HTMLInputElement, async (file) => {
     try {
       const bytes = await file.arrayBuffer();
-      const kind = propAnchor === 'head' ? 'hat' : 'held';
-      if (kind === 'hat') {
-        hatBytes = bytes;
-        hatFileName = file.name.replace(/\s+/g, '-');
-        const id = slug(($('hatId') as HTMLInputElement).value || file.name, 'prop-hat');
-        ($('hatId') as HTMLInputElement).value = id;
-      } else {
-        heldBytes = bytes;
-        heldFileName = file.name.replace(/\s+/g, '-');
-        const id = slug(($('heldId') as HTMLInputElement).value || file.name, 'prop-held');
-        ($('heldId') as HTMLInputElement).value = id;
-      }
-      const visual = await loadHairFile(new File([bytes], file.name));
+      const kind = SLOT_OF[propAnchor];
+      const fileName = file.name.replace(/\s+/g, '-');
+      setSlotBytes(kind, bytes, fileName);
+      const id = slug(idInput(kind).value || file.name, `prop-${kind}`);
+      idInput(kind).value = id;
+      const visual = await loadPropFile(new File([bytes], file.name));
       await attachProp(kind, visual, file.name, true);
     } catch (err) {
       toast(err instanceof Error ? err.message : String(err));
@@ -610,51 +697,51 @@ async function boot() {
   });
 
   for (const preset of PROP_PRESETS) {
-    const btn = $(preset.id === 'prop-cap' ? 'btnPropCap' : preset.id === 'prop-cup' ? 'btnPropCup' : 'btnPropLaptop');
+    const btn = $(preset.btn);
     btn.addEventListener('click', async () => {
-      setPropAnchor(preset.anchor);
-      const kind = preset.anchor === 'head' ? 'hat' : 'held';
-      const input = kind === 'hat' ? $('hatId') : $('heldId');
-      (input as HTMLInputElement).value = preset.id;
-      if (kind === 'hat') {
-        hatBytes = null;
-        hatFileName = `${preset.id}.glb`;
-      } else {
-        heldBytes = null;
-        heldFileName = `${preset.id}.glb`;
+      const kind = SLOT_OF[propAnchor];
+      idInput(kind).value = preset.id;
+      setSlotBytes(kind, null, `${preset.id}.glb`);
+      const rig = rigOf(kind);
+      rig.resetTransform();
+      const existing = catalog.props.find((p) => p.id === preset.id);
+      rig.setPreRotation(existing?.preRotation ?? [0, 0, 0]);
+      const visual = preset.file
+        ? await loadPropFile(preset.file, preset.fit)
+        : preset.make
+          ? preset.make()
+          : null;
+      if (!visual) {
+        toast(`${preset.label} 没有模型`);
+        return;
       }
-      await attachProp(kind, preset.make(), preset.label, true);
-      toast(`${preset.label} 已挂 ${preset.anchor === 'head' ? '头顶' : '右手'}`);
+      await attachProp(kind, visual, preset.file ?? preset.label, true);
+      toast(`${preset.label} 已挂 ${ANCHOR_LABEL[propAnchor]}`);
     });
   }
 
   $('btnClearProp').addEventListener('click', () => {
-    const kind = propAnchor === 'head' ? 'hat' : 'held';
-    const rig = kind === 'hat' ? hat : held;
-    rig.unmount();
-    if (kind === 'hat') {
-      hatBytes = null;
-      ($('hatId') as HTMLInputElement).value = '';
-    } else {
-      heldBytes = null;
-      ($('heldId') as HTMLInputElement).value = '';
-    }
-    $('propInfo').textContent = `已卸下${kind === 'hat' ? '帽子' : '手持'}`;
+    const kind = SLOT_OF[propAnchor];
+    rigOf(kind).unmount();
+    setSlotBytes(kind, null);
+    idInput(kind).value = '';
+    $('propInfo').textContent = `已卸下${SLOT_LABEL[kind]}`;
     if (editTarget === kind) setEditTarget(kind);
   });
 
+  const setAnimBtn = (active: 'idle' | 'run' | 'jump') => {
+    $('btnIdle').classList.toggle('active', active === 'idle');
+    $('btnRun').classList.toggle('active', active === 'run');
+    $('btnJump').classList.toggle('active', active === 'jump');
+  };
   $('btnIdle').addEventListener('click', () => {
     preview.play('idle');
-    $('btnIdle').classList.add('active');
-    $('btnRun').classList.remove('active');
-    $('btnJump').classList.remove('active');
+    setAnimBtn('idle');
     $('status').textContent = preview.statusLine();
   });
   $('btnRun').addEventListener('click', () => {
     preview.play('run');
-    $('btnRun').classList.add('active');
-    $('btnIdle').classList.remove('active');
-    $('btnJump').classList.remove('active');
+    setAnimBtn('run');
     $('status').textContent = preview.statusLine();
   });
   $('btnJump').addEventListener('click', () => {
@@ -663,9 +750,7 @@ async function boot() {
       return;
     }
     preview.play('jump');
-    $('btnJump').classList.add('active');
-    $('btnIdle').classList.remove('active');
-    $('btnRun').classList.remove('active');
+    setAnimBtn('jump');
     $('status').textContent = preview.statusLine();
   });
   $('btnCam').addEventListener('click', () => preview.resetCamera());
@@ -689,7 +774,7 @@ async function boot() {
   });
   $('btnSnap').addEventListener('click', () => {
     const rig = activeRig();
-    rig.snapToHead();
+    rig.snapToAttach(editTarget === 'back' ? 'back' : 'bottom');
     writeTransform(rig.getTransform());
   });
   $('btnResetXform').addEventListener('click', () => {
@@ -725,61 +810,82 @@ async function boot() {
       return;
     }
     const id = slot.id;
-    const label = slot.label;
     const gender = slot.gender;
+    const nick = ($('varLabel') as HTMLInputElement).value.trim();
+    const label = isPlayerSlotId(id) ? slot.label : nick || slot.label;
     ($('varId') as HTMLInputElement).value = id;
     ($('varLabel') as HTMLInputElement).value = label;
     ($('varGender') as HTMLInputElement).value = gender;
 
     const ownSkinId = slotSkinId(slot.id);
-    let skinDef = officialSkinForGender(gender);
+    const destSkinId = isPlayerSlotId(id) ? ownSkinId : `skin-${id}-${currentDay}`;
+    const existing = lookForSlot(catalog, slot.id);
+    const fallback = officialSkinForGender(gender);
+    const picked = customSkin
+      ? { id: customSkin.id, file: customSkin.file }
+      : existing?.skin === ownSkinId
+        ? catalog.skins.find((s) => s.id === ownSkinId) ?? fallback
+        : catalog.skins.find((s) => s.id === existing?.skin) ?? fallback;
 
-    if (customSkin?.bytes) {
-      const put = await saveAsset('skins', `${ownSkinId}.png`, customSkin.bytes);
+    const writeOwnSkin = async (bytes: ArrayBuffer, destId: string) => {
+      const put = await saveAsset('skins', `${destId}.png`, bytes);
       if (!put.ok || !put.file) {
         toast(`皮肤未写入：${put.error}`);
+        return null;
+      }
+      if (customSkin) {
+        customSkin = { ...customSkin, id: destId, file: put.file, bytes: undefined };
+      }
+      ($('skinId') as HTMLInputElement).value = destId;
+      return { id: destId, file: put.file, flipY: false as const };
+    };
+
+    let skinDef = fallback;
+    const shared = picked.id !== ownSkinId && picked.id !== destSkinId;
+    if (customSkin?.bytes) {
+      const written = await writeOwnSkin(customSkin.bytes, destSkinId);
+      if (!written) return;
+      skinDef = written;
+    } else if (shared && isPlayerSlotId(id)) {
+      try {
+        const written = await writeOwnSkin(await pngBytesFromUrl(picked.file), ownSkinId);
+        if (!written) return;
+        skinDef = written;
+        if (!customSkin) {
+          customSkin = { id: ownSkinId, file: written.file, map: await loadSkinMap(written.file, false) };
+          preview.setCustomSkin(customSkin.map);
+        }
+      } catch (err) {
+        toast(`无法把贴图写成「${ownSkinId}」：${err instanceof Error ? err.message : String(err)}`);
         return;
       }
-      skinDef = { id: ownSkinId, file: put.file, flipY: false };
-      customSkin.file = put.file;
-      customSkin.id = ownSkinId;
-      ($('skinId') as HTMLInputElement).value = ownSkinId;
-    } else if (customSkin && (customSkin.id === ownSkinId || isOfficialSkinId(customSkin.id) || isKitSkinId(customSkin.id))) {
-      skinDef = { id: customSkin.id, file: customSkin.file, flipY: false };
-    } else if (customSkin && !isOfficialSkinId(customSkin.id) && !isKitSkinId(customSkin.id) && customSkin.id !== ownSkinId) {
-      toast('这张皮属于别的角色，已改存为本角色独立皮');
-      skinDef = officialSkinForGender(gender);
-    } else if (customSkin) {
-      skinDef = { id: customSkin.id, file: customSkin.file, flipY: false };
     } else {
-      const existing = lookForSlot(catalog, slot.id);
-      if (existing?.skin === ownSkinId) {
-        const kept = catalog.skins.find((s) => s.id === ownSkinId);
-        if (kept) skinDef = kept;
-      }
+      skinDef = { id: picked.id, file: picked.file, flipY: false };
     }
 
     const uses: PropUse[] = [];
-    const persistProp = async (kind: 'hat' | 'held'): Promise<boolean> => {
-      const rig = kind === 'hat' ? hat : held;
+    const persistProp = async (kind: EditTarget): Promise<boolean> => {
+      const rig = rigOf(kind);
       if (!rig.visual) return true;
-      const anchor: AttachAnchor = kind === 'hat' ? 'head' : 'hand';
-      const input = kind === 'hat' ? $('hatId') : $('heldId');
+      const anchor = ANCHOR_OF[kind];
+      const input = idInput(kind);
       const ownId = `prop-${kind}-${id}`;
-      let propId = (input as HTMLInputElement).value.trim() || ownId;
+      let propId = input.value.trim() || ownId;
       const usedByOther = catalog.variants.some(
         (v) => v.id !== id && v.props.some((p) => p.id === propId)
       );
-      let file = catalog.props.find((p) => p.id === propId)?.file;
+      const prevProp = catalog.props.find((p) => p.id === propId);
+      let file = prevProp?.file;
+      const prevFit = prevProp?.fit;
       if (rig.source.startsWith('/models/colleagues/')) file = rig.source;
-      const bytes = kind === 'hat' ? hatBytes : heldBytes;
-      const fileName = kind === 'hat' ? hatFileName : heldFileName;
+      const bytes = slotBytes(kind);
+      const fileName = slotFileName(kind);
       const willWrite = !!bytes || !file;
       if (willWrite && usedByOther) {
         propId = ownId;
         file = undefined;
       }
-      (input as HTMLInputElement).value = propId;
+      input.value = propId;
       if (bytes && fileName) {
         const ext = fileName.toLowerCase().endsWith('.fbx') ? 'fbx' : 'glb';
         const put = await saveAsset('props', `${propId}.${ext}`, bytes);
@@ -797,11 +903,16 @@ async function boot() {
         }
         file = put.file;
       }
-      upsertProp(catalog, { id: propId, file: file!, preRotation: rig.preRotation });
+      upsertProp(catalog, {
+        id: propId,
+        file: file!,
+        preRotation: rig.preRotation,
+        fit: propFitOf(propId, prevFit),
+      });
       uses.push({ id: propId, anchor, transform: rig.getTransform() });
       return true;
     };
-    if (!(await persistProp('hat')) || !(await persistProp('held'))) return;
+    if (!(await persistProp('hat')) || !(await persistProp('held')) || !(await persistProp('back'))) return;
 
     let thumb: string | null = lookForSlot(catalog, id)?.thumb ?? null;
     try {
@@ -813,27 +924,42 @@ async function boot() {
       console.warn('缩略图未写入', err);
     }
 
-    let hairMapFile = customHair?.file ?? preview.hairMapFile ?? KIT_HAIR_ALBEDO;
-    if (customHair?.bytes) {
-      const put = await saveAsset('skins', `${ownSkinId}-hair.png`, customHair.bytes);
-      if (!put.ok || !put.file) {
-        toast(`头发贴图未写入：${put.error}`);
-        return;
+    const persistLookMap = async (
+      kind: 'hair' | 'skirt',
+      current: { file: string; bytes?: ArrayBuffer } | null,
+      previewFile: string,
+      fallback: string
+    ): Promise<string | null> => {
+      let file = current?.file ?? previewFile ?? fallback;
+      const destName = `${destSkinId}-${kind}.png`;
+      const destFile = `/models/colleagues/skins/${destName}`;
+      const field = kind === 'hair' ? 'kitHairMap' : 'kitSkirtMap';
+      const needWrite = !!current?.bytes || (lookMapUsedByOther(field, file, id) && file !== destFile);
+      if (!needWrite) return file;
+      try {
+        const bytes = current?.bytes ?? (await pngBytesFromUrl(file));
+        const put = await saveAsset('skins', destName, bytes);
+        if (!put.ok || !put.file) {
+          toast(`${kind === 'hair' ? '头发贴图' : '裙布'}未写入：${put.error}`);
+          return null;
+        }
+        return put.file;
+      } catch (err) {
+        toast(`${kind === 'hair' ? '头发贴图' : '裙布'}未写入：${err instanceof Error ? err.message : String(err)}`);
+        return null;
       }
-      hairMapFile = put.file;
-      customHair = { ...customHair, file: put.file, bytes: undefined };
-      hairPreviewUrl = put.file;
+    };
+    const hairMapFile = await persistLookMap('hair', customHair, preview.hairMapFile, KIT_HAIR_ALBEDO);
+    if (!hairMapFile) return;
+    if (customHair) {
+      customHair = { ...customHair, file: hairMapFile, bytes: undefined };
+      hairPreviewUrl = hairMapFile;
     }
-    let skirtMapFile = customSkirtTex?.file ?? preview.skirtMapFile ?? KIT_SKIRT_ALBEDO;
-    if (customSkirtTex?.bytes) {
-      const put = await saveAsset('skins', `${ownSkinId}-skirt.png`, customSkirtTex.bytes);
-      if (!put.ok || !put.file) {
-        toast(`裙布未写入：${put.error}`);
-        return;
-      }
-      skirtMapFile = put.file;
-      customSkirtTex = { ...customSkirtTex, file: put.file, bytes: undefined };
-      skirtPreviewUrl = put.file;
+    const skirtMapFile = await persistLookMap('skirt', customSkirtTex, preview.skirtMapFile, KIT_SKIRT_ALBEDO);
+    if (!skirtMapFile) return;
+    if (customSkirtTex) {
+      customSkirtTex = { ...customSkirtTex, file: skirtMapFile, bytes: undefined };
+      skirtPreviewUrl = skirtMapFile;
     }
 
     upsertSkin(catalog, skinDef);
@@ -846,11 +972,13 @@ async function boot() {
       hairTransform: { ...IDENTITY_TRANSFORM },
       props: uses,
       bodyMorph: preview.bodyMorph,
+      bodyScale: clampBodyScale(preview.bodyScale),
       kitHair: preview.kitHair,
       kitHairMap: hairMapFile,
       kitSkirt: preview.kitSkirt,
       kitSkirtMap: skirtMapFile,
       thumb,
+      enemySkill: isPlayerSlotId(id) ? null : migrateEnemySkill(($('enemySkill') as HTMLSelectElement).value),
     });
 
     const b = budgetReport(catalog);
@@ -875,9 +1003,17 @@ async function boot() {
     const mon = catalog.days.find((d) => d.id === 'monday');
     const cur = catalog.days.find((d) => d.id === currentDay);
     if (!mon || !cur) return;
-    cur.variants = structuredClone(mon.variants);
+    cur.variants = mon.variants.map((src) => {
+      const had = cur.variants.find((v) => v.id === src.id);
+      const next = structuredClone(src);
+      if (had) {
+        next.label = had.label;
+        next.enemySkill = had.enemySkill ?? null;
+      }
+      return next;
+    });
     catalog.variants = cur.variants;
-    void persist('已带入周一形象').then(() => {
+    void persist('已带入周一皮和身形，花名和技能保留').then(() => {
       renderRoster();
       void openSlot(selectedSlot);
     });

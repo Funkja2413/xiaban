@@ -1,4 +1,5 @@
 import type { LineId, SkillKey } from '../fx/catalog';
+import { sfx } from '../audio';
 
 /**
  * 不暂停抽卡：一套三选一同时混入冲撞属性和主动技能。
@@ -81,6 +82,9 @@ export class Cards {
   private cdNumEl: HTMLElement | null = null;
   private lastCdTxt = '';
 
+  private dashIds: LineId[] = Object.keys(LINES) as LineId[];
+  private skillIds: SkillId[] = Object.keys(SKILLS) as SkillId[];
+
   onApplied: ((label: string) => void) | null = null;
 
   constructor() {
@@ -96,6 +100,35 @@ export class Cards {
 
   get isOpen() {
     return this.open;
+  }
+
+  /** 这一关能抽到的冲刺和主动技能。没规划的关传入周一那套。 */
+  setDayKit(dashes: LineId[], skills: SkillId[]) {
+    this.dashIds = dashes.length ? dashes : (Object.keys(LINES) as LineId[]);
+    this.skillIds = skills.length ? skills : (Object.keys(SKILLS) as SkillId[]);
+  }
+
+  /** 再试一次：工牌、卡组和抽卡界面全部清掉 */
+  resetRun() {
+    this.line = null;
+    this.lineLv = 0;
+    this.skill = null;
+    this.skillLv = 0;
+    this.badges = 0;
+    this.quota = FIRST_QUOTA;
+    this.open = false;
+    this.offered = [];
+    this.timer = 0;
+    for (const el of this.cardEls) el.remove();
+    this.cardEls = [];
+    this.listEl.innerHTML = '';
+    this.rowEl.style.display = 'none';
+    this.dashBtn.style.borderColor = '';
+    this.dashBtn.style.background = '';
+    this.skillBtn.style.borderColor = '';
+    this.skillBtn.style.background = '';
+    this.renderBadge();
+    this.renderButtons();
   }
 
   /** 击倒同事获得工牌，攒满配额触发抽卡 */
@@ -149,7 +182,7 @@ export class Cards {
 
   private buildPool() {
     const dash: Card[] = [];
-    for (const id of Object.keys(LINES) as LineId[]) {
+    for (const id of this.dashIds) {
       if (id === this.line) {
         if (this.lineLv < 3) dash.push({ track: 'dash', id, toLevel: this.lineLv + 1, isSwitch: false });
       } else {
@@ -157,7 +190,7 @@ export class Cards {
       }
     }
     const skill: Card[] = [];
-    for (const id of Object.keys(SKILLS) as SkillId[]) {
+    for (const id of this.skillIds) {
       if (id === this.skill) {
         if (this.skillLv < 3) skill.push({ track: 'skill', id, toLevel: this.skillLv + 1, isSwitch: false });
       } else {
@@ -192,6 +225,7 @@ export class Cards {
     this.open = true;
     this.timer = PICK_TIME;
     this.renderCards();
+    sfx.play('card_deal');
   }
 
   private renderCards() {
@@ -225,6 +259,7 @@ export class Cards {
   private select(i: number, auto = false) {
     if (!this.open || i < 0 || i >= this.offered.length) return;
     this.open = false;
+    sfx.play('card_pick');
     const c = this.offered[i];
     const el = this.cardEls[i];
     el.classList.add('picked');

@@ -13,6 +13,8 @@ export {
   BUDGET,
   IDENTITY_TRANSFORM,
   OFFICIAL_SKINS,
+  PROP_PRESET_FIT,
+  propFitOf,
   emptyCatalog,
   ensureRosterLooks,
   loadCatalog,

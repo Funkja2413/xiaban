@@ -2,18 +2,29 @@ import { WEEKDAYS, weekdaySlot, type WeekdayId } from './levels';
 import {
   continueDay,
   isUnlocked,
+  loadPlayerSlot,
   loadProgress,
   loadSettings,
   markBeaten,
   rememberLastPlayed,
+  rememberPlayerSlot,
   resetProgress,
   saveSettings,
 } from './progress';
+import { isPlayerSlotId, rosterSlot, type PlayerSlotId } from './roster';
+import { BATTLE_SLOT_IDS, assetUrl, loadCatalog, lookForSlotOnDay, type ColleagueCatalog } from './catalog';
+import { bgm, sfx } from './audio';
 
-export type ShellMode = 'loading' | 'home' | 'levels' | 'settings' | 'play' | 'result';
+export type ShellMode = 'loading' | 'home' | 'levels' | 'settings' | 'avatar' | 'play' | 'result' | 'roster';
 
-let requestPlay: (day: WeekdayId) => void = (day) => goPlay(day);
+let requestPlay: (day: WeekdayId, player: PlayerSlotId) => void = (day, player) => goPlay(day, player);
 let onReturnHome: (() => void) | null = null;
+let onAvatarShow: ((selected: PlayerSlotId | null) => void) | null = null;
+let onAvatarHide: (() => void) | null = null;
+let onAvatarSelect: ((id: PlayerSlotId | null) => void) | null = null;
+let pendingDay: WeekdayId = 'monday';
+let pendingBack: 'home' | 'levels' = 'home';
+let pendingPlayer: PlayerSlotId | null = null;
 
 function stage() {
   return document.getElementById('stage')!;
@@ -23,11 +34,12 @@ function applyDebug(on: boolean) {
   document.getElementById('stats')!.classList.toggle('debugOn', on);
 }
 
-export function playUrl(day: WeekdayId) {
+export function playUrl(day: WeekdayId, player: PlayerSlotId = loadPlayerSlot()) {
   const url = new URL(location.href);
   url.search = '';
   url.searchParams.set('play', '1');
   url.searchParams.set('day', day);
+  url.searchParams.set('player', player);
   return url.pathname + url.search;
 }
 
@@ -43,25 +55,105 @@ export function setMode(mode: ShellMode) {
   if (mode === 'home' && prev && prev !== 'home' && prev !== 'loading') {
     onReturnHome?.();
   }
+  if (mode === 'avatar' && prev !== 'avatar') {
+    onAvatarShow?.(pendingPlayer);
+  }
+  if (prev === 'avatar' && mode !== 'avatar') {
+    onAvatarHide?.();
+  }
 }
 
 export function bindHome(fn: () => void) {
   onReturnHome = fn;
 }
 
-export function goPlay(day: WeekdayId) {
+export function bindAvatar(hooks: {
+  show: (selected: PlayerSlotId | null) => void;
+  hide: () => void;
+  select: (id: PlayerSlotId | null) => void;
+}) {
+  onAvatarShow = hooks.show;
+  onAvatarHide = hooks.hide;
+  onAvatarSelect = hooks.select;
+}
+
+export function goPlay(day: WeekdayId, player: PlayerSlotId = loadPlayerSlot()) {
   if (!isUnlocked(day)) return;
+  rememberPlayerSlot(player);
   rememberLastPlayed(day);
-  location.assign(playUrl(day));
+  location.assign(playUrl(day, player));
 }
 
 export function goHome() {
-  location.assign(homeUrl());
+  const url = homeUrl();
+  if (`${location.pathname}${location.search}` !== url) history.replaceState(null, '', url);
+  setMode('home');
 }
 
-export function bindPlay(fn: (day: WeekdayId) => void) {
+export function bindPlay(fn: (day: WeekdayId, player: PlayerSlotId) => void) {
   requestPlay = fn;
   renderLevels();
+}
+
+function confirmPlay(day: WeekdayId, player: PlayerSlotId) {
+  if (!isUnlocked(day)) return;
+  rememberPlayerSlot(player);
+  rememberLastPlayed(day);
+  requestPlay(day, player);
+}
+
+function askAvatar(day: WeekdayId, back: 'home' | 'levels') {
+  if (!isUnlocked(day)) return;
+  pendingDay = day;
+  pendingBack = back;
+  pendingPlayer = 'player';
+  syncAvatarPick();
+  setMode('avatar');
+}
+
+function pickAvatar(id: PlayerSlotId) {
+  pendingPlayer = id;
+  syncAvatarPick();
+  onAvatarSelect?.(id);
+}
+
+function syncAvatarPick() {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.avatarHit')) {
+    const id = btn.dataset.slot;
+    btn.classList.toggle('selected', !!pendingPlayer && id === pendingPlayer);
+  }
+  for (const name of document.querySelectorAll<HTMLElement>('.avatarNameArt')) {
+    const id = name.dataset.slot;
+    name.classList.toggle('selected', !!pendingPlayer && id === pendingPlayer);
+  }
+  const go = document.getElementById('avatarGo') as HTMLButtonElement;
+  go.disabled = !pendingPlayer;
+}
+
+/** 把名牌锚在 3D 角色脚底下方（归一化 0–1，左上原点） */
+export function layoutAvatarNames(feet: Partial<Record<PlayerSlotId, { x: number; y: number }>>) {
+  for (const el of document.querySelectorAll<HTMLElement>('.avatarNameArt')) {
+    const id = el.dataset.slot;
+    if (!isPlayerSlotId(id)) continue;
+    const p = feet[id];
+    if (!p) continue;
+    el.style.left = `${p.x * 100}%`;
+    // 名牌顶边紧贴脚底下方，贴近 Figma 脚下名牌
+    el.style.top = `${p.y * 100 + 0.6}%`;
+  }
+}
+
+function bindAvatarUi() {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.avatarHit')) {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.slot;
+      if (isPlayerSlotId(id)) pickAvatar(id);
+    });
+  }
+  document.getElementById('avatarGo')!.addEventListener('click', () => {
+    if (!pendingPlayer) return;
+    confirmPlay(pendingDay, pendingPlayer);
+  });
 }
 
 function bindArtSlots() {
@@ -85,28 +177,135 @@ function renderLevels() {
   for (const slot of WEEKDAYS) {
     const open = isUnlocked(slot.id, p);
     const beaten = p.beaten.includes(slot.id);
+    const state = !open ? 'locked' : beaten ? 'beaten' : 'open';
+    const tag = state === 'locked' ? '锁定' : state === 'beaten' ? '已下班' : '可闯关';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'levelCard' + (open ? '' : ' locked');
     btn.disabled = !open;
     btn.innerHTML =
-      `<span class="levelDay">${slot.label}</span>` +
-      `<span class="levelBlurb">${open ? slot.blurb : '尚未解锁'}</span>` +
-      `<span class="levelTag">${!open ? '锁定' : beaten ? '已下班' : '可闯关'}</span>`;
-    btn.addEventListener('click', () => requestPlay(slot.id));
+      `<span class="levelDay">${escapeText(slot.title)}</span>` +
+      `<span class="levelTag" data-state="${state}">${tag}</span>` +
+      `<span class="levelThumb"><img alt="" src="${escapeText(assetUrl(`ui/levels-day-${slot.id}.png`))}" width="1250" height="328"></span>`;
+    btn.addEventListener('click', () => askAvatar(slot.id, 'levels'));
     list.appendChild(btn);
   }
 }
 
+let resetLevelsScroll: (() => void) | null = null;
+let resetRosterScroll: (() => void) | null = null;
+
+function bindHeadScroll(rootId: string, scrollId: string): (() => void) | null {
+  const root = document.getElementById(rootId);
+  const scroller = document.getElementById(scrollId);
+  if (!root || !scroller) return null;
+  let scrolled = false;
+  const sync = () => {
+    const next = scrolled ? scroller.scrollTop > 4 : scroller.scrollTop > 12;
+    if (next === scrolled) return;
+    scrolled = next;
+    root.classList.toggle('is-scrolled', scrolled);
+  };
+  const reset = () => {
+    scrolled = false;
+    root.classList.remove('is-scrolled');
+    scroller.scrollTop = 0;
+  };
+  scroller.addEventListener('scroll', sync, { passive: true });
+  sync();
+  return reset;
+}
+
+function bindLevelsScroll() {
+  resetLevelsScroll = bindHeadScroll('levels', 'levelsScroll');
+}
+
+function bindRosterScroll() {
+  resetRosterScroll = bindHeadScroll('roster', 'rosterScroll');
+}
+
+function openLevels() {
+  renderLevels();
+  setMode('levels');
+  // display:none 时改 scrollTop 会被忽略，显示后再复位，避免标题叠在半路列表上
+  requestAnimationFrame(() => {
+    resetLevelsScroll?.();
+    requestAnimationFrame(() => resetLevelsScroll?.());
+  });
+}
+
+function openRoster() {
+  renderRoster();
+  setMode('roster');
+  requestAnimationFrame(() => {
+    resetRosterScroll?.();
+    requestAnimationFrame(() => resetRosterScroll?.());
+  });
+}
+
+let rosterCatalog: ColleagueCatalog | null = null;
+
+function escapeText(s: string) {
+  return s.replace(/[&<>"']/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] ?? ch
+  );
+}
+
+async function ensureRosterCatalog() {
+  if (!rosterCatalog) rosterCatalog = await loadCatalog();
+  return rosterCatalog;
+}
+
+function renderRoster() {
+  const hall = document.getElementById('rosterHall');
+  const sub = document.getElementById('rosterSub');
+  if (!hall) return;
+  const cat = rosterCatalog;
+  if (!cat) {
+    hall.textContent = '名册加载中…';
+    return;
+  }
+  const p = loadProgress();
+  const total = WEEKDAYS.length * BATTLE_SLOT_IDS.length;
+  let known = 0;
+  hall.innerHTML = '';
+  for (const day of WEEKDAYS) {
+    const open = isUnlocked(day.id, p);
+    for (const id of BATTLE_SLOT_IDS) {
+      const look = lookForSlotOnDay(cat, day.id, id);
+      const slot = rosterSlot(id);
+      const card = document.createElement('div');
+      card.className = 'rosterCard' + (open ? '' : ' locked');
+      const name = open ? look?.label || slot?.label || id : '???';
+      const thumb = look?.thumb ? assetUrl(look.thumb) : '';
+      if (open) known += 1;
+      card.innerHTML =
+        `<div class="rosterThumb">${thumb ? `<img alt="" src="${escapeText(thumb)}">` : ''}</div>` +
+        `<div class="rosterName">${escapeText(name)}</div>`;
+      hall.appendChild(card);
+    }
+  }
+  if (sub) sub.textContent = `已认识 ${known} / ${total} 个奇葩同事，通关解锁下一天的奇葩`;
+}
+
 function bindSettings() {
-  const sfx = document.getElementById('optSfx') as HTMLInputElement;
+  const music = document.getElementById('optMusic') as HTMLInputElement;
+  const sfxEl = document.getElementById('optSfx') as HTMLInputElement;
   const debug = document.getElementById('optDebug') as HTMLInputElement;
   const s = loadSettings();
-  sfx.checked = s.sfx;
+  music.checked = s.music;
+  sfxEl.checked = s.sfx;
   debug.checked = s.debug;
   applyDebug(s.debug);
-  const persist = () => saveSettings({ sfx: sfx.checked, debug: debug.checked });
-  sfx.addEventListener('change', persist);
+  const persist = () => saveSettings({ music: music.checked, sfx: sfxEl.checked, debug: debug.checked });
+  music.addEventListener('change', () => {
+    persist();
+    bgm.setEnabled(music.checked);
+  });
+  sfxEl.addEventListener('change', () => {
+    persist();
+    sfx.setEnabled(sfxEl.checked);
+  });
   debug.addEventListener('change', () => {
     persist();
     applyDebug(debug.checked);
@@ -115,57 +314,244 @@ function bindSettings() {
     if (!confirm('重置后只保留周一，确定？')) return;
     resetProgress();
     renderLevels();
+    renderRoster();
   });
 }
 
-export function showResult(kind: 'won' | 'lost', day: WeekdayId, sub: string) {
-  setMode('result');
-  const title = document.querySelector('#overlay .otitle')!;
-  const body = document.querySelector('#overlay .osub')!;
+function bindUiClicks() {
+  const ids = new Set([
+    'btnStart',
+    'btnLevels',
+    'btnRoster',
+    'btnSettings',
+    'btnLevelsBack',
+    'btnRosterBack',
+    'btnSettingsBack',
+    'btnAvatarBack',
+    'avatarGo',
+    'resultNext',
+    'resultRetry',
+    'resultHome',
+    'resetBtn',
+    'optReset',
+  ]);
+  document.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement | null)?.closest('button');
+    if (!btn) return;
+    if (btn.classList.contains('locked')) return;
+    if (ids.has(btn.id) || btn.classList.contains('avatarHit') || btn.classList.contains('levelCard')) {
+      sfx.play('ui_click');
+    }
+  });
+}
+
+const LOSE_TAUNTS = [
+  '以司为家，家没了。',
+  '饼画完了，人留下了。',
+  '你努力，老板改 KPI。',
+  '自愿加班，自愿的是老板。',
+  '不是 996，是热爱（被迫）。',
+  '青春献给公司，公司写进周报。',
+  '老板说我们是一家人。',
+  '加班费是梦想，梦想免税。',
+  '你卷赢了同事，卷输了电梯。',
+  '准时下班？群里已 @你。',
+  '今天也在为老板还房贷。',
+  '狼性精神，羊的工时。',
+  '优化不是裁员，是祝福。',
+  '再改一页就能走（谎言）。',
+  '努力会被看见：你还没走。',
+  '公司记得工时，忘了你是人。',
+];
+
+const LOSE_TIPS = [
+  '善于把同事引开，电梯更好挤哦',
+  '善于墙钮亮了先离开，再靠近才开门哦',
+  '善于把冲刺留给卡口，突围更快哦',
+  '善于绕开主管，硬刚只会加班哦',
+  '善于躲开水渍，冲刺才不滑哦',
+  '善于把拦截的人遛走，路才通哦',
+  '善于电梯到了先退再贴，门才开哦',
+  '善于抽到技能再用，空按没有用哦',
+  '善于把人群往反方向扯，侧面更好溜哦',
+  '善于早点冲电梯，别磨到 24:00 哦',
+  '善于在窄口挡人，自己从缝里钻哦',
+  '善于冷却时先绕路，别硬撞哦',
+];
+
+/** 成功页第一行：嘲讽老板 */
+const WIN_TAUNTS = [
+  '老板还在改需求，人已经在路上。',
+  'KPI 追不上脚步，电梯先到。',
+  '加班群还在刷，我已刷卡出门。',
+  '以司为家？今晚回家。',
+  '饼可以留着，人必须走。',
+  '你的「再改一页」到不了我这站。',
+  '狼性留给明天，今晚准点溜。',
+  '周报可以等，晚饭不等。',
+  '老板说一家人，我先回自己家。',
+  '志愿加班？志愿下班。',
+  '房贷你还，我先下班。',
+  '看见努力了吗：人已经走了。',
+  '工时记得清楚，我也记得门禁。',
+  '优化祝福留给你，准点留给自己。',
+  '996 热爱结束，18:00 开溜。',
+  '群里 @ 我？电梯里没信号。',
+];
+
+/** 成功页第二行：给打工人的温暖建议 */
+const WIN_TIPS = [
+  '好好吃饭，别用咖啡代替晚饭哦',
+  '早点睡，明天的自己会谢谢你哦',
+  '路上别急，安全到家最要紧哦',
+  '周末留一点空白，给自己喘口气哦',
+  '身体比周报重要，难受就休息哦',
+  '下班后别刷消息，先放下手机哦',
+  '记得喝水，别把嗓子留给开会哦',
+  '和喜欢的人说说话，别一个人硬扛哦',
+  '小确幸也要收着，生活不只工位哦',
+  '准点走不是偷懒，是爱惜自己哦',
+  '明天还会来，今晚先对自己好一点哦',
+  '走慢一点也没关系，你已经很努力了哦',
+];
+
+const LOSE_TAUNT_STORE = 'loseTaunt.i';
+const LOSE_TIP_STORE = 'loseTip.i';
+const WIN_TAUNT_STORE = 'winTaunt.i';
+const WIN_TIP_STORE = 'winTip.i';
+
+function nextFromPool(pool: readonly string[], store: string) {
+  let last = -1;
+  try {
+    last = Number(sessionStorage.getItem(store) ?? '-1');
+    if (!Number.isFinite(last)) last = -1;
+  } catch {
+    last = -1;
+  }
+  let i = Math.floor(Math.random() * pool.length);
+  if (pool.length > 1 && i === last) i = (i + 1) % pool.length;
+  try {
+    sessionStorage.setItem(store, String(i));
+  } catch {
+    /* ignore */
+  }
+  return pool[i]!;
+}
+
+function nextLoseTaunt() {
+  return nextFromPool(LOSE_TAUNTS, LOSE_TAUNT_STORE);
+}
+
+function nextLoseTip() {
+  return `建议：${nextFromPool(LOSE_TIPS, LOSE_TIP_STORE)}`;
+}
+
+function nextWinTaunt() {
+  return nextFromPool(WIN_TAUNTS, WIN_TAUNT_STORE);
+}
+
+function nextWinTip() {
+  return `建议：${nextFromPool(WIN_TIPS, WIN_TIP_STORE)}`;
+}
+
+function playResultIn() {
+  const overlay = document.getElementById('overlay')!;
+  overlay.classList.remove('is-play');
+  void overlay.offsetWidth;
+  overlay.classList.add('is-play');
+}
+
+function resultArtFile(kind: 'won' | 'lost', player: PlayerSlotId) {
+  const female = player === 'player-f';
+  if (kind === 'won') return female ? 'result-win-f.png' : 'result-win.png';
+  return female ? 'result-lose-f.png' : 'result-lose.png';
+}
+
+export function showResult(
+  kind: 'won' | 'lost',
+  day: WeekdayId,
+  sub: string,
+  player: PlayerSlotId = loadPlayerSlot()
+) {
+  const overlay = document.getElementById('overlay')!;
+  const stamp = overlay.querySelector('.resultStampMark')!;
+  const title = overlay.querySelector('.otitle')!;
+  const taunt = overlay.querySelector('.resultTaunt')!;
+  const tip = overlay.querySelector('.resultTip')!;
+  const body = overlay.querySelector('.osub')!;
+  const art = overlay.querySelector<HTMLImageElement>('.resultArt');
   const nextBtn = document.getElementById('resultNext') as HTMLButtonElement;
   const retryBtn = document.getElementById('resultRetry') as HTMLButtonElement;
+  overlay.dataset.kind = kind;
+  overlay.dataset.player = player;
+  if (art) art.src = assetUrl(`ui/${resultArtFile(kind, player)}`);
+  stamp.textContent = kind === 'won' ? '成功下班' : '下班失败';
   title.textContent = kind === 'won' ? '成功下班！' : '今晚走不了了…';
+  if (kind === 'lost') {
+    taunt.textContent = nextLoseTaunt();
+    tip.textContent = nextLoseTip();
+  } else {
+    taunt.textContent = nextWinTaunt();
+    tip.textContent = nextWinTip();
+  }
   body.innerHTML = sub;
+  retryBtn.style.display = '';
+  nextBtn.style.display = '';
 
   if (kind === 'won') {
     const nxt = markBeaten(day);
-    retryBtn.style.display = 'none';
     if (nxt) {
-      nextBtn.style.display = 'block';
-      nextBtn.textContent = `下一关 · ${weekdaySlot(nxt)?.label ?? ''}`;
-      nextBtn.onclick = () => requestPlay(nxt);
+      nextBtn.setAttribute('aria-label', `下一关 · ${weekdaySlot(nxt)?.label ?? ''}`);
+      nextBtn.onclick = () => confirmPlay(nxt, player);
     } else {
       nextBtn.style.display = 'none';
       body.innerHTML = sub + '<br>本周班都下完了。';
     }
   } else {
-    nextBtn.style.display = 'none';
-    retryBtn.style.display = 'block';
-    retryBtn.onclick = () => requestPlay(day);
+    retryBtn.onclick = () => confirmPlay(day, player);
   }
+
+  setMode('result');
+  playResultIn();
 }
 
 export function initShell() {
   applyDebug(loadSettings().debug);
   bindArtSlots();
+  bindAvatarUi();
+  bindLevelsScroll();
+  bindRosterScroll();
   renderLevels();
   bindSettings();
+  bindUiClicks();
 
-  document.getElementById('btnStart')!.addEventListener('click', () => requestPlay(continueDay()));
-  document.getElementById('btnLevels')!.addEventListener('click', () => setMode('levels'));
+  document.getElementById('btnStart')!.addEventListener('click', () => askAvatar(continueDay(), 'home'));
+  document.getElementById('btnLevels')!.addEventListener('click', () => openLevels());
+  document.getElementById('btnRoster')!.addEventListener('click', () => openRoster());
   document.getElementById('btnSettings')!.addEventListener('click', () => setMode('settings'));
-  for (const id of ['btnLevelsBack', 'btnSettingsBack']) {
-    document.getElementById(id)!.addEventListener('click', () => setMode('home'));
-  }
+  document.getElementById('btnLevelsBack')!.addEventListener('click', () => {
+    resetLevelsScroll?.();
+    setMode('home');
+  });
+  document.getElementById('btnRosterBack')!.addEventListener('click', () => {
+    resetRosterScroll?.();
+    setMode('home');
+  });
+  document.getElementById('btnSettingsBack')!.addEventListener('click', () => setMode('home'));
+  void ensureRosterCatalog().then(renderRoster);
+  document.getElementById('btnAvatarBack')!.addEventListener('click', () => setMode(pendingBack));
   document.getElementById('resultHome')!.addEventListener('click', () => goHome());
   document.getElementById('resetBtn')!.addEventListener('click', () => goHome());
 }
 
-export function wantsAutoPlay() {
+export function wantsAutoPlay(): { day: WeekdayId; player: PlayerSlotId } | null {
   const q = new URLSearchParams(location.search);
   if (q.get('play') === '1') {
     const day = weekdaySlot(q.get('day') ?? '')?.id ?? continueDay();
-    return isUnlocked(day) ? day : continueDay();
+    const qPlayer = q.get('player');
+    const player = isPlayerSlotId(qPlayer) ? qPlayer : loadPlayerSlot();
+    if (!isUnlocked(day)) return { day: continueDay(), player };
+    return { day, player };
   }
   return null;
 }

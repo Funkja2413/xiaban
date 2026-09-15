@@ -178,6 +178,13 @@
             <span>胖</span>
             <span class="morphVal">中</span>
           </div>
+          <p class="hint" style="margin-top:8px">整体缩放：1 是标准身高约 1.72 米。和配件 scl 分开，保存到该角色。</p>
+          <div class="morph-row">
+            <span>小</span>
+            <input type="range" class="bodyScaleRange" min="0.5" max="2" step="0.02" value="1">
+            <span>大</span>
+            <span class="bodyScaleVal">1.00</span>
+          </div>
         </div>
         <h2>Kit（进战场）</h2>
         <p class="hint">三款头发、包内皮、胖瘦会随「保存到角色」写入 catalog，游戏读同一份。</p>
@@ -225,15 +232,49 @@
         <p class="hint" id="skinInfo">身体：官方 Retro 皮 256×256，须正方形。</p>
 
         <h2>外挂道具</h2>
-        <p class="hint">帽子挂头顶，杯子/电脑挂右手。和体型、kit 头发一起保存进当天关卡。</p>
+        <p class="hint">三个挂点：头顶、右手、后背。先点挂点再点物品；同一件最多能挂三次，每个点各一件。和体型、kit 头发一起保存进当天关卡。</p>
         <div class="row">
-          <button type="button" id="btnAnchorHead" class="active">头顶 · 帽</button>
+          <button type="button" id="btnAnchorHead" class="active">头顶</button>
           <button type="button" id="btnAnchorHand">右手</button>
+          <button type="button" id="btnAnchorBack">后背</button>
         </div>
         <div class="row" style="margin-top:6px">
           <button type="button" id="btnPropCap">鸭舌帽</button>
           <button type="button" id="btnPropCup">咖啡杯</button>
           <button type="button" id="btnPropLaptop">笔记本</button>
+        </div>
+        <div class="row" style="margin-top:4px">
+          <button type="button" id="btnPropMic">主持人话筒</button>
+          <button type="button" id="btnPropLens">放大镜</button>
+          <button type="button" id="btnPropRadio">对讲机</button>
+        </div>
+        <div class="row" style="margin-top:4px">
+          <button type="button" id="btnPropAward">奖状</button>
+          <button type="button" id="btnPropPaper">报纸</button>
+          <button type="button" id="btnPropPapers">一摞报纸</button>
+          <button type="button" id="btnPropTrophy">奖杯</button>
+        </div>
+        <div class="row" style="margin-top:4px">
+          <button type="button" id="btnPropPack">徒步书包</button>
+          <button type="button" id="btnPropToilet">马桶</button>
+        </div>
+        <div class="row" style="margin-top:4px">
+          <button type="button" id="btnPropHorn">手持大喇叭</button>
+          <button type="button" id="btnPropHeart">桃心</button>
+          <button type="button" id="btnPropClock">闹钟</button>
+          <button type="button" id="btnPropPot">一口锅</button>
+          <button type="button" id="btnPropPizza">一张饼</button>
+          <button type="button" id="btnPropDetonator">引爆器按钮</button>
+        </div>
+        <div class="row" style="margin-top:4px">
+          <button type="button" id="btnPropBell">铃铛</button>
+          <button type="button" id="btnPropKeys">钥匙串</button>
+          <button type="button" id="btnPropStop">STOP 牌</button>
+        </div>
+        <div class="row" style="margin-top:4px">
+          <button type="button" id="btnPropBible">圣经书</button>
+          <button type="button" id="btnPropSwatter">苍蝇拍</button>
+          <button type="button" id="btnPropOil">橄榄油</button>
         </div>
         <div class="drop" id="propDrop">拖入道具 GLB / GLTF / FBX
           <input id="propFile" type="file" accept=".glb,.gltf,.fbx" hidden />
@@ -241,22 +282,27 @@
         <div class="row">
           <button type="button" id="btnClearProp">卸下当前锚点道具</button>
         </div>
-        <p class="hint" id="propInfo">先选锚点，再插入或拖入模型。用工具栏「帽子 / 手持」调变换。</p>
+        <p class="hint" id="propInfo">先点头顶 / 右手 / 后背，再点物品或拖入模型。同一件可以三个点各挂一次。用工具栏调变换。</p>
         <p class="author">作者约束：
 单位米；角色总高约 1.72。
-原点放在头皮/手心贴合处，+Y 向上，+Z 向前。
+原点在头皮 / 手心 / 后背贴合处，+Y 向上，+Z 向前（包体在 −Z）。
 刚体配件，不要自带骨骼。
 CC0 或自有版权。</p>
       </aside>
 
       <section id="center">
         <div id="viewport"></div>
-        <div id="morphBar" title="体型 morph：瘦 −1 … 0 … +1 胖">
+        <div id="morphBar" title="体型 morph：瘦 −1 … 0 … +1 胖；整体缩放相对 1.72m">
           <span class="morph-label">体型</span>
           <span>瘦</span>
           <input type="range" class="bodyMorphRange" min="-1" max="1" step="0.02" value="0">
           <span>胖</span>
           <span class="morphVal">中</span>
+          <span class="morph-label">缩放</span>
+          <span>小</span>
+          <input type="range" class="bodyScaleRange" min="0.5" max="2" step="0.02" value="1">
+          <span>大</span>
+          <span class="bodyScaleVal">1.00</span>
         </div>
         <div id="toolbar">
           <button type="button" id="btnIdle" class="active">idle</button>
@@ -264,8 +310,9 @@ CC0 或自有版权。</p>
           <button type="button" id="btnJump">jump</button>
           <button type="button" id="btnCam">重置相机</button>
           <span style="width:8px"></span>
-          <button type="button" id="btnEditHat" class="active">帽子</button>
-          <button type="button" id="btnEditHeld">手持</button>
+          <button type="button" id="btnEditHat" class="active">头顶</button>
+          <button type="button" id="btnEditHeld">右手</button>
+          <button type="button" id="btnEditBack">后背</button>
           <span style="width:8px"></span>
           <button type="button" id="gizmoT" class="active">移动</button>
           <button type="button" id="gizmoR">旋转</button>
@@ -278,7 +325,7 @@ CC0 或自有版权。</p>
 
       <aside class="pane" id="right">
         <h2>关卡槽</h2>
-        <p class="hint">周一到周五各一套形象。游戏读 catalog 里标成「当前」的那天，或 URL ?day=tuesday。</p>
+        <p class="hint">周一到周五各一套花名和技能。形象先共用周一的皮和身形，游戏读 catalog 当前关或 URL ?day=tuesday。</p>
         <div class="list" id="dayList"></div>
         <div class="row" style="margin-bottom:8px">
           <button type="button" id="btnActive">设为游戏当前关</button>
@@ -294,9 +341,17 @@ CC0 或自有版权。</p>
             <span>胖</span>
             <span class="morphVal">中</span>
           </div>
+          <h2 style="margin-top:12px">角色缩放</h2>
+          <p class="hint">整个人的大小，不是配件 scl。1 = 约 1.72 米。主管默认 1.38。</p>
+          <div class="morph-row">
+            <span>小</span>
+            <input type="range" class="bodyScaleRange" min="0.5" max="2" step="0.02" value="1">
+            <span>大</span>
+            <span class="bodyScaleVal">1.00</span>
+          </div>
         </div>
         <h2>当前配件变换</h2>
-        <p class="hint" id="xformHint">正在调帽子（Head 局部）。拖滑杆即可。</p>
+        <p class="hint" id="xformHint">正在调头顶（Head 局部）。拖滑杆即可。</p>
         <div class="sliders" id="xformSliders">
           <label class="slider">pos X <input type="range" id="px" min="-1" max="1" step="0.002" value="0"><span class="v" data-for="px">0</span></label>
           <label class="slider">pos Y <input type="range" id="py" min="-1" max="1" step="0.002" value="0"><span class="v" data-for="py">0</span></label>
@@ -316,7 +371,7 @@ CC0 或自有版权。</p>
         </div>
 
         <h2>游戏角色规划</h2>
-        <p class="hint" id="rosterHint">规划在 src/roster.ts。增加角色后点刷新。保存后该角色会出缩略图。</p>
+        <p class="hint" id="rosterHint">玩家五关同一套。同事每关换花名和皮；开局只能带一个玩家进关。</p>
         <div class="row">
           <button type="button" id="btnRefreshRoster">刷新规划</button>
           <button type="button" id="btnPack">下载 catalog</button>
@@ -324,16 +379,27 @@ CC0 或自有版权。</p>
         <div class="budget" id="budget"></div>
         <div class="list" id="varList"></div>
         <p class="hint" id="slotInfo">先点一个角色，调好看再保存到该槽。</p>
+        <label class="field" id="enemySkillField" hidden>主动技能
+          <select id="enemySkill">
+            <option value="">无</option>
+            <option value="cut-in">截杀 · 拦截者</option>
+            <option value="desk-slam">拍桌 · 主管</option>
+            <option value="rally">喊人 · 女同事</option>
+          </select>
+        </label>
         <input type="hidden" id="varId" />
-        <input type="hidden" id="varLabel" />
         <input type="hidden" id="varGender" />
+        <label class="field" id="nickField">当日花名
+          <input type="text" id="varLabel" placeholder="甩锅侠" maxlength="12" />
+        </label>
         <label class="field">皮肤 id <input type="text" id="skinId" placeholder="office-white-navy"></label>
-        <label class="field">帽子 id <input type="text" id="hatId" placeholder="prop-cap"></label>
-        <label class="field">手持 id <input type="text" id="heldId" placeholder="prop-cup"></label>
+        <label class="field">头顶 id <input type="text" id="hatId" placeholder="prop-cap"></label>
+        <label class="field">右手 id <input type="text" id="heldId" placeholder="prop-cup"></label>
+        <label class="field">后背 id <input type="text" id="backId" placeholder="prop-pack"></label>
         <div class="row">
           <button type="button" class="primary" id="btnSave">保存到选中角色</button>
         </div>
-        <p class="hint" id="saveHint">写入当天关卡的形象。kit 头发、体型、道具和缩略图一起进 catalog。</p>
+        <p class="hint" id="saveHint">官方/包内皮只读。保存时会复制成该角色自己的 skin-xxx.png，玩家·男不再挂共用默认皮。</p>
         <p class="hint" id="packPaths"></p>
       </aside>
     </div>

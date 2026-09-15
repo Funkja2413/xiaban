@@ -1,4 +1,5 @@
 import { WEEKDAYS, nextWeekday, weekdayIndex, weekdaySlot, type WeekdayId } from './levels';
+import { isPlayerSlotId, type PlayerSlotId } from './roster';
 
 const KEY = 'offwork.progress.v1';
 
@@ -7,6 +8,8 @@ export interface Progress {
   beaten: WeekdayId[];
   /** 上次进入过的关，主页 3D 背景用 */
   lastPlayed?: WeekdayId;
+  /** 上次选进关的主角；编辑器男女都改，进游戏只带这一个 */
+  playerSlot?: PlayerSlotId;
 }
 
 function empty(): Progress {
@@ -17,7 +20,7 @@ export function loadProgress(): Progress {
   try {
     if (new URLSearchParams(location.search).get('unlock') === 'all') {
       const p = loadProgressRaw();
-      return { beaten: WEEKDAYS.slice(0, -1).map((s) => s.id), lastPlayed: p.lastPlayed };
+      return { beaten: WEEKDAYS.slice(0, -1).map((s) => s.id), lastPlayed: p.lastPlayed, playerSlot: p.playerSlot };
     }
   } catch {
     /* ignore */
@@ -32,14 +35,25 @@ function loadProgressRaw(): Progress {
     const data = JSON.parse(raw) as Progress;
     const beaten = (data.beaten ?? []).filter((id): id is WeekdayId => !!weekdaySlot(id));
     const lastPlayed = data.lastPlayed && weekdaySlot(data.lastPlayed) ? data.lastPlayed : undefined;
-    return { beaten, lastPlayed };
+    const playerSlot = isPlayerSlotId(data.playerSlot) ? data.playerSlot : undefined;
+    return { beaten, lastPlayed, playerSlot };
   } catch {
     return empty();
   }
 }
 
 export function saveProgress(p: Progress) {
-  localStorage.setItem(KEY, JSON.stringify({ beaten: p.beaten, lastPlayed: p.lastPlayed }));
+  localStorage.setItem(KEY, JSON.stringify({ beaten: p.beaten, lastPlayed: p.lastPlayed, playerSlot: p.playerSlot }));
+}
+
+export function rememberPlayerSlot(id: PlayerSlotId) {
+  const p = loadProgress();
+  p.playerSlot = id;
+  saveProgress(p);
+}
+
+export function loadPlayerSlot(): PlayerSlotId {
+  return loadProgress().playerSlot ?? 'player';
 }
 
 export function rememberLastPlayed(id: WeekdayId) {
@@ -60,7 +74,8 @@ export function homeBackdropDay(): WeekdayId {
 }
 
 export function resetProgress() {
-  saveProgress(empty());
+  const playerSlot = loadProgressRaw().playerSlot;
+  saveProgress({ beaten: [], playerSlot });
 }
 
 /** 已解锁：周一，以及每个已通关日的下一天 */
@@ -88,17 +103,22 @@ export function continueDay(p = loadProgress()): WeekdayId {
   return 'friday';
 }
 
-export function loadSettings() {
+export type Settings = { music: boolean; sfx: boolean; debug: boolean };
+
+/** 旧档只有 sfx，当时表示音乐。缺 music 时沿用旧 sfx；新 sfx 默认开。 */
+export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem('offwork.settings.v1');
-    if (!raw) return { sfx: true, debug: false };
-    const data = JSON.parse(raw) as { sfx?: boolean; debug?: boolean };
-    return { sfx: data.sfx !== false, debug: !!data.debug };
+    if (!raw) return { music: true, sfx: true, debug: false };
+    const data = JSON.parse(raw) as { sfx?: boolean; music?: boolean; debug?: boolean };
+    const music = data.music !== undefined ? data.music !== false : data.sfx !== false;
+    const sfx = data.music !== undefined ? data.sfx !== false : true;
+    return { music, sfx, debug: !!data.debug };
   } catch {
-    return { sfx: true, debug: false };
+    return { music: true, sfx: true, debug: false };
   }
 }
 
-export function saveSettings(s: { sfx: boolean; debug: boolean }) {
+export function saveSettings(s: Settings) {
   localStorage.setItem('offwork.settings.v1', JSON.stringify(s));
 }

@@ -7,25 +7,31 @@ import {
   IDENTITY_TRANSFORM,
   assetUrl,
   bodyMorphForSlot,
+  bodyScaleForSlot,
   kitHairForSlot,
   kitHairMapForSlot,
   kitSkirtForSlot,
   kitSkirtMapForSlot,
+  catalogForPlayerSlot,
   loadCatalog,
+  setPlayDayHint,
+  propFitOf,
   propForSlot,
   skinForSlot,
+  type AttachAnchor,
 } from '../catalog';
+import { PLAYER_SLOT_IDS, isPlayerSlotId, type PlayerSlotId } from '../roster';
 import { PlayerHalo } from './look';
 import {
   applyKitAtlas,
   applyKitHairMaps,
   applyKitSkirtMaps,
   findKitBody,
-  isBodyDeformQuatTrack,
   KIT_HAIR_ALBEDO,
   KIT_SKIRT_ALBEDO,
   kitHairTextureFrom,
   fixKitHairBind,
+  retargetBodyQuats,
   setBodyMorph,
   setKitHair,
   setKitSkirt,
@@ -33,13 +39,16 @@ import {
   type KitSkirtId,
 } from '../kit';
 import {
+  BONE_BACK,
   BONE_HAND,
+  BONE_HAND_L,
   BONE_HEAD,
   attachHairToHead,
   attachToBone,
   findBone,
   findBoneAny,
   loadHairVisual,
+  loadPropVisual,
   makeSlotHair,
   type SlotHair,
 } from './hair';
@@ -62,15 +71,19 @@ export interface HumanoidKit {
   playerMat: THREE.MeshPhongMaterial;
   heavyMat: THREE.MeshPhongMaterial;
   interceptorMat: THREE.MeshPhongMaterial;
-  /** idle + 各跑步帧的 Head / 右手位姿；缩放统一用 idle，与编辑器一致 */
+  /** idle + 各跑步帧的 Head / 右手 / 左手 / 后背位姿；缩放统一用 idle，与编辑器一致 */
   headLocals: THREE.Matrix4[];
   handLocals: THREE.Matrix4[];
+  leftHandLocals: THREE.Matrix4[];
+  backLocals: THREE.Matrix4[];
   /** 与 BATTLE_SLOT_IDS / poseSets 对齐 */
   slotHair: (SlotHair | null)[];
   slotHat: (SlotHair | null)[];
   slotHeld: (SlotHair | null)[];
+  slotBack: (SlotHair | null)[];
   slotKitHair: (SlotHair | null)[];
   slotMorph: number[];
+  slotScale: number[];
   slotKitHairId: (KitHairId | null)[];
   slotKitSkirtId: (KitSkirtId | null)[];
   /** idle + run 裙网格，与 slotGeos 同姿态；无裙则为 null */
@@ -78,15 +91,33 @@ export interface HumanoidKit {
   slotSkirtMat: (THREE.MeshPhongMaterial | null)[];
   slotHairMap: (THREE.Texture | null)[];
   slotSkirtMap: (THREE.Texture | null)[];
+  playerSlot: PlayerSlotId;
+  playerLooks: Record<PlayerSlotId, PlayerLookPack>;
   playerHair: SlotHair | null;
   playerHat: SlotHair | null;
   playerHeld: SlotHair | null;
+  playerBack: SlotHair | null;
   playerMorph: number;
+  playerScale: number;
   playerKitHair: KitHairId | null;
   playerKitSkirt: KitSkirtId | null;
   playerHairMap: THREE.Texture | null;
   playerSkirtMap: THREE.Texture | null;
   clips: { idle?: THREE.AnimationClip; run?: THREE.AnimationClip };
+}
+
+export interface PlayerLookPack {
+  mat: THREE.MeshPhongMaterial;
+  morph: number;
+  scale: number;
+  kitHair: KitHairId | null;
+  kitSkirt: KitSkirtId | null;
+  hairMap: THREE.Texture | null;
+  skirtMap: THREE.Texture | null;
+  hair: SlotHair | null;
+  hat: SlotHair | null;
+  held: SlotHair | null;
+  back: SlotHair | null;
 }
 
 /** Kenney 动画 FBX 的 animations[0] 经常是 1 帧 Targeting Pose，不能当循环用 */
@@ -109,14 +140,6 @@ function clipLooksAnimated(clip: THREE.AnimationClip | undefined) {
     for (let i = stride; i < tr.values.length; i++) if (Math.abs(tr.values[i] - tr.values[i - stride]) > 1e-4) return true;
     return false;
   });
-}
-
-function retargetBodyQuats(clip: THREE.AnimationClip, root: THREE.Object3D) {
-  const names = new Set<string>();
-  root.traverse((o) => names.add(o.name));
-  const tracks = clip.tracks.filter((t) => isBodyDeformQuatTrack(t.name, (n) => names.has(n)));
-  if (!tracks.length) return clip;
-  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
 
 function toPhong(map: THREE.Texture, tint = 0xffffff) {
@@ -185,6 +208,17 @@ function captureBoneLocal(
   const m = bone.matrixWorld.clone();
   if (snapY) m.premultiply(new THREE.Matrix4().makeTranslation(0, -snapY, 0));
   return m;
+}
+
+function mirrorHandX(src: THREE.Matrix4): THREE.Matrix4 {
+  src.decompose(_headPos, _headQuat, _headScl);
+  _headPos.x *= -1;
+  return new THREE.Matrix4().compose(_headPos, _headQuat, _headScl);
+}
+
+function captureLeftHand(bone: THREE.Object3D | null, snapY: number, right: THREE.Matrix4): THREE.Matrix4 {
+  if (bone) return captureBoneLocal(bone, snapY, [-0.22, 0.95, 0.12]);
+  return mirrorHandX(right);
 }
 
 /** 走路帧不要用动画里晃动的骨缩放，统一成编辑器 idle 时的 Head 缩放 */
@@ -269,7 +303,7 @@ function poseMixer(mixer: THREE.AnimationMixer, mesh: THREE.SkinnedMesh, root: T
   });
 }
 
-function snapWalkGeos(walkGeos: THREE.BufferGeometry[], walkHeads: THREE.Matrix4[], walkHands: THREE.Matrix4[]) {
+function snapWalkGeos(walkGeos: THREE.BufferGeometry[], ...locals: THREE.Matrix4[][]) {
   let minY = Infinity;
   for (const g of walkGeos) minY = Math.min(minY, g.boundingBox!.min.y);
   for (const g of walkGeos) {
@@ -278,8 +312,7 @@ function snapWalkGeos(walkGeos: THREE.BufferGeometry[], walkHeads: THREE.Matrix4
     g.computeBoundingSphere();
   }
   const lift = new THREE.Matrix4().makeTranslation(0, -minY, 0);
-  for (const h of walkHeads) h.premultiply(lift);
-  for (const h of walkHands) h.premultiply(lift);
+  for (const list of locals) for (const h of list) h.premultiply(lift);
   return minY;
 }
 
@@ -325,15 +358,19 @@ function bakeKitSkirtFrame(root: THREE.Object3D, skirtId: KitSkirtId, snapY: num
 }
 
 /** Kenney Survivors kit + FBX idle/run 重定向 */
-export async function loadHumanoidKit(): Promise<HumanoidKit> {
+export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?: string | null): Promise<HumanoidKit> {
+  if (day) setPlayDayHint(day);
   const gltfLoader = new GLTFLoader();
   const fbxLoader = new FBXLoader();
   const texLoader = new THREE.TextureLoader();
 
   const catalog = await loadCatalog();
+  const activePlayer = isPlayerSlotId(playerSlot) ? playerSlot : 'player';
+  const playerCat = (id: PlayerSlotId) => catalogForPlayerSlot(catalog, id);
   const maleSkin = skinForSlot(catalog, 'colleague-a-m');
   const femaleSkin = skinForSlot(catalog, 'colleague-a-f');
-  const playerSkin = skinForSlot(catalog, 'player');
+  const playerSkin = skinForSlot(playerCat('player'), 'player');
+  const playerFSkin = skinForSlot(playerCat('player-f'), 'player-f');
   const heavySkin = skinForSlot(catalog, 'heavy');
   const interceptorSkin = skinForSlot(catalog, 'interceptor');
   const slotIds = [...BATTLE_SLOT_IDS];
@@ -358,18 +395,19 @@ export async function loadHumanoidKit(): Promise<HumanoidKit> {
     return map;
   };
 
-  const hairFileOf = (id: string) => kitHairMapForSlot(catalog, id) || KIT_HAIR_ALBEDO;
-  const skirtFileOf = (id: string) => kitSkirtMapForSlot(catalog, id) || KIT_SKIRT_ALBEDO;
-  const kitLookIds = ['player', ...slotIds];
+  const hairFileOf = (id: string) => kitHairMapForSlot(catalogForPlayerSlot(catalog, id), id) || KIT_HAIR_ALBEDO;
+  const skirtFileOf = (id: string) => kitSkirtMapForSlot(catalogForPlayerSlot(catalog, id), id) || KIT_SKIRT_ALBEDO;
+  const kitLookIds = [...PLAYER_SLOT_IDS, ...slotIds];
   const hairMapFiles = [...new Set(kitLookIds.map(hairFileOf))];
   const skirtMapFiles = [...new Set(kitLookIds.map(skirtFileOf))];
 
-  const [gltf, maleMap, femaleMap, playerMap, heavyMap, interceptorMap, idleRoot, runRoot, hairTexList, skirtTexList] =
+  const [gltf, maleMap, femaleMap, playerMap, playerFMap, heavyMap, interceptorMap, idleRoot, runRoot, hairTexList, skirtTexList] =
     await Promise.all([
       gltfLoader.loadAsync(assetUrl(catalog.base.mesh)),
       loadMap(maleSkin),
       loadMap(femaleSkin),
       loadMap(playerSkin),
+      loadMap(playerFSkin),
       loadMap(heavySkin),
       loadMap(interceptorSkin),
       fbxLoader.loadAsync(assetUrl(catalog.base.idle)).catch(() => null),
@@ -384,7 +422,10 @@ export async function loadHumanoidKit(): Promise<HumanoidKit> {
   const root = gltf.scene;
   const maleMat = toPhong(maleMap);
   const femaleMat = toPhong(femaleMap);
-  const playerMat = toPhong(playerMap);
+  const playerMatM = toPhong(playerMap);
+  const playerMatF = toPhong(playerFMap);
+  const playerMats: Record<PlayerSlotId, THREE.MeshPhongMaterial> = { player: playerMatM, 'player-f': playerMatF };
+  const playerMat = playerMats[activePlayer];
   const heavyMat = toPhong(heavyMap);
   const interceptorMat = toPhong(interceptorMap);
   const skinned = findKitBody(root);
@@ -426,34 +467,49 @@ export async function loadHumanoidKit(): Promise<HumanoidKit> {
 
   const head = findBoneAny(root, BONE_HEAD) ?? findBone(root, 'Head');
   const hand = findBoneAny(root, BONE_HAND);
+  const handL = findBoneAny(root, BONE_HAND_L);
+  const back = findBoneAny(root, BONE_BACK);
   const headLocals: THREE.Matrix4[] = [];
   const handLocals: THREE.Matrix4[] = [];
+  const leftHandLocals: THREE.Matrix4[] = [];
+  const backLocals: THREE.Matrix4[] = [];
 
   if (idleClip) poseMixer(mixer, skinned, root, idleClip, Math.min(0.3, idleClip.duration * 0.4));
   else mixer.stopAllAction();
   const idleBake = bakeSkinned(skinned, true);
   const geometry = idleBake.geometry;
   headLocals.push(captureBoneLocal(head, idleBake.snapY, [0, 1.46, 0]));
-  handLocals.push(captureBoneLocal(hand, idleBake.snapY, [0.22, 0.95, 0.12]));
+  const idleHand = captureBoneLocal(hand, idleBake.snapY, [0.22, 0.95, 0.12]);
+  handLocals.push(idleHand);
+  leftHandLocals.push(captureLeftHand(handL, idleBake.snapY, idleHand));
+  backLocals.push(captureBoneLocal(back, idleBake.snapY, [0, 1.08, -0.06]));
 
   const walkGeos: THREE.BufferGeometry[] = [];
   const walkHeads: THREE.Matrix4[] = [];
   const walkHands: THREE.Matrix4[] = [];
+  const walkHandsL: THREE.Matrix4[] = [];
+  const walkBacks: THREE.Matrix4[] = [];
   if (runClip && runClip.duration > 0.2) {
     for (let i = 0; i < WALK_FRAMES; i++) {
       poseMixer(mixer, skinned, root, runClip, (i / WALK_FRAMES) * runClip.duration);
       walkGeos.push(bakeSkinned(skinned, false).geometry);
       walkHeads.push(captureBoneLocal(head, 0, [0, 1.46, 0]));
-      walkHands.push(captureBoneLocal(hand, 0, [0.22, 0.95, 0.12]));
+      const rh = captureBoneLocal(hand, 0, [0.22, 0.95, 0.12]);
+      walkHands.push(rh);
+      walkHandsL.push(captureLeftHand(handL, 0, rh));
+      walkBacks.push(captureBoneLocal(back, 0, [0, 1.08, -0.06]));
     }
-    snapWalkGeos(walkGeos, walkHeads, walkHands);
+    snapWalkGeos(walkGeos, walkHeads, walkHands, walkHandsL, walkBacks);
     headLocals.push(...walkHeads);
     handLocals.push(...walkHands);
+    leftHandLocals.push(...walkHandsL);
+    backLocals.push(...walkBacks);
   }
 
   const slotGeos: THREE.BufferGeometry[][] = [];
   const slotKitHair: (SlotHair | null)[] = [];
   const slotMorph: number[] = [];
+  const slotScale: number[] = [];
   const slotKitHairId: (KitHairId | null)[] = [];
   const slotKitSkirtId: (KitSkirtId | null)[] = [];
   const slotSkirtGeos: (THREE.BufferGeometry[] | null)[] = [];
@@ -503,6 +559,7 @@ export async function loadHumanoidKit(): Promise<HumanoidKit> {
     if (idleClip) poseMixer(mixer, skinned, root, idleClip, Math.min(0.3, idleClip.duration * 0.4));
     slotKitHair.push(hairId ? bakeKitHairToHead(root, hairId, head, hairMat) : null);
     slotMorph.push(morph);
+    slotScale.push(bodyScaleForSlot(catalog, id));
     slotKitHairId.push(hairId);
     slotKitSkirtId.push(skirtId);
     slotHairMap.push(hairTex ?? null);
@@ -533,14 +590,31 @@ export async function loadHumanoidKit(): Promise<HumanoidKit> {
     if (restScale.x === 0 || restScale.y === 0 || restScale.z === 0) restScale.set(1, 1, 1);
     lockHeadScale(handLocals, restScale);
   }
+  if (handL) {
+    const restScale = new THREE.Vector3();
+    handL.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), restScale);
+    if (restScale.x === 0 || restScale.y === 0 || restScale.z === 0) restScale.set(1, 1, 1);
+    lockHeadScale(leftHandLocals, restScale);
+  } else if (hand) {
+    const restScale = new THREE.Vector3();
+    hand.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), restScale);
+    if (restScale.x === 0 || restScale.y === 0 || restScale.z === 0) restScale.set(1, 1, 1);
+    lockHeadScale(leftHandLocals, restScale);
+  }
+  if (back) {
+    const restScale = new THREE.Vector3();
+    back.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), restScale);
+    if (restScale.x === 0 || restScale.y === 0 || restScale.z === 0) restScale.set(1, 1, 1);
+    lockHeadScale(backLocals, restScale);
+  }
 
-  applyKitAtlas(skinned, playerMap);
   skinned.material = playerMat;
-  setBodyMorph(skinned, bodyMorphForSlot(catalog, 'player'));
-  const playerHairTex = hairMaps.get(hairFileOf('player')) ?? defaultHairMap ?? null;
-  const playerSkirtTex = skirtMaps.get(skirtFileOf('player')) ?? defaultSkirtMap ?? null;
-  const playerKitHairId = kitHairForSlot(catalog, 'player');
-  const playerKitSkirtId = kitSkirtForSlot(catalog, 'player');
+  applyKitAtlas(skinned, playerMat.map!);
+  setBodyMorph(skinned, bodyMorphForSlot(playerCat(activePlayer), activePlayer));
+  const playerHairTex = hairMaps.get(hairFileOf(activePlayer)) ?? defaultHairMap ?? null;
+  const playerSkirtTex = skirtMaps.get(skirtFileOf(activePlayer)) ?? defaultSkirtMap ?? null;
+  const playerKitHairId = kitHairForSlot(playerCat(activePlayer), activePlayer);
+  const playerKitSkirtId = kitSkirtForSlot(playerCat(activePlayer), activePlayer);
   setKitHair(root, playerKitHairId);
   setKitSkirt(root, playerKitSkirtId);
   if (playerHairTex) applyKitHairMaps(root, playerHairTex);
@@ -551,28 +625,32 @@ export async function loadHumanoidKit(): Promise<HumanoidKit> {
   if (runClip) clips.run = runClip;
 
   const propVisuals = new Map<string, THREE.Group>();
-  const needed = new Set<string>();
-  const note = (look: { def: { file: string } } | null) => {
-    if (look) needed.add(look.def.file);
+  const needed = new Map<string, { file: string; fit?: number }>();
+  const note = (look: { def: { id: string; file: string; fit?: number } } | null) => {
+    if (!look) return;
+    const fit = propFitOf(look.def.id, look.def.fit);
+    needed.set(`${look.def.file}#${fit ?? ''}`, { file: look.def.file, fit });
   };
-  for (const id of ['player', ...BATTLE_SLOT_IDS]) {
-    note(propForSlot(catalog, id, 'head'));
-    note(propForSlot(catalog, id, 'hand'));
+  for (const id of [...PLAYER_SLOT_IDS, ...BATTLE_SLOT_IDS]) {
+    note(propForSlot(catalogForPlayerSlot(catalog, id), id, 'head'));
+    note(propForSlot(catalogForPlayerSlot(catalog, id), id, 'hand'));
+    note(propForSlot(catalogForPlayerSlot(catalog, id), id, 'back'));
   }
   await Promise.all(
-    [...needed].map(async (file) => {
+    [...needed].map(async ([key, { file, fit }]) => {
       try {
-        propVisuals.set(file, await loadHairVisual(file));
+        propVisuals.set(key, await loadPropVisual(file, fit));
       } catch (err) {
         console.warn('配件未加载', file, err);
       }
     })
   );
 
-  const packProp = (id: string, anchor: 'head' | 'hand'): SlotHair | null => {
-    const look = propForSlot(catalog, id, anchor);
+  const packProp = (id: string, anchor: AttachAnchor): SlotHair | null => {
+    const look = propForSlot(catalogForPlayerSlot(catalog, id), id, anchor);
     if (!look) return null;
-    const visual = propVisuals.get(look.def.file);
+    const fit = propFitOf(look.def.id, look.def.fit);
+    const visual = propVisuals.get(`${look.def.file}#${fit ?? ''}`);
     if (!visual) return null;
     return makeSlotHair(visual, look.def, look.transform);
   };
@@ -589,21 +667,56 @@ export async function loadHumanoidKit(): Promise<HumanoidKit> {
     interceptorMat,
     headLocals,
     handLocals,
+    leftHandLocals,
+    backLocals,
     slotHair: BATTLE_SLOT_IDS.map(() => null),
     slotHat: BATTLE_SLOT_IDS.map((id) => packProp(id, 'head')),
     slotHeld: BATTLE_SLOT_IDS.map((id) => packProp(id, 'hand')),
+    slotBack: BATTLE_SLOT_IDS.map((id) => packProp(id, 'back')),
     slotKitHair,
     slotMorph,
+    slotScale,
     slotKitHairId,
     slotKitSkirtId,
     slotSkirtGeos,
     slotSkirtMat,
     slotHairMap,
     slotSkirtMap,
+    playerSlot: activePlayer,
+    playerLooks: {
+      player: {
+        mat: playerMatM,
+        morph: bodyMorphForSlot(playerCat('player'), 'player'),
+        scale: bodyScaleForSlot(playerCat('player'), 'player'),
+        kitHair: kitHairForSlot(playerCat('player'), 'player'),
+        kitSkirt: kitSkirtForSlot(playerCat('player'), 'player'),
+        hairMap: hairMaps.get(hairFileOf('player')) ?? defaultHairMap ?? null,
+        skirtMap: skirtMaps.get(skirtFileOf('player')) ?? defaultSkirtMap ?? null,
+        hair: null,
+        hat: packProp('player', 'head'),
+        held: packProp('player', 'hand'),
+        back: packProp('player', 'back'),
+      },
+      'player-f': {
+        mat: playerMatF,
+        morph: bodyMorphForSlot(playerCat('player-f'), 'player-f'),
+        scale: bodyScaleForSlot(playerCat('player-f'), 'player-f'),
+        kitHair: kitHairForSlot(playerCat('player-f'), 'player-f'),
+        kitSkirt: kitSkirtForSlot(playerCat('player-f'), 'player-f'),
+        hairMap: hairMaps.get(hairFileOf('player-f')) ?? defaultHairMap ?? null,
+        skirtMap: skirtMaps.get(skirtFileOf('player-f')) ?? defaultSkirtMap ?? null,
+        hair: null,
+        hat: packProp('player-f', 'head'),
+        held: packProp('player-f', 'hand'),
+        back: packProp('player-f', 'back'),
+      },
+    },
     playerHair: null,
-    playerHat: packProp('player', 'head'),
-    playerHeld: packProp('player', 'hand'),
-    playerMorph: bodyMorphForSlot(catalog, 'player'),
+    playerHat: packProp(activePlayer, 'head'),
+    playerHeld: packProp(activePlayer, 'hand'),
+    playerBack: packProp(activePlayer, 'back'),
+    playerMorph: bodyMorphForSlot(playerCat(activePlayer), activePlayer),
+    playerScale: bodyScaleForSlot(playerCat(activePlayer), activePlayer),
     playerKitHair: playerKitHairId,
     playerKitSkirt: playerKitSkirtId,
     playerHairMap: playerHairTex,
@@ -626,6 +739,7 @@ function cloneKitFigure(
   look: {
     map: THREE.Texture | null;
     morph: number;
+    scale?: number;
     kitHair: KitHairId | null;
     kitSkirt: KitSkirtId | null;
     hairMap: THREE.Texture | null;
@@ -633,6 +747,7 @@ function cloneKitFigure(
     hair: SlotHair | null;
     hat: SlotHair | null;
     held: SlotHair | null;
+    back: SlotHair | null;
   }
 ): HumanoidFigure {
   const figure = cloneSkeleton(kit.template) as THREE.Object3D;
@@ -662,8 +777,10 @@ function cloneKitFigure(
   if (look.hair) attachHairToHead(figure, look.hair, ghostMats);
   if (look.hat) attachToBone(figure, BONE_HEAD, look.hat, ghostMats);
   if (look.held) attachToBone(figure, BONE_HAND, look.held, ghostMats);
+  if (look.back) attachToBone(figure, BONE_BACK, look.back, ghostMats);
 
   const group = new THREE.Group();
+  group.scale.setScalar(look.scale && look.scale > 0 ? look.scale : 1);
   group.add(figure);
 
   const mixer = new THREE.AnimationMixer(figure);
@@ -687,17 +804,21 @@ export function setFigureGait(fig: HumanoidFigure, moving: boolean, dt = 0) {
   fig.mixer.update(dt || 1 / 60);
 }
 
-export function clonePlayerFigure(kit: HumanoidKit): HumanoidFigure {
+export function clonePlayerFigure(kit: HumanoidKit, slot?: PlayerSlotId): HumanoidFigure {
+  const id = slot && isPlayerSlotId(slot) ? slot : kit.playerSlot;
+  const look = kit.playerLooks[id] ?? kit.playerLooks.player;
   const fig = cloneKitFigure(kit, {
-    map: kit.playerMat.map,
-    morph: kit.playerMorph,
-    kitHair: kit.playerKitHair,
-    kitSkirt: kit.playerKitSkirt,
-    hairMap: kit.playerHairMap,
-    skirtMap: kit.playerSkirtMap,
-    hair: kit.playerHair,
-    hat: kit.playerHat,
-    held: kit.playerHeld,
+    map: look.mat.map,
+    morph: look.morph,
+    scale: look.scale,
+    kitHair: look.kitHair,
+    kitSkirt: look.kitSkirt,
+    hairMap: look.hairMap,
+    skirtMap: look.skirtMap,
+    hair: look.hair,
+    hat: look.hat,
+    held: look.held,
+    back: look.back,
   });
   const halo = new PlayerHalo();
   fig.group.add(halo.group);
@@ -719,5 +840,6 @@ export function cloneBattleFigure(kit: HumanoidKit, slot: number): HumanoidFigur
     hair: kit.slotHair[i] ?? null,
     hat: kit.slotHat[i] ?? null,
     held: kit.slotHeld[i] ?? null,
+    back: kit.slotBack[i] ?? null,
   });
 }

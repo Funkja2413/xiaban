@@ -7,6 +7,7 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const editorRoot = path.join(projectRoot, 'tools/scene-editor');
 const levelsDir = path.join(projectRoot, 'public/levels');
 const modelsDir = path.join(projectRoot, 'public/models');
+const fxDir = path.join(projectRoot, 'public/fx');
 
 function safeFileName(name: string): string | null {
   const base = path.basename(name);
@@ -125,5 +126,5 @@ export default defineConfig({
     strictPort: true,
     fs: { allow: [projectRoot] },
   },
-  plugins: [serveDir('/levels', levelsDir), serveDir('/models', modelsDir), sceneSavePlugin()],
+  plugins: [serveDir('/levels', levelsDir), serveDir('/models', modelsDir), serveDir('/fx', fxDir), sceneSavePlugin()],
 });

@@ -90,12 +90,24 @@ function catalogPrunePlugin(): Plugin {
         keepLevels.add(path.normalize(levelCatalog));
         try {
           const cat = JSON.parse(fs.readFileSync(levelCatalog, 'utf8')) as {
-            levels?: { atmosphere?: { floor?: { map?: string | null }; wall?: { map?: string | null } } }[];
+            levels?: {
+              atmosphere?: { floor?: { map?: string | null }; wall?: { map?: string | null } };
+              walls?: { faces?: Record<string, { map?: string | null } | string> }[];
+              boundFaces?: Record<string, Record<string, { map?: string | null } | string>>;
+            }[];
           };
           const toAbs = (p: string) => path.normalize(path.join(dist, p.replace(/^\//, '')));
+          const keepFace = (faces?: Record<string, { map?: string | null } | string>) => {
+            if (!faces) return;
+            for (const v of Object.values(faces)) {
+              if (v && typeof v === 'object' && v.map) keepLevels.add(toAbs(v.map));
+            }
+          };
           for (const lv of cat.levels ?? []) {
             if (lv.atmosphere?.floor?.map) keepLevels.add(toAbs(lv.atmosphere.floor.map));
             if (lv.atmosphere?.wall?.map) keepLevels.add(toAbs(lv.atmosphere.wall.map));
+            for (const w of lv.walls ?? []) keepFace(w.faces);
+            if (lv.boundFaces) for (const faces of Object.values(lv.boundFaces)) keepFace(faces);
           }
         } catch {
           /* keep catalog only */

@@ -12,34 +12,52 @@ export interface RosterSlot {
   enemy?: EnemyKind;
 }
 
+export const PLAYER_SLOT_IDS = ['player', 'player-f'] as const;
+export type PlayerSlotId = (typeof PLAYER_SLOT_IDS)[number];
+
+export function isPlayerSlotId(id: string | null | undefined): id is PlayerSlotId {
+  return PLAYER_SLOT_IDS.some((s) => s === id);
+}
+
+export function rosterPlayers(): RosterSlot[] {
+  return ROSTER.filter((s) => s.kind === 'player');
+}
+
 export const ROSTER: RosterSlot[] = [
   {
     id: 'player',
-    label: '玩家',
-    blurb: '你自己，往电梯跑的那一个',
+    label: '玩家·男',
+    blurb: '开局二选一：男性自己',
     kind: 'player',
     gender: 'male',
   },
   {
+    id: 'player-f',
+    label: '玩家·女',
+    blurb: '开局二选一：女性自己',
+    kind: 'player',
+    gender: 'female',
+  },
+  {
+    id: 'colleague-a-m',
+    label: '普通同事·男',
+    blurb: 'A 型人群。花名和皮按关写在 catalog',
+    kind: 'crowd',
+    gender: 'male',
+    enemy: 'A',
+  },
+  {
     id: 'colleague-a-f',
     label: '普通同事·女',
-    blurb: 'A 型人群：被你吸引，可撞飞',
+    blurb: 'A 型人群。花名和皮按关写在 catalog',
     kind: 'crowd',
     gender: 'female',
     enemy: 'A',
   },
   {
-    id: 'colleague-a-m',
-    label: '普通同事·男',
-    blurb: 'A 型人群：被你吸引，可撞飞',
-    kind: 'crowd',
-    gender: 'male',
-    enemy: 'A',
-  },
-  {
     id: 'heavy',
     label: '重量级主管',
-    blurb: 'C 型：冲刺撞不动，守门口',
+    blurb: 'C 型：撞不动。花名和皮按关换',
     kind: 'special',
     gender: 'male',
     enemy: 'C',
@@ -47,7 +65,7 @@ export const ROSTER: RosterSlot[] = [
   {
     id: 'interceptor',
     label: '拦截者',
-    blurb: 'F 型：去电梯必经之路蹲守',
+    blurb: 'F 型：蹲电梯。花名和皮按关换',
     kind: 'special',
     gender: 'female',
     enemy: 'F',

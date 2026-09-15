@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { skillFx } from '../fx/catalog';
 import { Enemies, EState } from './enemies';
 import type { SkillId } from './cards';
+import { sfx } from '../audio';
 
 interface Decoy {
   group: THREE.Group;
@@ -42,6 +43,19 @@ export class Skills {
     return this.decoy ? { x: this.decoy.x, z: this.decoy.z } : null;
   }
 
+  reset() {
+    this.cd = 0;
+    if (this.decoy) {
+      this.scene.remove(this.decoy.group);
+      this.decoy = null;
+    }
+    if (this.kb) {
+      this.scene.remove(this.kb.mesh);
+      this.kb = null;
+    }
+    sfx.setDecoy(false);
+  }
+
   cast(id: SkillId, lv: number, px: number, pz: number, dirX: number, dirZ: number): boolean {
     if (this.cd > 0) return false;
     const pack = skillFx(id, lv);
@@ -54,6 +68,7 @@ export class Skills {
       this.scene.add(g);
       const d = pack.decoy!;
       this.decoy = { group: g, x: px, z: pz, t: d.duration, lv };
+      sfx.play('decoy');
     } else if (id === 'keyboard') {
       this.cd = pack.keyboard?.cooldown ?? 5.5;
       if (this.kb) this.scene.remove(this.kb.mesh);
@@ -71,6 +86,7 @@ export class Skills {
         hit: new Set(),
         lv,
       };
+      sfx.play('keyboard');
     } else if (id === 'coffee') {
       const c = pack.coffee;
       if (!c) return false;
@@ -86,6 +102,7 @@ export class Skills {
         const rk = c.radius * (0.84 + Math.random() * 0.32);
         this.pourCoffee(px + dirX * dist + jx, pz + dirZ * dist + jz, rk, c.life, look);
       }
+      sfx.play('coffee');
       if (c.splashRadius > 0.05) {
         const dist = c.range + Math.max(0, n - 1) * c.spacing + 0.4 + Math.random() * 0.2;
         const jx = sideX * (Math.random() - 0.5) * 0.3;
@@ -128,6 +145,7 @@ export class Skills {
         this.decoy = null;
       }
     }
+    sfx.setDecoy(!!this.decoy);
 
     if (this.kb) {
       const k = this.kb;
@@ -147,6 +165,7 @@ export class Skills {
         if (dd < 0.8) {
           this.scene.remove(k.mesh);
           this.kb = null;
+          sfx.play('keyboard_catch');
         } else {
           k.x += (dx / dd) * kb.speed * dt;
           k.z += (dz / dd) * kb.speed * dt;

@@ -18,6 +18,7 @@ import {
   setKitHair,
   setKitSkirt,
   fixKitHairBind,
+  retargetBodyQuats,
   type KitHairId,
   type KitSkirtId,
 } from './kit';
@@ -47,25 +48,6 @@ function clipLooksAnimated(clip: THREE.AnimationClip | undefined) {
   });
 }
 
-/**
- * Kenney FBX 接到 kit：只借变形骨的 quaternion。
- * position/scale 是厘米，整段接上会把人拉飞；Ctrl/IK/Roll 会和变形骨打架。
- */
-function retargetBodyQuats(clip: THREE.AnimationClip, root: THREE.Object3D) {
-  const names = new Set<string>();
-  root.traverse((o) => names.add(o.name));
-  const tracks = clip.tracks.filter((t) => {
-    const [bone, prop] = t.name.split('.');
-    if (!names.has(bone) || prop !== 'quaternion') return false;
-    if (/Ctrl|IK|Roll|Heel/.test(bone)) return false;
-    return /^(Hips|Spine|Chest|UpperChest|Neck|Head|LeftShoulder|RightShoulder|LeftArm|RightArm|LeftForeArm|RightForeArm|LeftHand|RightHand|LeftUpLeg|RightUpLeg|LeftLeg|RightLeg|LeftFoot|RightFoot|LeftToes|RightToes)/.test(
-      bone
-    );
-  });
-  if (!tracks.length) return clip;
-  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
-}
-
 export function findSkinned(root: THREE.Object3D): THREE.SkinnedMesh | null {
   let found: THREE.SkinnedMesh | null = null;
   root.traverse((o) => {
@@ -87,6 +69,7 @@ export function findBone(root: THREE.Object3D, name: string): THREE.Bone | THREE
 }
 
 export const BONE_HAND = ['RightHand', 'Hand_R', 'mixamorigRightHand', 'Right_Hand', 'hand_r'];
+export const BONE_BACK = ['Chest', 'Spine', 'UpperChest', 'mixamorigSpine2', 'mixamorigSpine1', 'mixamorigSpine'];
 
 export function findBoneAny(root: THREE.Object3D, names: string[]): THREE.Object3D | null {
   for (const n of names) {
@@ -121,10 +104,13 @@ export class CharacterPreview {
   skinned: THREE.SkinnedMesh | null = null;
   head: THREE.Object3D | null = null;
   hand: THREE.Object3D | null = null;
+  back: THREE.Object3D | null = null;
   clips: { idle?: THREE.AnimationClip; run?: THREE.AnimationClip; jump?: THREE.AnimationClip } = {};
   playing: 'idle' | 'run' | 'jump' | 'none' = 'none';
   boneNames: string[] = [];
   bodyMorph = 0;
+  bodyScale = 1;
+  private figure: THREE.Group | null = null;
   kitHair: KitHairId | null = null;
   kitSkirt: KitSkirtId | null = null;
   hairMap: THREE.Texture | null = null;
@@ -256,11 +242,16 @@ export class CharacterPreview {
     });
 
     normalizeToGround(root);
-    this.scene.add(root);
+    const figure = new THREE.Group();
+    figure.name = 'figureScale';
+    figure.add(root);
+    this.scene.add(figure);
+    this.figure = figure;
     this.root = root;
     this.skinned = skinned;
     this.head = findBone(root, 'Head');
     this.hand = findBoneAny(root, BONE_HAND);
+    this.back = findBoneAny(root, BONE_BACK);
 
     this.boneNames = [];
     root.traverse((o) => {
@@ -299,6 +290,11 @@ export class CharacterPreview {
   setMorph(t: number) {
     this.bodyMorph = t;
     if (this.skinned) setBodyMorph(this.skinned, t);
+  }
+
+  setBodyScale(t: number) {
+    this.bodyScale = t;
+    this.figure?.scale.setScalar(t);
   }
 
   setKitHairStyle(name: KitHairId | null) {
@@ -438,9 +434,11 @@ export class CharacterPreview {
     const clipName = clip ? `${clip.name} ${clip.duration.toFixed(2)}s` : '无动画';
     const head = this.head ? `Head ✓` : 'Head 未找到';
     const hand = this.hand ? `Hand ✓` : 'Hand 未找到';
+    const back = this.back ? `Back ✓` : 'Back 未找到';
     const morph = this.bodyMorph === 0 ? '中' : this.bodyMorph > 0 ? `胖 ${this.bodyMorph.toFixed(2)}` : `瘦 ${this.bodyMorph.toFixed(2)}`;
+    const scale = this.bodyScale === 1 ? '尺 1' : `尺 ${this.bodyScale.toFixed(2)}`;
     const hair = this.kitHair ?? '图集短发';
-    return `${clipName} · ${morph} · ${hair} · ${head} · ${hand} · 骨 ${this.boneNames.length}`;
+    return `${clipName} · ${morph} · ${scale} · ${hair} · ${head} · ${hand} · ${back} · 骨 ${this.boneNames.length}`;
   }
 
   private resize() {

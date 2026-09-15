@@ -1,38 +1,61 @@
 import { Game } from './game/game';
-import { homeBackdropDay, rememberLastPlayed } from './progress';
-import { bindHome, bindPlay, initShell, playUrl, setMode, showResult, wantsAutoPlay } from './shell';
+import { homeBackdropDay, loadPlayerSlot, rememberLastPlayed, rememberPlayerSlot } from './progress';
+import { isPlayerSlotId } from './roster';
+import { bindAvatar, bindHome, bindPlay, initShell, playUrl, setMode, showResult, wantsAutoPlay } from './shell';
+import { bgm } from './audio';
 
 initShell();
 setMode('loading');
 
 const auto = wantsAutoPlay();
-const bootDay = auto ?? homeBackdropDay();
+const bootDay = auto?.day ?? homeBackdropDay();
+const qPlayer = new URLSearchParams(location.search).get('player');
+const bootPlayer = auto?.player ?? (isPlayerSlotId(qPlayer) ? qPlayer : loadPlayerSlot());
 const game = new Game();
-game.onSettled = (kind, info) => showResult(kind, info.day, info.sub);
+game.onSettled = (kind, info) => showResult(kind, info.day, info.sub, game.playerSlot);
 
-bindPlay((day) => {
+bindPlay((day, player) => {
+  rememberPlayerSlot(player);
   rememberLastPlayed(day);
-  if (game.day === day) {
+  bgm.play(day);
+  if (game.day === day && game.playerSlot === player) {
     game.beginPlay();
     setMode('play');
     return;
   }
-  location.assign(playUrl(day));
+  location.assign(playUrl(day, player));
 });
 
 bindHome(() => game.enterMenu());
+bindAvatar({
+  show: (id) => game.enterAvatarPick(id),
+  hide: () => game.exitAvatarPick(),
+  select: (id) => game.selectAvatar(id),
+});
 
 const loadingSub = document.querySelector('#loading .sub') as HTMLElement | null;
 if (loadingSub) loadingSub.textContent = auto ? '正在进入办公室…' : '正在准备场景…';
 
 game
-  .start(document.getElementById('app')!, bootDay, { menu: !auto })
+  .start(document.getElementById('app')!, bootDay, { menu: !auto, playerSlot: bootPlayer })
   .then(() => {
     if (auto) {
-      rememberLastPlayed(auto);
+      rememberPlayerSlot(auto.player);
+      rememberLastPlayed(auto.day);
       setMode('play');
     } else {
       setMode('home');
+      const preview = new URLSearchParams(location.search).get('result');
+      if (preview === 'lost' || preview === 'won') {
+        showResult(
+          preview,
+          bootDay,
+          preview === 'lost'
+            ? '任务塞到了 24:00<br>下次试着把人群引开、用冲刺撞穿薄弱处'
+            : '逃亡用时 01:08<br>最终下班时间 18:24',
+          bootPlayer
+        );
+      }
     }
   })
   .catch((err) => {

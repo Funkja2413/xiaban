@@ -193,6 +193,72 @@ export function makeFabricTex() {
   );
 }
 
+/** 近白织纹，给沙发/椅面乘颜色；蓝布纹会把橙红黄都拧掉。 */
+export function makeClothTex() {
+  const rnd = seed(71);
+  return toTex(
+    canvas(128, 128, (ctx, w, h) => {
+      ctx.fillStyle = '#f3f1ec';
+      ctx.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 2) {
+        ctx.fillStyle = `rgba(255,255,255,${0.05 + rnd() * 0.06})`;
+        ctx.fillRect(0, y, w, 1);
+      }
+      for (let x = 0; x < w; x += 3) {
+        ctx.fillStyle = `rgba(40,32,24,${0.035 + rnd() * 0.03})`;
+        ctx.fillRect(x, 0, 1, h);
+      }
+    })
+  );
+}
+
+/** 不规则软边渍：咖啡/水渍共用，运行时只换颜色。 */
+export function makeStainTex(n = 1) {
+  const rnd = seed(n * 7919 + 17);
+  const c = canvas(128, 128, (ctx, w) => {
+    ctx.clearRect(0, 0, w, w);
+    ctx.globalCompositeOperation = 'lighter';
+    const blobs = 5 + ((rnd() * 3) | 0);
+    for (let i = 0; i < blobs; i++) {
+      const ox = (rnd() - 0.5) * w * 0.38;
+      const oy = (rnd() - 0.5) * w * 0.34;
+      const rad = w * (0.16 + rnd() * 0.28);
+      const g = ctx.createRadialGradient(w * 0.5 + ox, w * 0.5 + oy, 0, w * 0.5 + ox, w * 0.5 + oy, rad);
+      const core = 0.55 + rnd() * 0.4;
+      g.addColorStop(0, `rgba(255,255,255,${core})`);
+      g.addColorStop(0.42, `rgba(255,255,255,${core * 0.55})`);
+      g.addColorStop(0.78, 'rgba(255,255,255,0.12)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, w);
+    }
+    const drops = 6 + ((rnd() * 5) | 0);
+    for (let i = 0; i < drops; i++) {
+      const ang = rnd() * Math.PI * 2;
+      const dist = w * (0.2 + rnd() * 0.32);
+      const x = w * 0.5 + Math.cos(ang) * dist;
+      const y = w * 0.5 + Math.sin(ang) * dist;
+      const rad = w * (0.035 + rnd() * 0.07);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, 'rgba(255,255,255,0.7)');
+      g.addColorStop(0.55, 'rgba(255,255,255,0.28)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+  const out = new THREE.CanvasTexture(c);
+  out.wrapS = out.wrapT = THREE.ClampToEdgeWrapping;
+  out.minFilter = THREE.LinearFilter;
+  out.magFilter = THREE.LinearFilter;
+  out.generateMipmaps = false;
+  out.colorSpace = THREE.NoColorSpace;
+  out.needsUpdate = true;
+  return out;
+}
+
 export function makeMetalTex() {
   const rnd = seed(17);
   return toTex(
@@ -225,6 +291,48 @@ export function makeScreenTex() {
       ctx.fillRect(4, 23, 48, 3);
       ctx.fillStyle = '#5ee0a0';
       ctx.fillRect(4, 30, 18, 6);
+    }),
+    { wrap: false }
+  );
+}
+
+/** 俯视可读的加班报纸：报头 + 栏线 + 照片框。 */
+export function makeNewsTex() {
+  const rnd = seed(91);
+  return toTex(
+    canvas(256, 192, (ctx, w, h) => {
+      ctx.fillStyle = '#f4ead4';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#c43a32';
+      ctx.fillRect(8, 8, w - 16, 28);
+      ctx.fillStyle = '#f7efe0';
+      ctx.font = 'bold 18px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('加班日报', w / 2, 28);
+      ctx.fillStyle = '#6a5a48';
+      ctx.font = '9px sans-serif';
+      ctx.fillText('OFFICE DAILY  ·  周一见报  ·  今日加班 12 小时', w / 2, 48);
+      ctx.fillStyle = '#d8c8ae';
+      ctx.fillRect(14, 56, 88, 62);
+      ctx.fillStyle = '#b8a890';
+      ctx.fillRect(20, 62, 76, 36);
+      ctx.fillStyle = '#8a7a66';
+      ctx.font = '8px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('会议纪要', 22, 110);
+      const cols = [112, 176];
+      for (const x of cols) {
+        for (let y = 58; y < 170; y += 5) {
+          const len = 42 + rnd() * 18;
+          ctx.fillStyle = `rgba(50,42,34,${0.28 + rnd() * 0.22})`;
+          ctx.fillRect(x, y, len, 2);
+        }
+      }
+      ctx.strokeStyle = 'rgba(90,50,30,0.28)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(48, 150, 22, 0, Math.PI * 1.6);
+      ctx.stroke();
     }),
     { wrap: false }
   );
@@ -368,6 +476,7 @@ export function phong(opts: {
   specular?: number;
   transparent?: boolean;
   opacity?: number;
+  alphaTest?: number;
   emissive?: number;
 }): THREE.MeshPhongMaterial {
   const key = `${opts.color ?? 0}|${opts.shininess ?? 18}|${opts.specular ?? 0}|${opts.map ? 1 : 0}|${opts.bumpMap ? 1 : 0}|${opts.transparent ? 1 : 0}|${opts.emissive ?? 0}`;
@@ -399,11 +508,106 @@ let woodT: THREE.CanvasTexture | undefined;
 let woodB: THREE.CanvasTexture | undefined;
 let plasterT: THREE.CanvasTexture | undefined;
 let fabricT: THREE.CanvasTexture | undefined;
+let clothT: THREE.CanvasTexture | undefined;
+const stainT: THREE.CanvasTexture[] = [];
 let metalT: THREE.CanvasTexture | undefined;
 let screenT: THREE.CanvasTexture | undefined;
+let newsT: THREE.CanvasTexture | undefined;
 let tileT: THREE.CanvasTexture | undefined;
 
 const colorMaps = new Map<string, Promise<THREE.Texture>>();
+
+function bleedAlphaRgb(px: Uint8ClampedArray, w: number, h: number, passes: number) {
+  const src = new Uint8ClampedArray(px.length);
+  for (let p = 0; p < passes; p++) {
+    src.set(px);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (src[i + 3] > 8) continue;
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const xx = x + dx;
+            const yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+            const j = (yy * w + xx) * 4;
+            if (src[j + 3] <= 8) continue;
+            r += src[j];
+            g += src[j + 1];
+            b += src[j + 2];
+            n++;
+          }
+        }
+        if (!n) continue;
+        px[i] = r / n;
+        px[i + 1] = g / n;
+        px[i + 2] = b / n;
+      }
+    }
+  }
+}
+
+/** 墙面海报：吃掉近透明脏点，并把颜色渗进透明边，避免黑边。 */
+export function prepareFacePosterMap(src: THREE.Texture): THREE.Texture {
+  const size = textureImageSize(src);
+  const img = src.image as CanvasImageSource | undefined;
+  if (!size || !img) {
+    const face = src.clone();
+    face.wrapS = face.wrapT = THREE.ClampToEdgeWrapping;
+    face.repeat.set(1, 1);
+    face.offset.set(0, 0);
+    face.needsUpdate = true;
+    return face;
+  }
+  const c = document.createElement('canvas');
+  c.width = size.w;
+  c.height = size.h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (!ctx) {
+    const face = src.clone();
+    face.wrapS = face.wrapT = THREE.ClampToEdgeWrapping;
+    face.needsUpdate = true;
+    return face;
+  }
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, c.width, c.height);
+  const px = data.data;
+  for (let i = 3; i < px.length; i += 4) {
+    if (px[i] < 16) px[i] = 0;
+  }
+  bleedAlphaRgb(px, c.width, c.height, 2);
+  ctx.putImageData(data, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 4;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.premultiplyAlpha = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function textureImageSize(tex: THREE.Texture): { w: number; h: number } | null {
+  const img = tex.image as {
+    width?: number;
+    height?: number;
+    naturalWidth?: number;
+    naturalHeight?: number;
+    videoWidth?: number;
+    videoHeight?: number;
+  } | undefined;
+  const w = Number(img?.naturalWidth ?? img?.videoWidth ?? img?.width ?? 0);
+  const h = Number(img?.naturalHeight ?? img?.videoHeight ?? img?.height ?? 0);
+  if (!w || !h) return null;
+  return { w, h };
+}
 
 export function loadColorMap(url: string): Promise<THREE.Texture> {
   let p = colorMaps.get(url);
@@ -432,8 +636,14 @@ export const tex = {
   woodBump: () => (woodB ??= makeWoodBump()),
   plaster: () => (plasterT ??= makePlasterTex()),
   fabric: () => (fabricT ??= makeFabricTex()),
+  cloth: () => (clothT ??= makeClothTex()),
+  stain: (i = 0) => {
+    const k = ((i % 4) + 4) % 4;
+    return (stainT[k] ??= makeStainTex(k + 1));
+  },
   metal: () => (metalT ??= makeMetalTex()),
   screen: () => (screenT ??= makeScreenTex()),
+  news: () => (newsT ??= makeNewsTex()),
   tile: () => (tileT ??= makeTileTex()),
 };
 
@@ -448,6 +658,7 @@ export function phongFresh(opts: Parameters<typeof phong>[0]): THREE.MeshPhongMa
     specular: new THREE.Color(opts.specular ?? 0x333333),
     transparent: opts.transparent ?? false,
     opacity: opts.opacity ?? 1,
+    alphaTest: opts.alphaTest ?? 0,
     ...(opts.emissive
       ? { emissive: new THREE.Color(opts.emissive), emissiveIntensity: 0.35 }
       : {}),

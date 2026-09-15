@@ -9,6 +9,7 @@ export class Hud {
   private dashBtn = document.getElementById('dashBtn')!;
   private elevEl = document.getElementById('elevTimer')!;
   private overlayEl = document.getElementById('overlay')!;
+  private readyEl = document.getElementById('readyCount')!;
 
   private frames = 0;
   private fpsTimer = 0;
@@ -20,6 +21,16 @@ export class Hud {
   addOvertime(min: number) {
     this.overtimeMin += min;
     this.toast(`+${min} 分钟加班！`);
+    this.renderDeadline();
+  }
+
+  /** 再试 / 重开关：下班钟回到 18:00 */
+  resetRun() {
+    this.overtimeMin = 0;
+    this.toastTimer = 0;
+    this.toastEl.style.opacity = '0';
+    this.setElevatorTimer(null);
+    this.setReadyCount(null);
     this.renderDeadline();
   }
 
@@ -55,6 +66,23 @@ export class Hud {
       this.elevEl.style.display = 'block';
       this.elevEl.textContent = text;
     }
+  }
+
+  /** 开局准备倒计时；null 隐藏，数字显示 3/2/1，'go' 显示「开始！」 */
+  setReadyCount(value: number | 'go' | null) {
+    if (value === null) {
+      this.readyEl.classList.remove('show', 'go');
+      this.readyEl.textContent = '';
+      return;
+    }
+    this.readyEl.classList.add('show');
+    if (value === 'go') {
+      this.readyEl.classList.add('go');
+      this.readyEl.textContent = '开始！';
+      return;
+    }
+    this.readyEl.classList.remove('go');
+    this.readyEl.textContent = String(value);
   }
 
   showOverlay(title: string, sub: string) {

@@ -3,9 +3,16 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { FlowField } from '../sim/flowfield';
 import { ENEMY_CUT_GROUPS, ENEMY_GROUPS } from '../sim/physics';
 import { RagdollFactory, type RagdollHandle } from './ragdoll';
-import { phong } from './style';
 import type { HumanoidKit } from './humanoid';
-import type { CrowdActorId } from '../fx/catalog';
+import { enemySkillFx, type CrowdActorId, type EnemySkillId } from '../fx/catalog';
+import { sfx } from '../audio';
+
+export interface SkillTarget {
+  applySlow(duration: number, factor: number): void
+  stun(duration: number): void
+  vx: number
+  vz: number
+}
 
 export enum EState { Inactive = 0, Chase = 1, Knock = 2, Ragdoll = 3, Getup = 4 }
 
@@ -37,6 +44,18 @@ const HEAVY_SPRINT = 3.6;
 const INTERCEPT_ARRIVE = 1.25;
 /** 已占点时，玩家挤过来才上前堵 */
 const INTERCEPT_ENGAGE = 1.45;
+/** 贴身交任务半径 */
+const CHANNEL_RANGE = 1.15;
+/** 本局第一次交任务（让几乎每局都会加时） */
+const CHANNEL_FIRST = 0.45;
+/** 之后：普通/拦截 */
+const CHANNEL_NEED_A = 0.85;
+/** 之后：主管 */
+const CHANNEL_NEED_C = 1.2;
+/** 离开范围后先停这么久再掉进度 */
+const CHANNEL_GRACE = 0.25;
+/** 离身掉进度倍率（秒进度 / 秒），原先是 2 */
+const CHANNEL_DECAY = 0.6;
 
 export interface HitOpts {
   /** 直接布娃娃（冲刺/椅子） */
@@ -58,6 +77,10 @@ export class Enemies {
   private colorIdx: Uint8Array;
   private knockT: Float32Array;
   private channelT: Float32Array;
+  /** 离开贴身范围后的宽限，宽限内不掉读条 */
+  private channelAwayT: Float32Array;
+  /** 本局是否已经交过一次任务 */
+  private deliveredOnce = false;
   private getupT: Float32Array;
   private staggT: Float32Array;
   private stagger: Uint8Array;
@@ -87,6 +110,18 @@ export class Enemies {
   private slowT: Float32Array;
   private slowMul: Float32Array;
   private stunFxT: Float32Array;
+  private skill: string[];
+  private skillCd: Float32Array;
+  private skillWind: Float32Array;
+  private burstT: Float32Array;
+  private burstX: Float32Array;
+  private burstZ: Float32Array;
+  private shoutT: Float32Array;
+  private hasteT: Float32Array;
+  private hasteMul: Float32Array;
+  private rallyLeft = 2;
+  skillOf: ((id: CrowdActorId) => EnemySkillId | null) | null = null;
+  onSkill: ((id: EnemySkillId, phase: 'windup' | 'fire', x: number, z: number, i: number) => void) | null = null;
   private ragCount = 0;
   private static readonly MAX_RAG = 8;
 
@@ -102,12 +137,15 @@ export class Enemies {
   private hairMeshes: (THREE.InstancedMesh | null)[] = [];
   private hatMeshes: (THREE.InstancedMesh | null)[] = [];
   private heldMeshes: (THREE.InstancedMesh | null)[] = [];
+  private backMeshes: (THREE.InstancedMesh | null)[] = [];
   private kitHairMeshes: (THREE.InstancedMesh | null)[] = [];
   /** 与 poseSets 同槽；无裙则为 null */
   private skirtPoseSets: (THREE.InstancedMesh[] | null)[] = [];
   private tmpHair = new THREE.Matrix4();
-  private folderMesh: THREE.InstancedMesh;
   private blobMesh: THREE.InstancedMesh;
+  private lastPose: Uint8Array;
+  private lastBody: THREE.Matrix4[];
+  private tmpGlow = new THREE.Matrix4();
 
   private tmpM = new THREE.Matrix4();
   private tmpM2 = new THREE.Matrix4();
@@ -143,6 +181,7 @@ export class Enemies {
     this.colorIdx = new Uint8Array(capacity);
     this.knockT = new Float32Array(capacity);
     this.channelT = new Float32Array(capacity);
+    this.channelAwayT = new Float32Array(capacity);
     this.getupT = new Float32Array(capacity);
     this.staggT = new Float32Array(capacity);
     this.stagger = new Uint8Array(capacity);
@@ -165,14 +204,22 @@ export class Enemies {
     this.slowT = new Float32Array(capacity);
     this.slowMul = new Float32Array(capacity);
     this.stunFxT = new Float32Array(capacity);
+    this.skill = new Array(capacity).fill('');
+    this.skillCd = new Float32Array(capacity);
+    this.skillWind = new Float32Array(capacity);
+    this.burstT = new Float32Array(capacity);
+    this.burstX = new Float32Array(capacity);
+    this.burstZ = new Float32Array(capacity);
+    this.shoutT = new Float32Array(capacity);
+    this.hasteT = new Float32Array(capacity);
+    this.hasteMul = new Float32Array(capacity);
+    this.lastPose = new Uint8Array(capacity);
+    this.lastBody = Array.from({ length: capacity }, () => new THREE.Matrix4());
 
-    const folderGeo = new THREE.BoxGeometry(0.22, 0.28, 0.04);
-    folderGeo.translate(0, 2.05, 0.18);
     const blobGeo = new THREE.CircleGeometry(0.34, 14);
     blobGeo.rotateX(-Math.PI / 2);
 
     const blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false });
-    const folderMat = phong({ color: 0xf3ead2, shininess: 12, specular: 0x444433 });
 
     const poseMats = [kit.maleMat, kit.femaleMat, kit.heavyMat, kit.interceptorMat];
     for (let s = 0; s < poseMats.length; s++) {
@@ -194,6 +241,7 @@ export class Enemies {
     fillAttach(kit.slotHair, this.hairMeshes);
     fillAttach(kit.slotHat, this.hatMeshes);
     fillAttach(kit.slotHeld, this.heldMeshes);
+    fillAttach(kit.slotBack, this.backMeshes);
     fillAttach(kit.slotKitHair, this.kitHairMeshes);
 
     for (let s = 0; s < poseMats.length; s++) {
@@ -206,14 +254,13 @@ export class Enemies {
       this.skirtPoseSets.push(geos.map((geo) => new THREE.InstancedMesh(geo, mat, capacity)));
     }
 
-    this.folderMesh = new THREE.InstancedMesh(folderGeo, folderMat, capacity);
     this.blobMesh = new THREE.InstancedMesh(blobGeo, blobMat, capacity);
 
-    const attachLive = [...this.hairMeshes, ...this.hatMeshes, ...this.heldMeshes, ...this.kitHairMeshes].filter(
+    const attachLive = [...this.hairMeshes, ...this.hatMeshes, ...this.heldMeshes, ...this.backMeshes, ...this.kitHairMeshes].filter(
       (m): m is THREE.InstancedMesh => !!m
     );
     const skirtLive = this.skirtPoseSets.flatMap((set) => set ?? []);
-    for (const mesh of [...this.poseSets.flat(), ...attachLive, ...skirtLive, this.folderMesh]) {
+    for (const mesh of [...this.poseSets.flat(), ...attachLive, ...skirtLive]) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -229,12 +276,12 @@ export class Enemies {
       for (const mesh of this.hairMeshes) mesh?.setMatrixAt(i, zero);
       for (const mesh of this.hatMeshes) mesh?.setMatrixAt(i, zero);
       for (const mesh of this.heldMeshes) mesh?.setMatrixAt(i, zero);
+      for (const mesh of this.backMeshes) mesh?.setMatrixAt(i, zero);
       for (const mesh of this.kitHairMeshes) mesh?.setMatrixAt(i, zero);
       for (const set of this.skirtPoseSets) {
         if (!set) continue;
         for (const mesh of set) mesh.setMatrixAt(i, zero);
       }
-      this.folderMesh.setMatrixAt(i, zero);
       this.blobMesh.setMatrixAt(i, zero);
     }
   }
@@ -245,13 +292,37 @@ export class Enemies {
     return n;
   }
 
+  /** 再试一次：清掉所有活人/布娃娃，下一波重新刷 */
+  clearAll() {
+    for (let i = 0; i < this.cap; i++) {
+      if (this.state[i] === EState.Inactive && !this.bodies[i] && !this.rags[i]) continue;
+      const rag = this.rags[i];
+      if (rag) {
+        this.ragFactory.despawn(rag);
+        this.rags[i] = null;
+      }
+      const body = this.bodies[i];
+      if (body) {
+        this.world.removeRigidBody(body);
+        this.bodies[i] = null;
+      }
+      this.state[i] = EState.Inactive;
+      this.clearChannel(i);
+    }
+    this.ragCount = 0;
+    this.deliveredOnce = false;
+    this.resetSkills();
+  }
+
   /** 体型缩放（渲染 + 布娃娃 + 命中半径共用） */
   private scaleOf(i: number) {
+    const fromKit = this.kit.slotScale[this.poseSetOf(i)];
+    if (fromKit && fromKit > 0) return fromKit;
     return this.types[i] === EType.C ? 1.38 : 1;
   }
 
   private hitRadiusOf(i: number) {
-    return this.types[i] === EType.C ? 0.58 : 0.42;
+    return 0.42 * this.scaleOf(i);
   }
 
   private colorOf(i: number) {
@@ -276,7 +347,7 @@ export class Enemies {
       this.faceX[i] = 0;
       this.faceZ[i] = 0;
       this.stagger[i] = 0;
-      this.channelT[i] = 0;
+      this.clearChannel(i);
       this.anchorX[i] = x;
       this.anchorZ[i] = z;
       this.gender[i] = type === EType.A && Math.random() < 0.5 ? 1 : 0;
@@ -287,6 +358,11 @@ export class Enemies {
       this.slowT[i] = 0;
       this.slowMul[i] = 1;
       this.stunFxT[i] = 0;
+      this.hasteT[i] = 0;
+      this.hasteMul[i] = 1;
+      this.burstT[i] = 0;
+      this.shoutT[i] = 0;
+      this.bindSkill(i);
       this.createBody(i, x, z);
       return true;
     }
@@ -295,15 +371,16 @@ export class Enemies {
 
   private createBody(i: number, x: number, z: number) {
     const heavy = this.types[i] === EType.C;
+    const s = this.scaleOf(i);
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(x, heavy ? 0.92 : 0.66, z)
+        .setTranslation(x, 0.66 * s, z)
         .lockRotations()
         .setLinearDamping(2.5)
     );
     const desc = heavy
-      ? RAPIER.ColliderDesc.capsule(0.48, 0.42).setMass(220).setFriction(0.3)
-      : RAPIER.ColliderDesc.capsule(0.35, 0.3).setMass(60).setFriction(0.2);
+      ? RAPIER.ColliderDesc.capsule(0.35 * s, 0.3 * s).setMass(220).setFriction(0.3)
+      : RAPIER.ColliderDesc.capsule(0.35 * s, 0.3 * s).setMass(60).setFriction(0.2);
     desc.setCollisionGroups(this.types[i] === EType.F ? ENEMY_CUT_GROUPS : ENEMY_GROUPS);
     this.world.createCollider(desc, body);
     this.bodies[i] = body;
@@ -351,14 +428,14 @@ export class Enemies {
         this.toRagdoll(i, dirX, dirZ, Math.min(impulse, 900), opts.cannon === true);
         return;
       }
-      this.channelT[i] = 0;
+      this.clearChannel(i);
       this.bodies[i]!.applyImpulse({ x: dirX * impulse * 0.25, y: 0, z: dirZ * impulse * 0.25 }, true);
       return;
     }
 
     this.stagger[i]++;
     this.staggT[i] = 1.3;
-    this.channelT[i] = 0;
+    this.clearChannel(i);
 
     if (opts.force || impulse >= RAGDOLL_IMPULSE || this.stagger[i] >= STAGGER_TO_RAGDOLL) {
       this.toRagdoll(i, dirX, dirZ, Math.min(Math.max(impulse * 0.85, 200), 500), opts.cannon === true);
@@ -406,6 +483,7 @@ export class Enemies {
     this.createBody(i, rx, rz);
     this.state[i] = EState.Getup;
     this.getupT[i] = 0.65;
+    sfx.play('getup');
   }
 
   private recycleOldestRagdoll() {
@@ -427,7 +505,7 @@ export class Enemies {
   stun(i: number, dur = 0.9) {
     const s = this.state[i];
     if (s !== EState.Chase && s !== EState.Knock) return;
-    this.channelT[i] = 0;
+    this.clearChannel(i);
     this.state[i] = EState.Knock;
     this.knockT[i] = Math.max(this.knockT[i], dur);
     this.stunFxT[i] = Math.max(this.stunFxT[i], dur);
@@ -449,6 +527,7 @@ export class Enemies {
     const v = b.linvel();
     const sp = Math.hypot(v.x, v.z);
     if (sp < 1.2) return;
+    sfx.play('slick_slip');
     this.toRagdoll(i, v.x / sp, v.z / sp, 150 + sp * 30);
   }
 
@@ -485,6 +564,66 @@ export class Enemies {
     }
   }
 
+  isChanneling(i: number) {
+    return this.state[i] === EState.Chase && this.channelT[i] > 0.12;
+  }
+
+  bodyScale(i: number) {
+    return this.scaleOf(i);
+  }
+
+  resetSkills() {
+    this.rallyLeft = 2;
+  }
+
+  private bindSkill(i: number) {
+    const id = this.skillOf?.(this.actorId(i)) ?? null;
+    if (id === 'rally') {
+      if (this.rallyLeft <= 0) {
+        this.skill[i] = '';
+        return;
+      }
+      this.rallyLeft -= 1;
+    }
+    this.skill[i] = id ?? '';
+    this.skillCd[i] = 1.2;
+    this.skillWind[i] = 0;
+  }
+
+  boostAround(x: number, z: number, radius: number, duration: number, mul: number, pred?: (i: number) => boolean) {
+    const r2 = radius * radius;
+    for (let i = 0; i < this.cap; i++) {
+      if (this.state[i] === EState.Inactive) continue;
+      if (pred && !pred(i)) continue;
+      const dx = this.posX[i] - x;
+      const dz = this.posZ[i] - z;
+      if (dx * dx + dz * dz > r2) continue;
+      this.hasteT[i] = Math.max(this.hasteT[i], duration);
+      this.hasteMul[i] = Math.max(this.hasteMul[i] || 1, mul);
+    }
+  }
+
+  bursting(i: number) {
+    return this.burstT[i] > 0;
+  }
+
+  hastening(i: number) {
+    return this.hasteT[i] > 0;
+  }
+
+  yawOf(i: number) {
+    return this.yaw[i];
+  }
+
+  handWorld(i: number, out: THREE.Vector3, left = false) {
+    const pose = this.lastPose[i] ?? 0;
+    const locals = left ? this.kit.leftHandLocals : this.kit.handLocals;
+    const bone = locals[pose] ?? locals[0];
+    if (!bone) return out.set(this.posX[i], 0.95, this.posZ[i]);
+    this.tmpGlow.copy(this.lastBody[i]!).multiply(bone);
+    return out.setFromMatrixPosition(this.tmpGlow);
+  }
+
   actorId(i: number): CrowdActorId {
     const t = this.types[i];
     if (t === EType.C) return 'heavy';
@@ -492,11 +631,50 @@ export class Enemies {
     return this.gender[i] ? 'colleague-a-f' : 'colleague-a-m';
   }
 
+  private clearChannel(i: number) {
+    this.channelT[i] = 0;
+    this.channelAwayT[i] = 0;
+  }
+
+  private channelNeedOf(i: number) {
+    if (!this.deliveredOnce) return CHANNEL_FIRST;
+    return this.types[i] === EType.C ? CHANNEL_NEED_C : CHANNEL_NEED_A;
+  }
+
+  private decayChannel(i: number, dt: number) {
+    this.channelAwayT[i] += dt;
+    if (this.channelAwayT[i] < CHANNEL_GRACE) return;
+    this.channelT[i] = Math.max(0, this.channelT[i] - dt * CHANNEL_DECAY);
+    if (this.channelT[i] <= 0) this.channelAwayT[i] = 0;
+  }
+
+  /** 隐藏地板：范围内的同事直接弹飞（含主管） */
+  flingAround(x: number, z: number, radius: number, impulse: number, lift: number) {
+    const r2 = radius * radius;
+    for (let i = 0; i < this.cap; i++) {
+      const s = this.state[i];
+      if (s === EState.Inactive || s === EState.Ragdoll) continue;
+      const body = this.bodies[i];
+      if (!body) continue;
+      const t = body.translation();
+      const dx = t.x - x;
+      const dz = t.z - z;
+      if (dx * dx + dz * dz > r2) continue;
+      const len = Math.hypot(dx, dz);
+      const dirX = len > 0.08 ? dx / len : 1;
+      const dirZ = len > 0.08 ? dz / len : 0;
+      this.hit(i, dirX, dirZ, impulse, { force: true, heavyOk: true });
+      const rag = this.rags[i];
+      if (rag) rag.bodies[1].applyImpulse({ x: dirX * impulse * 0.15, y: lift, z: dirZ * impulse * 0.15 }, true);
+      else this.bodies[i]?.applyImpulse({ x: dirX * impulse * 0.2, y: lift, z: dirZ * impulse * 0.2 }, true);
+    }
+  }
+
   /** 蛮力 LV3：把重量级推开（不摔，纯位移 + 打断读条） */
   shove(i: number, dirX: number, dirZ: number, impulse: number) {
     const b = this.bodies[i];
     if (!b) return;
-    this.channelT[i] = 0;
+    this.clearChannel(i);
     b.applyImpulse({ x: dirX * impulse, y: 0, z: dirZ * impulse }, true);
   }
 
@@ -543,13 +721,18 @@ export class Enemies {
       this.posting[i] = 0;
       this.rushing[i] = 0;
       this.aggro[i] = 0;
-      this.channelT[i] = 0;
+      this.clearChannel(i);
       this.faceX[i] = 0;
       this.faceZ[i] = 0;
     }
   }
 
-  update(dt: number, playerX: number, playerZ: number, opts?: { suppressChannel?: boolean; bruteChain?: boolean; forceChase?: boolean }) {
+  update(
+    dt: number,
+    playerX: number,
+    playerZ: number,
+    opts?: { suppressChannel?: boolean; bruteChain?: boolean; forceChase?: boolean; skillTarget?: SkillTarget }
+  ) {
     this.forceChase = opts?.forceChase === true;
     this.aimPX = playerX;
     this.aimPZ = playerZ;
@@ -572,7 +755,9 @@ export class Enemies {
 
     for (let i = 0; i < this.cap; i++) {
       switch (this.state[i]) {
-        case EState.Chase: this.updateChase(i, dt, playerX, playerZ, opts?.suppressChannel === true); break;
+        case EState.Chase:
+          this.updateChase(i, dt, playerX, playerZ, opts?.suppressChannel === true, opts?.skillTarget);
+          break;
         case EState.Knock:
           this.knockT[i] -= dt;
           if (this.knockT[i] <= 0) this.state[i] = EState.Chase;
@@ -660,6 +845,7 @@ export class Enemies {
       return;
     }
     this.flow.sample(x, z, outDir);
+    if (outDir.x === 0 && outDir.z === 0) this.toward(px, pz, x, z, outDir);
   }
 
   private toward(tx: number, tz: number, x: number, z: number, outDir: { x: number; z: number }) {
@@ -730,19 +916,78 @@ export class Enemies {
     this.toward(this.interceptAtX, this.interceptAtZ, x, z, outDir);
   }
 
-  private updateChase(i: number, dt: number, px: number, pz: number, suppressChannel: boolean) {
+  private tickSkill(i: number, dt: number, px: number, pz: number, target: SkillTarget) {
+    const id = this.skill[i] as EnemySkillId | '';
+    if (!id) return;
+    const fx = enemySkillFx(id);
+    if (this.skillCd[i] > 0) this.skillCd[i] -= dt;
+    if (this.skillWind[i] > 0) {
+      this.skillWind[i] -= dt;
+      if (this.skillWind[i] <= 0) this.fireSkill(i, id, px, pz, target);
+      return;
+    }
+    if (this.skillCd[i] > 0 || this.state[i] !== EState.Chase) return;
+    const dist = Math.hypot(px - this.posX[i], pz - this.posZ[i]);
+    let ready = false;
+    if (id === 'cut-in') ready = this.types[i] === EType.F && dist < fx.radius;
+    else if (id === 'desk-slam') ready = this.types[i] === EType.C && dist < fx.radius;
+    else if (id === 'rally') ready = this.types[i] === EType.A && dist < fx.radius;
+    if (!ready) return;
+    this.skillWind[i] = fx.windup;
+    this.skillCd[i] = fx.cooldown;
+    this.onSkill?.(id, 'windup', this.posX[i], this.posZ[i], i);
+  }
+
+  private fireSkill(i: number, id: EnemySkillId, px: number, pz: number, target: SkillTarget) {
+    const fx = enemySkillFx(id);
+    this.onSkill?.(id, 'fire', this.posX[i], this.posZ[i], i);
+    if (id === 'cut-in') {
+      this.burstT[i] = fx.duration;
+      this.burstX[i] = px + target.vx * 0.45;
+      this.burstZ[i] = pz + target.vz * 0.45;
+      target.stun(fx.lock ?? 2);
+    } else if (id === 'desk-slam') {
+      target.applySlow(fx.duration, fx.factor ?? 0.45);
+    } else if (id === 'rally') {
+      let factor = fx.factor ?? 0.5;
+      if (factor > 1) factor = Math.max(0.25, 1 / factor);
+      target.applySlow(fx.duration, factor);
+      this.shoutT[i] = 0.55 + (fx.waves ?? 3) * (fx.waveGap ?? 0.14);
+    }
+  }
+
+  private updateChase(i: number, dt: number, px: number, pz: number, suppressChannel: boolean, skillTarget?: SkillTarget) {
     const x = this.posX[i];
     const z = this.posZ[i];
     const dxp = px - x;
     const dzp = pz - z;
     const distSq = dxp * dxp + dzp * dzp;
 
+    if (skillTarget) this.tickSkill(i, dt, px, pz, skillTarget);
     this.steerDir(i, px, pz, distSq, this.flowDir);
+    if (this.burstT[i] > 0) {
+      this.burstT[i] -= dt;
+      this.toward(this.burstX[i], this.burstZ[i], x, z, this.flowDir);
+    }
+    if (this.skillWind[i] > 0) {
+      this.flowDir.x = 0;
+      this.flowDir.z = 0;
+    }
+    if (this.shoutT[i] > 0) {
+      this.shoutT[i] -= dt;
+      this.flowDir.x = 0;
+      this.flowDir.z = 0;
+    }
     const dirX = this.flowDir.x;
     const dirZ = this.flowDir.z;
     const ti0 = this.types[i];
     const heavySprint = ti0 === EType.C && !this.posting[i];
-    let sp = heavySprint ? HEAVY_SPRINT : this.speed[i];
+    let sp = this.burstT[i] > 0 ? enemySkillFx('cut-in').speed ?? 7.2 : heavySprint ? HEAVY_SPRINT : this.speed[i];
+    if (this.hasteT[i] > 0) {
+      this.hasteT[i] -= dt;
+      sp *= this.hasteMul[i] > 0 ? this.hasteMul[i] : 1;
+      if (this.hasteT[i] <= 0) this.hasteMul[i] = 1;
+    }
     if (this.slowT[i] > 0) {
       this.slowT[i] -= dt;
       sp *= this.slowMul[i] > 0 ? this.slowMul[i] : 0.4;
@@ -813,14 +1058,16 @@ export class Enemies {
     const cur = body.linvel();
     body.setLinvel({ x: vx, y: cur.y, z: vz }, true);
 
-    // 塞任务读条（重量级塞大活，读条稍长）；替身引流/玩家虚化期间无法塞
-    const channelNeed = this.types[i] === EType.C ? 2.4 : 2.0;
+    // 塞任务：首刀快、之后普通 0.85 / 主管 1.2；离身先停 0.25s 再慢掉
+    const inRange = distSq < CHANNEL_RANGE * CHANNEL_RANGE;
     if (suppressChannel) {
-      this.channelT[i] = Math.max(0, this.channelT[i] - dt * 2);
-    } else if (distSq < 0.95 * 0.95) {
+      this.decayChannel(i, dt);
+    } else if (inRange) {
+      this.channelAwayT[i] = 0;
       this.channelT[i] += dt;
-      if (this.channelT[i] >= channelNeed) {
-        this.channelT[i] = 0;
+      if (this.channelT[i] >= this.channelNeedOf(i)) {
+        this.clearChannel(i);
+        this.deliveredOnce = true;
         this.onTaskDelivered?.(this.types[i], x, z, this.gender[i]);
         const d = Math.sqrt(distSq) || 1;
         if (this.types[i] !== EType.C) {
@@ -830,7 +1077,7 @@ export class Enemies {
         }
       }
     } else if (this.channelT[i] > 0) {
-      this.channelT[i] = Math.max(0, this.channelT[i] - dt * 2);
+      this.decayChannel(i, dt);
     }
   }
 
@@ -877,12 +1124,12 @@ export class Enemies {
     for (const mesh of this.hairMeshes) mesh?.setMatrixAt(i, this.tmpM);
     for (const mesh of this.hatMeshes) mesh?.setMatrixAt(i, this.tmpM);
     for (const mesh of this.heldMeshes) mesh?.setMatrixAt(i, this.tmpM);
+    for (const mesh of this.backMeshes) mesh?.setMatrixAt(i, this.tmpM);
     for (const mesh of this.kitHairMeshes) mesh?.setMatrixAt(i, this.tmpM);
     for (const set of this.skirtPoseSets) {
       if (!set) continue;
       for (const mesh of set) mesh.setMatrixAt(i, this.tmpM);
     }
-    this.folderMesh.setMatrixAt(i, this.tmpM);
     this.blobMesh.setMatrixAt(i, this.tmpM);
   }
 
@@ -924,6 +1171,7 @@ export class Enemies {
     this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotHair, this.kit.headLocals, this.hairMeshes);
     this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotHat, this.kit.headLocals, this.hatMeshes);
     this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotHeld, this.kit.handLocals, this.heldMeshes);
+    this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotBack, this.kit.backLocals, this.backMeshes);
     this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotKitHair, this.kit.headLocals, this.kitHairMeshes);
     this.tmpM2.makeScale(0, 0, 0);
     for (let s = 0; s < this.skirtPoseSets.length; s++) {
@@ -1036,31 +1284,29 @@ export class Enemies {
       if (s === EState.Getup) {
         const k = 1 - this.getupT[i] / 0.65;
         sy = scale * (0.35 + 0.65 * k);
+      } else if (this.skillWind[i] > 0) {
+        const pack = enemySkillFx(this.skill[i] as EnemySkillId);
+        const u = 1 - this.skillWind[i] / Math.max(0.05, pack.windup);
+        const dip = pack.squash ?? 0.78;
+        sy = scale * (dip + (1 - dip) * u * u);
       }
       m.compose(pos, q, this.tmpS.set(scale, sy, scale));
+      this.lastPose[i] = pose;
+      this.lastBody[i]!.copy(m);
       this.setBodyPose(i, pose, m);
 
       m2.compose(this.tmpV.set(t.x, 0.02, t.z), this.tmpQL.identity(), this.tmpS.set(scale * 1.2, 1, scale * 1.2));
       this.blobMesh.setMatrixAt(i, m2);
 
-      if (s === EState.Chase && this.channelT[i] > 0.12) {
-        const bobF = Math.sin(time * 10) * 0.04;
-        m.compose(this.tmpV.set(bx, by + bobF, bz), q, this.tmpS.set(scale, sy, scale));
-        this.folderMesh.setMatrixAt(i, m);
-      } else {
-        m2.makeScale(0, 0, 0);
-        this.folderMesh.setMatrixAt(i, m2);
-      }
     }
     for (const mesh of this.poseSets.flat()) mesh.instanceMatrix.needsUpdate = true;
-    for (const mesh of [...this.hairMeshes, ...this.hatMeshes, ...this.heldMeshes, ...this.kitHairMeshes]) {
+    for (const mesh of [...this.hairMeshes, ...this.hatMeshes, ...this.heldMeshes, ...this.backMeshes, ...this.kitHairMeshes]) {
       if (mesh) mesh.instanceMatrix.needsUpdate = true;
     }
     for (const set of this.skirtPoseSets) {
       if (!set) continue;
       for (const mesh of set) mesh.instanceMatrix.needsUpdate = true;
     }
-    this.folderMesh.instanceMatrix.needsUpdate = true;
     this.blobMesh.instanceMatrix.needsUpdate = true;
   }
 

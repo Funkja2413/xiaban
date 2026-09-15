@@ -1,62 +1,141 @@
 import * as THREE from 'three/webgpu';
-import { commonFx, crowdFx, dashFx, playerRingFx, type HaloBandFx, type HeadFx, type HitFx, type ImpactMistFx, type PaperBurstFx, type ShockRingFx, type SlowLookFx, type StunElem, type StunLookFx, type TrailFx } from '../fx/catalog';
-import type { ChairStyle, DeskDef, DeskKit, DeskTop, FurnitureTone, MapBounds, PlantKit, PropDef, PropKind, SkyKind } from '../levels';
-import { deskYaw } from '../levels';
+import { commonFx, crowdFx, dashFx, mergeHazardFx, overtimePopText, playerRingFx, type ChannelLookFx, type HaloBandFx, type HitFx, type ImpactMistFx, type OvertimeFx, type PaperBurstFx, type ShockRingFx, type SlowLookFx, type StunElem, type StunLookFx, type TrailFx } from '../fx/catalog';
+import type { ChairStyle, DeskDef, DeskKit, DeskTop, FurnitureTone, PlantKit, PropDef, PropKind, SkyKind } from '../levels';
+import { deskYaw, ELEVATOR_PAD_ALONG, ELEVATOR_PAD_FAR, ELEVATOR_PAD_NEAR, hexToInt, migrateHexColor } from '../levels';
+import { channelStampMap } from './channelStamp';
 import { mats, phong, phongFresh, tex } from './style';
 
-/** 亮色 = 白/米家具配深地板；暗色 = 现有木色/炭灰。只换颜色，不增网格。 */
-export function furnitureLook(tone: FurnitureTone = 'dark') {
-  if (tone === 'light') {
-    return {
-      body: 0xf3f1ec,
-      bodyAlt: 0xe6e2da,
-      wood: 0xe8dfd2,
-      woodPlank: 0xddd4c6,
-      woodDark: 0xc8bfb4,
-      metal: 0xd4dae0,
-      fabric: 0xeee8de,
-      fabricAlt: 0xd8cfc4,
-      leather: 0xf0ebe4,
-      appliance: 0xf5f6f8,
-      applianceDark: 0xc5cad0,
-      bin: 0xe8ecef,
-      pot: 0xf2efe8,
-      sofa: 0xe4ddd4,
-      locker: 0xe8edf2,
-      slot: 0xd0cac0,
-      kb: 0xe6e4e0,
-      mouse: 0xdedcd8,
-      bezel: 0xc8ccd2,
-      pad: 0xf7f4ee,
-      frame: 0xd8dce0,
-    };
-  }
+type FurnLook = {
+  body: number;
+  bodyAlt: number;
+  wood: number;
+  woodPlank: number;
+  woodDark: number;
+  metal: number;
+  fabric: number;
+  fabricAlt: number;
+  leather: number;
+  appliance: number;
+  applianceDark: number;
+  bin: number;
+  pot: number;
+  sofa: number;
+  locker: number;
+  slot: number;
+  kb: number;
+  mouse: number;
+  bezel: number;
+  pad: number;
+  frame: number;
+};
+
+const LIGHT_FURN: FurnLook = {
+  body: 0xf3f1ec,
+  bodyAlt: 0xe6e2da,
+  wood: 0xe8dfd2,
+  woodPlank: 0xddd4c6,
+  woodDark: 0xc8bfb4,
+  metal: 0xd4dae0,
+  fabric: 0xeee8de,
+  fabricAlt: 0xd8cfc4,
+  leather: 0xf0ebe4,
+  appliance: 0xf5f6f8,
+  applianceDark: 0xc5cad0,
+  bin: 0xe8ecef,
+  pot: 0xf2efe8,
+  sofa: 0xe4ddd4,
+  locker: 0xe8edf2,
+  slot: 0xd0cac0,
+  kb: 0xe6e4e0,
+  mouse: 0xdedcd8,
+  bezel: 0xc8ccd2,
+  pad: 0xf7f4ee,
+  frame: 0xd8dce0,
+};
+
+const DARK_FURN: FurnLook = {
+  body: 0x3a322c,
+  bodyAlt: 0x2a2622,
+  wood: 0xc4b8a4,
+  woodPlank: 0xc4b49a,
+  woodDark: 0x8a7a66,
+  metal: 0x8a9098,
+  fabric: 0x3d6a8a,
+  fabricAlt: 0x2a4a62,
+  leather: 0x1a1410,
+  appliance: 0x2a2e34,
+  applianceDark: 0x1a1c20,
+  bin: 0x3a4048,
+  pot: 0xb85c38,
+  sofa: 0x3d6a8a,
+  locker: 0x4a6280,
+  slot: 0x8a7a66,
+  kb: 0x2a2e34,
+  mouse: 0x2c3036,
+  bezel: 0x1a1d22,
+  pad: 0x2a3038,
+  frame: 0x3a3e44,
+};
+
+function mixHex(a: number, b: number, t: number) {
+  return new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
+}
+
+function scaleHex(a: number, k: number) {
+  const c = new THREE.Color(a);
+  c.r = Math.min(1, c.r * k);
+  c.g = Math.min(1, c.g * k);
+  c.b = Math.min(1, c.b * k);
+  return c.getHex();
+}
+
+/** 亮色 = 白/米家具配深地板；暗色 = 现有木色/炭灰。color 有值时整件换成该主色。 */
+export function furnitureLook(tone: FurnitureTone = 'dark', color?: string): FurnLook {
+  const base = tone === 'light' ? LIGHT_FURN : DARK_FURN;
+  const hex = migrateHexColor(color);
+  if (!hex) return base;
+  const main = hexToInt(hex);
+  const dark = scaleHex(main, 0.78);
+  const darker = scaleHex(main, 0.55);
+  const pale = mixHex(main, 0xffffff, 0.28);
+  const metal = mixHex(main, 0x8a9098, 0.4);
   return {
-    body: 0x3a322c,
-    bodyAlt: 0x2a2622,
-    wood: 0xc4b8a4,
-    woodPlank: 0xc4b49a,
-    woodDark: 0x8a7a66,
-    metal: 0x8a9098,
-    fabric: 0x3d6a8a,
-    fabricAlt: 0x2a4a62,
-    leather: 0x1a1410,
-    appliance: 0x2a2e34,
-    applianceDark: 0x1a1c20,
-    bin: 0x3a4048,
-    pot: 0xb85c38,
-    sofa: 0x3d6a8a,
-    locker: 0x4a6280,
-    slot: 0x8a7a66,
-    kb: 0x2a2e34,
-    mouse: 0x2c3036,
-    bezel: 0x1a1d22,
-    pad: 0x2a3038,
-    frame: 0x3a3e44,
+    body: main,
+    bodyAlt: dark,
+    wood: mixHex(main, 0xc4b49a, 0.22),
+    woodPlank: mixHex(main, 0xb8a888, 0.28),
+    woodDark: darker,
+    metal,
+    fabric: main,
+    fabricAlt: dark,
+    leather: darker,
+    appliance: main,
+    applianceDark: dark,
+    bin: mixHex(main, 0x4a5058, 0.25),
+    pot: main,
+    sofa: main,
+    locker: main,
+    slot: dark,
+    kb: darker,
+    mouse: dark,
+    bezel: darker,
+    pad: pale,
+    frame: metal,
   };
 }
 
-type FurnLook = ReturnType<typeof furnitureLook>;
+function isTinted(color?: string) {
+  return !!migrateHexColor(color);
+}
+
+function shade(tone: FurnitureTone, color: string | undefined, pal: FurnLook, key: keyof FurnLook, darkHex: number) {
+  return isTinted(color) || tone === 'light' ? pal[key] : darkHex;
+}
+
+/** 自定义色用近白织纹，避免蓝布纹把橙/红/黄乘没。 */
+function clothFor(color?: string) {
+  return isTinted(color) ? tex.cloth() : tex.fabric();
+}
 
 const HAIR = [0x2c1a10, 0x5c4033, 0x8b5a2b, 0xc4a574, 0x3d2914, 0x6d4c41];
 
@@ -139,15 +218,13 @@ export function buildPlayerFigure(): { group: THREE.Group; ghostMats: THREE.Mesh
   return { group, ghostMats };
 }
 
-export function deskAO(parent: THREE.Group, minX: number, minZ: number, maxX: number, maxZ: number) {
-  const w = maxX - minX + 0.45;
-  const d = maxZ - minZ + 0.45;
+export function deskAO(parent: THREE.Group, w: number, d: number) {
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(w, d),
+    new THREE.PlaneGeometry(w + 0.45, d + 0.45),
     new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false })
   );
   mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set((minX + maxX) / 2, 0.011, (minZ + maxZ) / 2);
+  mesh.position.set(0, 0.011, 0);
   parent.add(mesh);
 }
 
@@ -177,7 +254,7 @@ function paintBand(
   dashed: boolean,
   hotspot: number
 ) {
-  const size = HALO_TEX;
+  const size = ctx.canvas.width || HALO_TEX;
   const img = ctx.createImageData(size, size);
   const data = img.data;
   const cx = (size - 1) * 0.5;
@@ -499,9 +576,9 @@ function deskSurface(top: DeskTop) {
   }
   if (top === 'bench') {
     return {
-      board: mats.wood(),
+      board: phongFresh({ color: 0xf2f0ec, shininess: 42, specular: 0x888888 }),
       leg: mats.metal(),
-      panel: phongFresh({ color: 0xc8b8a0, map: tex.fabric(), shininess: 8 }),
+      panel: phongFresh({ color: 0xc4282e, shininess: 22, specular: 0x662222 }),
     };
   }
   return { board: mats.wood(), leg: mats.metal(), panel: mats.wood() };
@@ -993,27 +1070,16 @@ function dressPacked(parent: THREE.Group, x: number, z: number, face: number, ra
 }
 
 function dressDesk(parent: THREE.Group, desk: DeskDef, pal: FurnLook) {
-  const { minX, minZ, maxX, maxZ } = desk;
-  const cx = (minX + maxX) / 2;
-  const cz = (minZ + maxZ) / 2;
-  const w = maxX - minX;
-  const d = maxZ - minZ;
+  const w = desk.maxX - desk.minX;
   const kit = desk.kit ?? 'simple';
-  const face = desk.face ?? 'pz';
-  const alongSide = face === 'pz' || face === 'nz' ? w : d;
-  const yaw = deskYaw(desk);
-  const n = Math.max(1, Math.round(alongSide / 2.2));
-  const rig = new THREE.Group();
-  rig.position.set(cx, 0, cz);
-  rig.rotation.y = yaw;
-  parent.add(rig);
+  const n = Math.max(1, Math.round(w / 2.2));
   for (let i = 0; i < n; i++) {
-    const lx = -alongSide / 2 + (i + 0.5) * (alongSide / n);
-    dressStation(rig, lx, 0.06, 1, kit, i, hashSeed(desk.id) ^ Math.imul(i + 3, 0x9e3779b9), pal);
+    const lx = -w / 2 + (i + 0.5) * (w / n);
+    dressStation(parent, lx, 0.06, 1, kit, i, hashSeed(desk.id) ^ Math.imul(i + 3, 0x9e3779b9), pal);
   }
 }
 
-/** 碰撞仍是实心桌，视觉按 top / kit 换桌面和桌上物品 */
+/** 碰撞仍是实心桌，视觉按 top / kit 换桌面和桌上物品。朝向转整张桌子。 */
 export function buildDesk(parent: THREE.Group, desk: DeskDef, tone: FurnitureTone = 'dark') {
   const { minX, minZ, maxX, maxZ } = desk;
   const cx = (minX + maxX) / 2;
@@ -1021,49 +1087,52 @@ export function buildDesk(parent: THREE.Group, desk: DeskDef, tone: FurnitureTon
   const w = maxX - minX;
   const d = maxZ - minZ;
   const top = desk.top ?? 'oak';
-  const pal = furnitureLook(tone);
+  const pal = furnitureLook(tone, desk.color);
   const matsFor = deskSurface(top);
-  const face = desk.face ?? 'pz';
-  const alongSide = face === 'pz' || face === 'nz' ? w : d;
-  const alongSit = face === 'pz' || face === 'nz' ? d : w;
-  const yaw = deskYaw(desk);
+  if (isTinted(desk.color)) {
+    matsFor.leg = phongFresh({ color: pal.bodyAlt, shininess: 40 });
+    matsFor.panel = phongFresh({ color: pal.body, shininess: 18 });
+  }
+
+  const body = new THREE.Group();
+  body.position.set(cx, 0, cz);
+  body.rotation.y = deskYaw(desk);
+  parent.add(body);
 
   const board = new THREE.Mesh(new THREE.BoxGeometry(w, top === 'bench' ? 0.07 : 0.05, d), matsFor.board);
-  board.position.set(cx, 0.76, cz);
+  board.position.set(0, 0.76, 0);
   board.castShadow = true;
   board.receiveShadow = true;
-  parent.add(board);
+  body.add(board);
 
   const inset = 0.09;
+  const hx = w / 2 - inset;
+  const hz = d / 2 - inset;
   for (const [lx, lz] of [
-    [minX + inset, minZ + inset],
-    [maxX - inset, minZ + inset],
-    [minX + inset, maxZ - inset],
-    [maxX - inset, maxZ - inset],
+    [-hx, -hz],
+    [hx, -hz],
+    [-hx, hz],
+    [hx, hz],
   ] as const) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.74, 0.09), matsFor.leg);
     leg.position.set(lx, 0.37, lz);
     leg.castShadow = true;
-    parent.add(leg);
+    body.add(leg);
   }
 
-  const rig = new THREE.Group();
-  rig.position.set(cx, 0, cz);
-  rig.rotation.y = yaw;
-  parent.add(rig);
   if (top === 'bench') {
-    const divider = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.3, alongSide - 0.12), 0.42, 0.04), matsFor.panel);
-    divider.position.set(0, 0.99, -alongSit / 2 + 0.04);
+    const divider = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.3, w - 0.12), 0.42, 0.04), matsFor.panel);
+    divider.position.set(0, 0.99, -d / 2 + 0.04);
     divider.castShadow = true;
-    rig.add(divider);
+    body.add(divider);
   } else {
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.2, alongSide - 0.16), 0.28, 0.025), matsFor.panel);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.2, w - 0.16), 0.28, 0.025), matsFor.panel);
     panel.position.set(0, 0.52, 0);
-    rig.add(panel);
+    body.add(panel);
   }
 
-  dressDesk(parent, desk, pal);
-  deskAO(parent, minX, minZ, maxX, maxZ);
+  dressDesk(body, desk, pal);
+  deskAO(body, w, d);
 }
 
 function starBase(group: THREE.Group, frameMat: THREE.Material, y = -0.45) {
@@ -1079,22 +1148,28 @@ function starBase(group: THREE.Group, frameMat: THREE.Material, y = -0.45) {
   }
 }
 
-function frameMat(tone: FurnitureTone) {
-  const pal = furnitureLook(tone);
-  return tone === 'light'
+function frameMat(tone: FurnitureTone, color?: string) {
+  const pal = furnitureLook(tone, color);
+  return isTinted(color) || tone === 'light'
     ? phong({ color: pal.metal, shininess: 55, specular: 0xaaaaaa })
     : mats.metal();
 }
 
 /** 和游戏里能撞飞的办公椅同一套模型，编辑器直接摆这把椅子。 */
-export function addOfficeChair(parent: THREE.Object3D, rotY = 0, style: ChairStyle = 'task', tone: FurnitureTone = 'dark'): THREE.Group {
+export function addOfficeChair(
+  parent: THREE.Object3D,
+  rotY = 0,
+  style: ChairStyle = 'task',
+  tone: FurnitureTone = 'dark',
+  color?: string
+): THREE.Group {
   const group = new THREE.Group();
   group.rotation.y = rotY;
-  const pal = furnitureLook(tone);
-  const frame = frameMat(tone);
+  const pal = furnitureLook(tone, color);
+  const frame = frameMat(tone, color);
 
   if (style === 'stool') {
-    const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.07, 14), phongFresh({ color: tone === 'light' ? pal.fabricAlt : 0x3a3530, map: tex.fabric(), shininess: 14 }));
+    const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.07, 14), phongFresh({ color: shade(tone, color, pal, 'fabricAlt', 0x3a3530), map: clothFor(color), shininess: 14 }));
     seat.position.y = -0.02;
     seat.castShadow = true;
     group.add(seat);
@@ -1107,8 +1182,8 @@ export function addOfficeChair(parent: THREE.Object3D, rotY = 0, style: ChairSty
   }
 
   if (style === 'guest') {
-    const wood = phongFresh({ color: tone === 'light' ? pal.wood : 0x8a6238, map: tex.wood(), shininess: 28 });
-    const fabric = phongFresh({ color: tone === 'light' ? pal.fabric : 0xd8c4a8, map: tex.fabric(), shininess: 10 });
+    const wood = phongFresh({ color: shade(tone, color, pal, 'wood', 0x8a6238), map: tex.wood(), shininess: 28 });
+    const fabric = phongFresh({ color: shade(tone, color, pal, 'fabric', 0xd8c4a8), map: clothFor(color), shininess: 10 });
     const seat = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.07, 0.46), fabric);
     seat.position.y = -0.04;
     seat.castShadow = true;
@@ -1129,11 +1204,11 @@ export function addOfficeChair(parent: THREE.Object3D, rotY = 0, style: ChairSty
   }
 
   if (style === 'mesh') {
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.5), phongFresh({ color: tone === 'light' ? pal.fabric : 0x2a4a62, map: tex.fabric(), shininess: 16 }));
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.5), phongFresh({ color: shade(tone, color, pal, 'fabric', 0x2a4a62), map: clothFor(color), shininess: 16 }));
     seat.position.y = -0.04;
     seat.castShadow = true;
     group.add(seat);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.58, 0.04), phongFresh({ color: tone === 'light' ? pal.fabricAlt : 0x1e3344, shininess: 12 }));
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.58, 0.04), phongFresh({ color: shade(tone, color, pal, 'fabricAlt', 0x1e3344), shininess: 12 }));
     back.position.set(0, 0.3, -0.23);
     back.castShadow = true;
     group.add(back);
@@ -1177,7 +1252,7 @@ export function addOfficeChair(parent: THREE.Object3D, rotY = 0, style: ChairSty
     return group;
   }
 
-  const seatMat = tone === 'light' ? phongFresh({ color: pal.fabric, map: tex.fabric(), shininess: 12 }) : mats.fabric();
+  const seatMat = isTinted(color) || tone === 'light' ? phongFresh({ color: pal.fabric, map: clothFor(color), shininess: 12 }) : mats.fabric();
   const seat = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.09, 0.52), seatMat);
   seat.position.y = -0.05;
   seat.castShadow = true;
@@ -1229,10 +1304,11 @@ function addPotted(
   x: number,
   z: number,
   tone: FurnitureTone,
-  opts: { scale: number; folio: Folio; leaf: number; accent: number; pot: number }
+  opts: { scale: number; folio: Folio; leaf: number; accent: number; pot: number },
+  color?: string
 ) {
   const s = opts.scale;
-  const pal = furnitureLook(tone);
+  const pal = furnitureLook(tone, color);
   const potH = 0.14 * s + 0.08;
   const potR = 0.08 * s + 0.05;
   const pot = new THREE.Mesh(
@@ -1329,58 +1405,62 @@ function addPotted(
   parent.add(bush2);
 }
 
-function potColor(rand: () => number, tone: FurnitureTone) {
+function potColor(rand: () => number, tone: FurnitureTone, color?: string) {
+  const hex = migrateHexColor(color);
+  if (hex) return hexToInt(hex);
   const pal = furnitureLook(tone);
   const dark = [0xb85c38, 0x8a5a38, pal.pot, 0x3a4048, 0x6a7a68];
   const light = [pal.pot, 0xf2efe8, 0xe8e0d4, 0xd8d4cc, 0xc4b8a4];
   return pick(rand, tone === 'light' ? light : dark);
 }
 
-function plantSpec(rand: () => number, size: 's' | 'm' | 'l', scale: number, tone: FurnitureTone) {
+function plantSpec(rand: () => number, size: 's' | 'm' | 'l', scale: number, tone: FurnitureTone, color?: string) {
   return {
     scale,
     folio: pickFolio(rand, size),
     leaf: pick(rand, LEAF_COLORS),
     accent: pick(rand, LEAF_ACCENT),
-    pot: potColor(rand, tone),
+    pot: potColor(rand, tone, color),
   };
 }
 
-export function addPlant(parent: THREE.Group, tone: FurnitureTone = 'dark', kit: PlantKit = 'pot', seed = 1) {
+export function addPlant(parent: THREE.Group, tone: FurnitureTone = 'dark', kit: PlantKit = 'pot', seed = 1, color?: string) {
   const rand = makeRng(seed);
+  const spec = (size: 's' | 'm' | 'l', scale: number) => plantSpec(rand, size, scale, tone, color);
+  const pot = (x: number, z: number, s: ReturnType<typeof plantSpec>) => addPotted(parent, x, z, tone, s, color);
   if (kit === 'pair') {
-    addPotted(parent, -0.16, 0.02, tone, plantSpec(rand, rand() > 0.45 ? 'm' : 's', 0.72 + rand() * 0.28, tone));
-    addPotted(parent, 0.18, -0.04, tone, plantSpec(rand, rand() > 0.4 ? 'm' : 'l', 0.9 + rand() * 0.35, tone));
+    pot(-0.16, 0.02, spec(rand() > 0.45 ? 'm' : 's', 0.72 + rand() * 0.28));
+    pot(0.18, -0.04, spec(rand() > 0.4 ? 'm' : 'l', 0.9 + rand() * 0.35));
     return;
   }
   if (kit === 'trio') {
-    addPotted(parent, -0.2, 0.12, tone, plantSpec(rand, 's', 0.62 + rand() * 0.22, tone));
-    addPotted(parent, 0.18, 0.1, tone, plantSpec(rand, 'm', 0.85 + rand() * 0.28, tone));
-    addPotted(parent, 0.02, -0.18, tone, plantSpec(rand, rand() > 0.5 ? 'l' : 'm', 1.0 + rand() * 0.28, tone));
+    pot(-0.2, 0.12, spec('s', 0.62 + rand() * 0.22));
+    pot(0.18, 0.1, spec('m', 0.85 + rand() * 0.28));
+    pot(0.02, -0.18, spec(rand() > 0.5 ? 'l' : 'm', 1.0 + rand() * 0.28));
     return;
   }
   if (kit === 'cluster') {
-    addPotted(parent, -0.22, 0.16, tone, plantSpec(rand, 's', 0.55 + rand() * 0.2, tone));
-    addPotted(parent, 0.2, 0.18, tone, plantSpec(rand, 's', 0.6 + rand() * 0.22, tone));
-    addPotted(parent, -0.08, -0.02, tone, plantSpec(rand, 'm', 0.88 + rand() * 0.25, tone));
-    addPotted(parent, 0.22, -0.16, tone, plantSpec(rand, 'm', 0.78 + rand() * 0.28, tone));
-    if (rand() > 0.35) addPotted(parent, -0.24, -0.2, tone, plantSpec(rand, 's', 0.5 + rand() * 0.18, tone));
+    pot(-0.22, 0.16, spec('s', 0.55 + rand() * 0.2));
+    pot(0.2, 0.18, spec('s', 0.6 + rand() * 0.22));
+    pot(-0.08, -0.02, spec('m', 0.88 + rand() * 0.25));
+    pot(0.22, -0.16, spec('m', 0.78 + rand() * 0.28));
+    if (rand() > 0.35) pot(-0.24, -0.2, spec('s', 0.5 + rand() * 0.18));
     return;
   }
   if (kit === 'grove') {
-    addPotted(parent, 0.02, -0.04, tone, plantSpec(rand, 'l', 1.28 + rand() * 0.32, tone));
-    addPotted(parent, -0.28, 0.18, tone, plantSpec(rand, 's', 0.58 + rand() * 0.2, tone));
-    addPotted(parent, 0.26, 0.16, tone, plantSpec(rand, 'm', 0.8 + rand() * 0.22, tone));
-    addPotted(parent, 0.18, -0.24, tone, plantSpec(rand, 's', 0.55 + rand() * 0.2, tone));
-    addPotted(parent, -0.22, -0.22, tone, plantSpec(rand, rand() > 0.5 ? 'm' : 's', 0.62 + rand() * 0.22, tone));
+    pot(0.02, -0.04, spec('l', 1.28 + rand() * 0.32));
+    pot(-0.28, 0.18, spec('s', 0.58 + rand() * 0.2));
+    pot(0.26, 0.16, spec('m', 0.8 + rand() * 0.22));
+    pot(0.18, -0.24, spec('s', 0.55 + rand() * 0.2));
+    pot(-0.22, -0.22, spec(rand() > 0.5 ? 'm' : 's', 0.62 + rand() * 0.22));
     return;
   }
-  addPotted(parent, 0, 0, tone, plantSpec(rand, rand() > 0.55 ? 'm' : rand() > 0.35 ? 'l' : 's', 0.85 + rand() * 0.4, tone));
+  pot(0, 0, spec(rand() > 0.55 ? 'm' : rand() > 0.35 ? 'l' : 's', 0.85 + rand() * 0.4));
 }
 
-export function addCooler(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.9, 0.42), phong({ color: tone === 'light' ? pal.appliance : 0xe8eef4, map: tex.metal(), shininess: 45 }));
+export function addCooler(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.9, 0.42), phong({ color: shade(tone, color, pal, 'appliance', 0xe8eef4), map: tex.metal(), shininess: 45 }));
   body.position.y = 0.45;
   body.castShadow = true;
   parent.add(body);
@@ -1398,8 +1478,8 @@ export function addCooler(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(jug);
 }
 
-export function addCoffee(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
+export function addCoffee(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.38, 0.28), phong({ color: pal.appliance, shininess: 40 }));
   body.position.y = 0.35;
   body.castShadow = true;
@@ -1410,10 +1490,10 @@ export function addCoffee(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   );
   tank.position.set(0.06, 0.58, -0.06);
   parent.add(tank);
-  const spout = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.1), frameMat(tone));
+  const spout = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.1), frameMat(tone, color));
   spout.position.set(0, 0.42, 0.14);
   parent.add(spout);
-  const tray = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.02, 0.12), frameMat(tone));
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.02, 0.12), frameMat(tone, color));
   tray.position.set(0, 0.18, 0.12);
   parent.add(tray);
   const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.06, 8), phong({ color: 0xf4f0ea, shininess: 40 }));
@@ -1424,16 +1504,16 @@ export function addCoffee(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(btn);
 }
 
-export function addFridge(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.55, 0.52), phong({ color: tone === 'light' ? pal.appliance : 0xe8eef2, map: tex.metal(), shininess: 50 }));
+export function addFridge(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.55, 0.52), phong({ color: shade(tone, color, pal, 'appliance', 0xe8eef2), map: tex.metal(), shininess: 50 }));
   body.position.y = 0.775;
   body.castShadow = true;
   parent.add(body);
   const freeze = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.02, 0.02), phong({ color: pal.metal, shininess: 20 }));
   freeze.position.set(0, 1.18, 0.27);
   parent.add(freeze);
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.42, 0.03), frameMat(tone));
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.42, 0.03), frameMat(tone, color));
   handle.position.set(0.22, 0.7, 0.28);
   parent.add(handle);
   const note = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.01), phong({ color: 0xfff38a, shininess: 6 }));
@@ -1441,9 +1521,9 @@ export function addFridge(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(note);
 }
 
-export function addSofa(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
-  const fabric = phongFresh({ color: pal.sofa, map: tex.fabric(), shininess: 10 });
+export function addSofa(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const fabric = phongFresh({ color: pal.sofa, map: tex.cloth(), shininess: 10 });
   const seat = new THREE.Mesh(new THREE.SphereGeometry(0.48, 12, 10), fabric);
   seat.scale.set(1.15, 0.52, 0.95);
   seat.position.y = 0.26;
@@ -1463,22 +1543,22 @@ export function addSofa(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(armR);
 }
 
-export function addSink(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
-  const counter = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.08, 0.48), phong({ color: tone === 'light' ? pal.body : 0xe8e6e1, shininess: 35 }));
+export function addSink(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.08, 0.48), phong({ color: shade(tone, color, pal, 'body', 0xe8e6e1), shininess: 35 }));
   counter.position.y = 0.86;
   counter.castShadow = true;
   parent.add(counter);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.78, 0.46), phong({ color: tone === 'light' ? pal.bodyAlt : 0xd8d4cc, shininess: 18 }));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.78, 0.46), phong({ color: shade(tone, color, pal, 'bodyAlt', 0xd8d4cc), shininess: 18 }));
   body.position.y = 0.43;
   parent.add(body);
   const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.08, 12), phong({ color: 0xf4f6f8, shininess: 70 }));
   basin.position.set(-0.18, 0.92, 0.02);
   parent.add(basin);
-  const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.16, 8), frameMat(tone));
+  const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.16, 8), frameMat(tone, color));
   tap.position.set(-0.18, 1.02, -0.08);
   parent.add(tap);
-  const spout = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.14), frameMat(tone));
+  const spout = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.14), frameMat(tone, color));
   spout.position.set(-0.18, 1.08, 0.02);
   parent.add(spout);
   const soap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.05), phong({ color: 0xc8e4f4, shininess: 40 }));
@@ -1489,13 +1569,13 @@ export function addSink(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(mirror);
 }
 
-export function addBar(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.06, 0.58), phong({ color: tone === 'light' ? pal.wood : 0x6a4a32, map: tex.wood(), shininess: 28 }));
+export function addBar(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.06, 0.58), phong({ color: shade(tone, color, pal, 'wood', 0x6a4a32), map: tex.wood(), shininess: 28 }));
   top.position.y = 1.02;
   top.castShadow = true;
   parent.add(top);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.98, 0.54), phong({ color: tone === 'light' ? pal.bodyAlt : 0x3a322c, shininess: 12 }));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.98, 0.54), phong({ color: shade(tone, color, pal, 'bodyAlt', 0x3a322c), shininess: 12 }));
   body.position.y = 0.5;
   parent.add(body);
   const machine = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.38, 0.28), phong({ color: pal.appliance, shininess: 40 }));
@@ -1517,8 +1597,8 @@ export function addBar(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(menu);
 }
 
-export function addCabinet(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
+export function addCabinet(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.22, 0.42), phong({ color: pal.wood, map: tex.wood(), shininess: 16 }));
   body.position.y = 0.61;
   body.castShadow = true;
@@ -1527,15 +1607,15 @@ export function addCabinet(parent: THREE.Group, tone: FurnitureTone = 'dark') {
     const slot = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.02), phong({ color: pal.slot, shininess: 10 }));
     slot.position.set(0, y, 0.22);
     parent.add(slot);
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.03), frameMat(tone));
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.03), frameMat(tone, color));
     handle.position.set(0, y + 0.08, 0.23);
     parent.add(handle);
   }
 }
 
-export function addPrinter(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
-  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.42), phong({ color: tone === 'light' ? pal.bodyAlt : 0xd0d4d8, shininess: 20 }));
+export function addPrinter(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.42), phong({ color: shade(tone, color, pal, 'bodyAlt', 0xd0d4d8), shininess: 20 }));
   stand.position.y = 0.28;
   parent.add(stand);
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.22, 0.4), phong({ color: pal.frame, shininess: 35 }));
@@ -1550,19 +1630,19 @@ export function addPrinter(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(tray);
 }
 
-export function addBin(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
+export function addBin(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
   const can = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.42, 12), phong({ color: pal.bin, shininess: 30 }));
   can.position.y = 0.21;
   can.castShadow = true;
   parent.add(can);
-  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.03, 12), frameMat(tone));
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.03, 12), frameMat(tone, color));
   rim.position.y = 0.43;
   parent.add(rim);
 }
 
-export function addShelf(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
+export function addShelf(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
   const back = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.38, 0.04), phong({ color: pal.wood, map: tex.wood(), shininess: 14 }));
   back.position.set(0, 0.7, -0.12);
   parent.add(back);
@@ -1580,8 +1660,8 @@ export function addShelf(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   parent.add(plant);
 }
 
-export function addWhiteboard(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
+export function addWhiteboard(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
   const board = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.98, 0.04), phong({ color: 0xf4f6f8, shininess: 40 }));
   board.position.set(0, 1.05, 0);
   board.castShadow = true;
@@ -1589,7 +1669,7 @@ export function addWhiteboard(parent: THREE.Group, tone: FurnitureTone = 'dark')
   const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.06, 0.05), phong({ color: pal.frame, shininess: 20 }));
   frame.position.set(0, 1.05, -0.01);
   parent.add(frame);
-  const standL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.56, 0.05), frameMat(tone));
+  const standL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.56, 0.05), frameMat(tone, color));
   standL.position.set(-0.7, 0.28, 0);
   parent.add(standL);
   const standR = standL.clone();
@@ -1600,8 +1680,37 @@ export function addWhiteboard(parent: THREE.Group, tone: FurnitureTone = 'dark')
   parent.add(mark);
 }
 
-export function addLocker(parent: THREE.Group, tone: FurnitureTone = 'dark') {
-  const pal = furnitureLook(tone);
+export function addConferenceTable(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const topMat = phong({ color: pal.wood, map: tex.wood(), shininess: 28, specular: 0x554433 });
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.06, 20), topMat);
+  top.scale.set(2.05, 1, 1.08);
+  top.position.y = 0.73;
+  top.castShadow = true;
+  parent.add(top);
+  const apron = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.07, 16), phong({ color: pal.woodDark, map: tex.wood(), shininess: 18 }));
+  apron.scale.set(2.0, 1, 1.05);
+  apron.position.y = 0.67;
+  parent.add(apron);
+  const leg = phong({ color: pal.metal, map: tex.metal(), shininess: 50 });
+  for (const [x, z] of [[-0.78, -0.32], [0.78, -0.32], [-0.78, 0.32], [0.78, 0.32]] as const) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.68, 8), leg);
+    post.position.set(x, 0.34, z);
+    parent.add(post);
+  }
+  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 10), phong({ color: pal.frame, shininess: 20 }));
+  hole.position.y = 0.765;
+  parent.add(hole);
+  const phone = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, 0.16), phong({ color: pal.applianceDark, shininess: 30 }));
+  phone.position.set(0.18, 0.78, 0.08);
+  parent.add(phone);
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.008, 0.2), phong({ color: pal.pad, shininess: 8 }));
+  pad.position.set(-0.35, 0.765, -0.12);
+  parent.add(pad);
+}
+
+export function addLocker(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.58, 0.46), phong({ color: pal.locker, map: tex.metal(), shininess: 35 }));
   body.position.y = 0.79;
   body.castShadow = true;
@@ -1610,26 +1719,219 @@ export function addLocker(parent: THREE.Group, tone: FurnitureTone = 'dark') {
   split.position.set(0, 0.79, 0.24);
   parent.add(split);
   for (const x of [-0.1, 0.1]) {
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.03), frameMat(tone));
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.03), frameMat(tone, color));
     handle.position.set(x, 0.82, 0.25);
     parent.add(handle);
   }
 }
 
-export function placeOfficeProp(parent: THREE.Group, kind: PropKind, tone: FurnitureTone = 'dark', prop?: PropDef) {
-  if (kind === 'plant') addPlant(parent, tone, prop?.plantKit ?? 'pot', hashSeed(prop?.id ?? 'plant'));
-  else if (kind === 'cooler') addCooler(parent, tone);
-  else if (kind === 'coffee') addCoffee(parent, tone);
-  else if (kind === 'fridge') addFridge(parent, tone);
-  else if (kind === 'sofa') addSofa(parent, tone);
-  else if (kind === 'sink') addSink(parent, tone);
-  else if (kind === 'bar') addBar(parent, tone);
-  else if (kind === 'cabinet') addCabinet(parent, tone);
-  else if (kind === 'printer') addPrinter(parent, tone);
-  else if (kind === 'bin') addBin(parent, tone);
-  else if (kind === 'shelf') addShelf(parent, tone);
-  else if (kind === 'whiteboard') addWhiteboard(parent, tone);
-  else if (kind === 'locker') addLocker(parent, tone);
+function addTrafficCone(parent: THREE.Group, x: number, z: number) {
+  const orange = phong({ color: 0xff5a1a, shininess: 28 });
+  const white = phong({ color: 0xf4f0ea, shininess: 22 });
+  const black = phong({ color: 0x2a2c30, shininess: 16 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.22), black);
+  base.position.set(x, 0.018, z);
+  parent.add(base);
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.105, 0.46, 10), orange);
+  body.position.set(x, 0.265, z);
+  body.castShadow = true;
+  parent.add(body);
+  const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.088, 0.045, 10), white);
+  lo.position.set(x, 0.16, z);
+  parent.add(lo);
+  const hi = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.042, 10), white);
+  hi.position.set(x, 0.28, z);
+  parent.add(hi);
+}
+
+function addWet(parent: THREE.Group, prop?: PropDef) {
+  const fx = mergeHazardFx('wet', prop?.hazard);
+  const r = fx.radius;
+  const n = hashSeed(prop?.id ?? 'wet');
+  const sx = 0.86 + (n % 17) / 50;
+  const sz = 0.74 + ((n >> 3) % 19) / 55;
+  const geo = new THREE.PlaneGeometry(2, 2);
+  geo.rotateX(-Math.PI / 2);
+  const puddle = new THREE.Mesh(
+    geo,
+    new THREE.MeshPhongMaterial({
+      map: tex.stain(n),
+      color: fx.color,
+      transparent: true,
+      opacity: Math.min(0.88, (fx.opacity ?? 0.5) + 0.16),
+      depthWrite: false,
+      shininess: 110,
+      specular: new THREE.Color(0xe8f8ff),
+      side: THREE.DoubleSide,
+    })
+  );
+  puddle.rotation.y = (n % 360) * 0.017;
+  puddle.position.y = 0.022;
+  puddle.scale.set(r * sx, 1, r * sz);
+  puddle.renderOrder = 1;
+  parent.add(puddle);
+  const sheen = new THREE.Mesh(
+    geo,
+    new THREE.MeshBasicMaterial({
+      map: tex.stain(n + 1),
+      color: 0xd8f4ff,
+      transparent: true,
+      opacity: 0.26,
+      depthWrite: false,
+      toneMapped: false,
+    })
+  );
+  sheen.rotation.y = puddle.rotation.y + 0.35;
+  sheen.position.y = 0.028;
+  sheen.scale.set(r * sx * 0.52, 1, r * sz * 0.48);
+  sheen.renderOrder = 2;
+  parent.add(sheen);
+  addTrafficCone(parent, r * sx * 0.72, r * sz * 0.18);
+}
+
+function addPit(parent: THREE.Group, _tone: FurnitureTone, color?: string, prop?: PropDef) {
+  const n = hashSeed(prop?.id ?? 'paper');
+  const tint = isTinted(color) ? hexToInt(migrateHexColor(color)!) : 0xf3ead6;
+  const geo = new THREE.PlaneGeometry(1, 1);
+  geo.rotateX(-Math.PI / 2);
+  const sheet = (w: number, d: number, y: number, ox: number, oz: number, rot: number, col: number) => {
+    const m = new THREE.Mesh(
+      geo,
+      phong({ color: col, map: tex.news(), shininess: 5, specular: 0x332211 })
+    );
+    m.position.set(ox, y, oz);
+    m.rotation.y = rot;
+    m.scale.set(w, 1, d);
+    m.renderOrder = 2;
+    parent.add(m);
+  };
+  const yaw = ((n % 41) - 20) * 0.022;
+  sheet(0.78, 0.56, 0.012, 0.02, 0, yaw, tint);
+  sheet(0.5, 0.38, 0.02, -0.12, 0.1, yaw - 0.4, mixHex(tint, 0xe4d6b8, 0.4));
+}
+
+function addCrate(parent: THREE.Group, _tone: FurnitureTone, color?: string) {
+  const brown = isTinted(color) ? hexToInt(migrateHexColor(color)!) : 0x7a4a26;
+  const dark = scaleHex(brown, 0.7);
+  const kraft = phong({ color: brown, map: tex.wood(), shininess: 8 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.26, 0.32), kraft);
+  body.position.y = 0.13;
+  body.castShadow = true;
+  parent.add(body);
+  const lid = new THREE.Mesh(
+    new THREE.BoxGeometry(0.45, 0.045, 0.35),
+    phong({ color: scaleHex(brown, 0.88), map: tex.wood(), shininess: 10 })
+  );
+  lid.position.y = 0.278;
+  parent.add(lid);
+  const flap = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.008, 0.16),
+    phong({ color: scaleHex(brown, 0.82), map: tex.wood(), shininess: 8 })
+  );
+  flap.position.set(0, 0.3, 0.12);
+  flap.rotation.x = -0.55;
+  parent.add(flap);
+  const label = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.008), phong({ color: 0xf3eee4, shininess: 4 }));
+  label.position.set(0, 0.15, 0.164);
+  parent.add(label);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.018, 0.01), phong({ color: dark, shininess: 6 }));
+  stripe.position.set(0, 0.15, 0.17);
+  parent.add(stripe);
+  const hole = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.032, 0.02), phong({ color: dark, shininess: 4 }));
+  hole.position.set(-0.215, 0.18, 0);
+  parent.add(hole);
+  const holeR = hole.clone();
+  holeR.position.x = 0.215;
+  parent.add(holeR);
+}
+
+function addLaunch(parent: THREE.Group, tone: FurnitureTone, color?: string) {
+  const pal = furnitureLook(tone, color);
+  const openW = 0.96;
+  const openH = 1.56;
+  const frame = 0.09;
+  const thick = 0.12;
+  const z = -0.02;
+  const postH = openH + frame;
+  const left = new THREE.Mesh(new THREE.BoxGeometry(frame, postH, thick), phong({ color: pal.metal, shininess: 28 }));
+  left.position.set(-(openW / 2 + frame / 2), postH / 2, z);
+  parent.add(left);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(frame, postH, thick), phong({ color: pal.metal, shininess: 28 }));
+  right.position.set(openW / 2 + frame / 2, postH / 2, z);
+  parent.add(right);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(openW + frame * 2, frame, thick), phong({ color: pal.metal, shininess: 28 }));
+  cap.position.set(0, openH + frame / 2, z);
+  parent.add(cap);
+  const hinge = new THREE.Group();
+  hinge.position.set(-openW / 2 + 0.02, 0, 0.05);
+  parent.add(hinge);
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(openW - 0.04, openH - 0.04, 0.045), phong({ color: 0xe8b86a, shininess: 22 }));
+  slab.position.set((openW - 0.04) / 2, (openH - 0.04) / 2 + 0.02, 0);
+  hinge.add(slab);
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.16, 8), phong({ color: pal.metal, shininess: 40 }));
+  handle.rotation.z = Math.PI / 2;
+  handle.position.set(openW - 0.14, openH * 0.48, 0.04);
+  hinge.add(handle);
+  parent.userData.launchHinge = hinge;
+}
+
+function addAlarm(parent: THREE.Group, prop?: PropDef) {
+  const fx = mergeHazardFx('alarm', prop?.hazard);
+  const r = fx.radius;
+  const plate = new THREE.Mesh(
+    new THREE.CircleGeometry(r, 22),
+    new THREE.MeshPhongMaterial({
+      color: fx.color,
+      transparent: true,
+      opacity: Math.min(0.22, Math.max(0.05, fx.opacity)),
+      depthWrite: false,
+      shininess: 8,
+      specular: 0x222222,
+    })
+  );
+  plate.rotation.x = -Math.PI / 2;
+  plate.position.y = 0.012;
+  plate.renderOrder = 1;
+  parent.add(plate);
+  const seam = new THREE.Mesh(
+    new THREE.RingGeometry(r * 0.82, r * 0.98, 22),
+    new THREE.MeshBasicMaterial({
+      color: 0x3a3834,
+      transparent: true,
+      opacity: Math.min(0.28, Math.max(0.08, fx.opacity + 0.06)),
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+  );
+  seam.rotation.x = -Math.PI / 2;
+  seam.position.y = 0.016;
+  seam.renderOrder = 2;
+  parent.add(seam);
+}
+
+export function placeOfficeProp(parent: THREE.Group, kind: PropKind, tone: FurnitureTone = 'dark', prop?: PropDef, sky: SkyKind = 'day') {
+  const color = prop?.color;
+  if (kind === 'plant') addPlant(parent, tone, prop?.plantKit ?? 'pot', hashSeed(prop?.id ?? 'plant'), color);
+  else if (kind === 'cooler') addCooler(parent, tone, color);
+  else if (kind === 'coffee') addCoffee(parent, tone, color);
+  else if (kind === 'fridge') addFridge(parent, tone, color);
+  else if (kind === 'sofa') addSofa(parent, tone, color);
+  else if (kind === 'sink') addSink(parent, tone, color);
+  else if (kind === 'bar') addBar(parent, tone, color);
+  else if (kind === 'cabinet') addCabinet(parent, tone, color);
+  else if (kind === 'printer') addPrinter(parent, tone, color);
+  else if (kind === 'bin') addBin(parent, tone, color);
+  else if (kind === 'shelf') addShelf(parent, tone, color);
+  else if (kind === 'whiteboard') addWhiteboard(parent, tone, color);
+  else if (kind === 'locker') addLocker(parent, tone, color);
+  else if (kind === 'table') addConferenceTable(parent, tone, color);
+  else if (kind === 'tv') addTv(parent, tone, color);
+  else if (kind === 'window') addWindow(parent, 0, prop?.y ?? 1.15, 0, 0, prop?.w ?? 2.4, prop?.h ?? 1.05, sky);
+  else if (kind === 'wet') addWet(parent, prop);
+  else if (kind === 'pit') addPit(parent, tone, color, prop);
+  else if (kind === 'crate') addCrate(parent, tone, color);
+  else if (kind === 'launch') addLaunch(parent, tone, color);
+  else if (kind === 'alarm') addAlarm(parent, prop);
 }
 
 export function addCeilingLight(
@@ -1695,29 +1997,14 @@ function paintElevatorSign(ctx: CanvasRenderingContext2D, w: number, h: number, 
   drawDigit(ones, 118, false);
 }
 
-function elevatorYaw(map: MapBounds, zone: { minX: number; maxX: number; minZ: number; maxZ: number }) {
-  const cx = (zone.minX + zone.maxX) / 2;
-  const cz = (zone.minZ + zone.maxZ) / 2;
-  const edges: { yaw: number; dist: number; x: number; z: number }[] = [
-    { yaw: 0, dist: cz - map.minZ, x: cx, z: map.minZ + 0.42 },
-    { yaw: Math.PI, dist: map.maxZ - cz, x: cx, z: map.maxZ - 0.42 },
-    { yaw: Math.PI / 2, dist: cx - map.minX, x: map.minX + 0.42, z: cz },
-    { yaw: -Math.PI / 2, dist: map.maxX - cx, x: map.maxX - 0.42, z: cz },
-  ];
-  edges.sort((a, b) => a.dist - b.dist);
-  return edges[0]!;
-}
-
-/** 轿厢 + 对开门 + 墙钮 + 楼层屏。无点光，亮的全靠自发光。 */
+/** 轿厢 + 对开门 + 墙钮 + 楼层屏。无点光，亮的全靠自发光。姿态跟所贴墙面。 */
 export function buildElevator(
-  zone: { minX: number; maxX: number; minZ: number; maxZ: number },
-  map: MapBounds,
+  pose: { x: number; z: number; rotY: number },
   glow: number
 ): ElevatorRig {
   const group = new THREE.Group();
-  const pose = elevatorYaw(map, zone);
   group.position.set(pose.x, 0, pose.z);
-  group.rotation.y = pose.yaw;
+  group.rotation.y = pose.rotY;
 
   const steel = phongFresh({ color: 0xb8bec6, map: tex.metal(), shininess: 78, specular: 0xccd0d4 });
   const steelDark = phongFresh({ color: 0x6a7078, map: tex.metal(), shininess: 55, specular: 0x889099 });
@@ -1838,11 +2125,11 @@ export function buildElevator(
   group.add(btnRing);
 
   const pad = new THREE.Mesh(
-    new THREE.PlaneGeometry(Math.max(2.2, zone.maxX - zone.minX), Math.max(1.2, zone.maxZ - zone.minZ)),
+    new THREE.PlaneGeometry(ELEVATOR_PAD_ALONG * 2, ELEVATOR_PAD_FAR - ELEVATOR_PAD_NEAR),
     new THREE.MeshBasicMaterial({ color: glow, transparent: true, opacity: 0.22 })
   );
   pad.rotation.x = -Math.PI / 2;
-  pad.position.set(0, 0.02, 0.7);
+  pad.position.set(0, 0.02, (ELEVATOR_PAD_NEAR + ELEVATOR_PAD_FAR) / 2);
   group.add(pad);
 
   const doorClosed = doorW / 2 + 0.01;
@@ -1908,6 +2195,38 @@ export function buildElevator(
       padMat.opacity = state === 'idle' ? 0.16 : 0.22 + (state === 'ready' || state === 'opening' ? 0.12 : 0) + Math.sin(time * 3) * 0.04;
     },
   };
+}
+
+export function addTv(parent: THREE.Group, tone: FurnitureTone = 'dark', color?: string) {
+  const pal = furnitureLook(tone, color);
+  const y = 1.38;
+  const bezel = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.78, 0.05), phong({ color: pal.bezel, shininess: 42, specular: 0x667088 }));
+  bezel.position.set(0, y, 0.03);
+  parent.add(bezel);
+  const screen = new THREE.Mesh(
+    new THREE.BoxGeometry(1.18, 0.64, 0.02),
+    new THREE.MeshPhongMaterial({
+      color: 0x12161c,
+      emissive: new THREE.Color(0x1a3048),
+      emissiveIntensity: 0.45,
+      shininess: 70,
+      specular: 0x445566,
+    })
+  );
+  screen.position.set(0, y, 0.055);
+  parent.add(screen);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.018, 0.01), phong({ color: pal.metal, shininess: 40 }));
+  bar.position.set(0, y - 0.34, 0.058);
+  parent.add(bar);
+  const led = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.01), new THREE.MeshBasicMaterial({ color: 0xff3a3a }));
+  led.position.set(0.52, y - 0.34, 0.06);
+  parent.add(led);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.08), phong({ color: pal.frame, map: tex.metal(), shininess: 50 }));
+  arm.position.set(0, y, -0.03);
+  parent.add(arm);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.03), phong({ color: pal.frame, map: tex.metal(), shininess: 45 }));
+  plate.position.set(0, y, -0.07);
+  parent.add(plate);
 }
 
 export function addWindow(
@@ -2083,10 +2402,15 @@ export class DashTrail {
   }
 
   emit(x: number, z: number, yaw: number, dt: number) {
-    const cfg = this.style;
     this.acc += dt;
-    if (this.acc < cfg.interval) return;
+    if (this.acc < this.style.interval) return;
     this.acc = 0;
+    this.stamp(x, z, yaw);
+  }
+
+  /** 立刻盖一枚残影，间隔由调用方自己控（多人加速时不能共用 acc）。 */
+  stamp(x: number, z: number, yaw: number) {
+    const cfg = this.style;
     const copies = Math.max(1, cfg.copies | 0);
     const stretch = Math.max(0.4, cfg.stretch);
     const ghost = cfg.ghost;
@@ -2248,42 +2572,78 @@ export function spawnHitFx(papers: PaperBurst, mist: ImpactMist, x: number, z: n
   mist.spawn(x, z, hit.mist);
 }
 
-/** 判定加时：头顶一枚加色光饼向上飘 */
-export class HeadMark {
-  private items: { mesh: THREE.Mesh; life: number; max: number; rise: number; opacity: number; size: number }[] = [];
-  private geo: THREE.SphereGeometry;
+function hexCss(n: number) {
+  return `#${(n >>> 0).toString(16).padStart(6, '0')}`;
+}
+
+const popTexCache = new Map<string, THREE.CanvasTexture>();
+
+function overtimePopMap(text: string, color: number, outline: boolean, outlineColor: number): THREE.CanvasTexture {
+  const key = `${text}|${color}|${outline ? outlineColor : 'x'}`;
+  const hit = popTexCache.get(key);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 128;
+  const ctx = c.getContext('2d')!;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.font = '700 72px "PingFang SC","Hiragino Sans GB","Noto Sans SC",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (outline) {
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = hexCss(outlineColor);
+    ctx.strokeText(text, 256, 68);
+  }
+  ctx.fillStyle = hexCss(color);
+  ctx.fillText(text, 256, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  popTexCache.set(key, tex);
+  return tex;
+}
+
+/** 判定加时：头顶飘出 +N分钟，不再用色块 */
+export class OvertimePop {
+  private items: {
+    sprite: THREE.Sprite;
+    life: number;
+    max: number;
+    rise: number;
+    opacity: number;
+    size: number;
+  }[] = [];
 
   constructor(private scene: THREE.Scene) {
-    this.geo = new THREE.SphereGeometry(1, 10, 8);
     for (let i = 0; i < 12; i++) {
-      const m = new THREE.Mesh(
-        this.geo,
-        new THREE.MeshBasicMaterial({
-          color: 0xffe080,
-          transparent: true,
-          opacity: 0.85,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-        })
-      );
-      m.visible = false;
-      m.castShadow = false;
-      scene.add(m);
-      this.items.push({ mesh: m, life: 0, max: 1, rise: 1, opacity: 0.85, size: 0.32 });
+      const mat = new THREE.SpriteMaterial({
+        transparent: true,
+        depthWrite: false,
+        opacity: 1,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.visible = false;
+      sprite.center.set(0.5, 0.35);
+      scene.add(sprite);
+      this.items.push({ sprite, life: 0, max: 1, rise: 1, opacity: 1, size: 0.48 });
     }
   }
 
-  spawn(x: number, z: number, look?: HeadFx) {
+  spawn(x: number, z: number, minutes: number, look?: OvertimeFx) {
     const cfg = look ?? crowdFx('colleague-a-m').overtime;
     if (!cfg.enabled) return;
-    const slot = this.items.find((s) => !s.mesh.visible) ?? this.items[0]!;
-    const mat = slot.mesh.material as THREE.MeshBasicMaterial;
-    mat.color.setHex(cfg.color);
+    const slot = this.items.find((s) => !s.sprite.visible) ?? this.items[0]!;
+    const mat = slot.sprite.material;
+    mat.map = overtimePopMap(overtimePopText(minutes), cfg.color, cfg.outline, cfg.outlineColor);
+    mat.color.setHex(0xffffff);
     mat.opacity = cfg.opacity;
-    mat.blending = fxBlend(cfg.additive);
-    slot.mesh.position.set(x, cfg.y, z);
-    slot.mesh.scale.set(cfg.size, cfg.size * 0.28, cfg.size);
-    slot.mesh.visible = true;
+    mat.needsUpdate = true;
+    slot.sprite.position.set(x, cfg.y, z);
+    slot.sprite.scale.set(cfg.size * 4, cfg.size, 1);
+    slot.sprite.visible = true;
     slot.life = cfg.duration;
     slot.max = cfg.duration;
     slot.rise = cfg.rise;
@@ -2293,45 +2653,48 @@ export class HeadMark {
 
   update(dt: number) {
     for (const s of this.items) {
-      if (!s.mesh.visible) continue;
+      if (!s.sprite.visible) continue;
       s.life -= dt;
       if (s.life <= 0) {
-        s.mesh.visible = false;
+        s.sprite.visible = false;
         continue;
       }
       const k = 1 - s.life / s.max;
-      s.mesh.position.y += s.rise * dt;
-      const sc = s.size * (1 + k * 0.55);
-      s.mesh.scale.set(sc, sc * 0.28, sc);
-      (s.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, s.opacity * (1 - k));
+      s.sprite.position.y += s.rise * dt;
+      const sc = s.size * (1 + k * 0.18);
+      s.sprite.scale.set(sc * 4, sc, 1);
+      s.sprite.material.opacity = Math.max(0, s.opacity * (1 - k * k));
     }
   }
 
   dispose() {
     for (const s of this.items) {
-      this.scene.remove(s.mesh);
-      (s.mesh.material as THREE.Material).dispose();
+      this.scene.remove(s.sprite);
+      s.sprite.material.dispose();
     }
     this.items.length = 0;
-    this.geo.dispose();
   }
 }
 
+export { OvertimePop as HeadMark };
+
 /** 倦怠圈：撞人后地面一圈灰蓝减速波 */
 export class SlowPulse {
-  private items: { mesh: THREE.Mesh; life: number; max: number; radius: number; opacity: number }[] = [];
+  private items: { mesh: THREE.Mesh; life: number; max: number; radius: number; opacity: number; outline: boolean }[] = [];
   private geo: THREE.PlaneGeometry;
-  private map: THREE.CanvasTexture;
+  private fillMap: THREE.CanvasTexture;
+  private ringMap: THREE.CanvasTexture;
 
   constructor(private scene: THREE.Scene) {
     this.geo = new THREE.PlaneGeometry(1, 1);
     this.geo.rotateX(-Math.PI / 2);
-    this.map = slowAuraMap(0.4, 0.72, 0.1);
+    this.fillMap = slowAuraMap(0.4, 0.72, 0.1);
+    this.ringMap = slowAuraMap(0.78, 0.22, 0.04);
     for (let i = 0; i < 8; i++) {
       const m = new THREE.Mesh(
         this.geo,
         new THREE.MeshBasicMaterial({
-          map: this.map,
+          map: this.fillMap,
           color: 0x7a90a8,
           transparent: true,
           opacity: 0.45,
@@ -2344,23 +2707,26 @@ export class SlowPulse {
       m.castShadow = false;
       m.renderOrder = 1;
       scene.add(m);
-      this.items.push({ mesh: m, life: 0, max: 1, radius: 1, opacity: 0.45 });
+      this.items.push({ mesh: m, life: 0, max: 1, radius: 1, opacity: 0.45, outline: false });
     }
   }
 
-  spawn(x: number, z: number, radius: number, color: number, opacity: number, life: number) {
+  spawn(x: number, z: number, radius: number, color: number, opacity: number, life: number, outline = false) {
     const slot = this.items.find((s) => !s.mesh.visible) ?? this.items[0]!;
     const mat = slot.mesh.material as THREE.MeshBasicMaterial;
+    mat.map = outline ? this.ringMap : this.fillMap;
     mat.color.setHex(color);
     mat.opacity = opacity;
-    slot.mesh.position.set(x, 0.04, z);
-    const s = Math.max(0.2, radius * 0.35) * 2;
+    mat.needsUpdate = true;
+    slot.mesh.position.set(x, outline ? 0.03 : 0.04, z);
+    const s = Math.max(0.2, radius) * 2;
     slot.mesh.scale.set(s, 1, s);
     slot.mesh.visible = true;
     slot.life = Math.max(0.08, life);
     slot.max = slot.life;
     slot.radius = radius;
     slot.opacity = opacity;
+    slot.outline = outline;
   }
 
   update(dt: number) {
@@ -2372,9 +2738,9 @@ export class SlowPulse {
         continue;
       }
       const k = 1 - s.life / s.max;
-      const sc = s.radius * (0.35 + k * 0.65) * 2;
+      const sc = s.outline ? s.radius * (1.05 + k * 0.12) * 2 : s.radius * (0.35 + k * 0.65) * 2;
       s.mesh.scale.set(sc, 1, sc);
-      (s.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, s.opacity * (1 - k) ** 1.2);
+      (s.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, s.opacity * (s.outline ? 1 - k * k : (1 - k) ** 1.2));
     }
   }
 
@@ -2497,6 +2863,131 @@ type SlowSlot = {
   t: number;
 };
 
+type ChannelSlot = {
+  group: THREE.Group;
+  tilt: THREE.Group;
+  card: THREE.Mesh;
+  logoF: THREE.Mesh;
+  logoB: THREE.Mesh;
+  key: number;
+  spin: number;
+  bob: number;
+  bobSpeed: number;
+  y: number;
+  t: number;
+};
+
+/** 贴身读条：平躺文件卡 + 透明底 Logo，绕竖轴水平转 */
+export class ChannelMarks {
+  private items: ChannelSlot[] = [];
+  private cardGeo = new THREE.BoxGeometry(1, 1, 1);
+  private logoGeo = new THREE.PlaneGeometry(0.78, 0.78);
+
+  constructor(private scene: THREE.Scene, cap = 24) {
+    for (let i = 0; i < cap; i++) {
+      const group = new THREE.Group();
+      group.visible = false;
+      const tilt = new THREE.Group();
+      tilt.rotation.x = -Math.PI / 2;
+      const card = new THREE.Mesh(
+        this.cardGeo,
+        phongFresh({ color: 0xf3ead2, shininess: 12, specular: 0x444433, transparent: true, opacity: 1 })
+      );
+      card.castShadow = true;
+      const logoMat = () =>
+        new THREE.MeshBasicMaterial({
+          map: channelStampMap('word'),
+          transparent: true,
+          depthWrite: false,
+          alphaTest: 0.08,
+        });
+      const logoF = new THREE.Mesh(this.logoGeo, logoMat());
+      logoF.position.z = 0.52;
+      const logoB = new THREE.Mesh(this.logoGeo, logoMat());
+      logoB.position.z = -0.52;
+      logoB.rotation.y = Math.PI;
+      tilt.add(card, logoF, logoB);
+      group.add(tilt);
+      scene.add(group);
+      this.items.push({ group, tilt, card, logoF, logoB, key: -1, spin: 1.8, bob: 0.04, bobSpeed: 10, y: 2.05, t: 0 });
+    }
+  }
+
+  pin(key: number, x: number, z: number, look?: ChannelLookFx, bodyScale = 1) {
+    const cfg = look ?? crowdFx('colleague-a-m').channel;
+    if (!cfg.enabled) {
+      this.clear(key);
+      return;
+    }
+    const slot = this.items.find((s) => s.key === key) ?? this.items.find((s) => s.key < 0) ?? this.items[0]!;
+    const cardMat = slot.card.material as THREE.MeshPhongMaterial;
+    const paper = cfg.stamp === 'paper';
+    cardMat.color.setHex(cfg.color);
+    cardMat.map = paper ? channelStampMap('paper') : null;
+    cardMat.opacity = cfg.opacity;
+    cardMat.transparent = paper || cfg.opacity < 0.98;
+    cardMat.needsUpdate = true;
+    const map = channelStampMap(cfg.stamp);
+    for (const logo of [slot.logoF, slot.logoB]) {
+      const mat = logo.material as THREE.MeshBasicMaterial;
+      mat.map = map;
+      logo.visible = !paper;
+      mat.needsUpdate = true;
+    }
+    slot.key = key;
+    slot.spin = cfg.spin;
+    slot.bob = cfg.bob;
+    slot.bobSpeed = cfg.bobSpeed;
+    slot.y = cfg.y * bodyScale;
+    slot.tilt.scale.set(cfg.width * bodyScale, cfg.height * bodyScale, cfg.thick * bodyScale);
+    slot.group.position.set(x, slot.y, z);
+    slot.group.visible = true;
+  }
+
+  follow(key: number, x: number, z: number) {
+    const slot = this.items.find((s) => s.key === key);
+    if (!slot) return;
+    slot.group.position.x = x;
+    slot.group.position.z = z;
+  }
+
+  clear(key: number) {
+    const slot = this.items.find((s) => s.key === key);
+    if (!slot) return;
+    slot.key = -1;
+    slot.group.visible = false;
+  }
+
+  clearAll() {
+    for (const s of this.items) {
+      s.key = -1;
+      s.group.visible = false;
+    }
+  }
+
+  syncEnemy(i: number, x: number, z: number, on: boolean, scale: number, look: ChannelLookFx) {
+    if (on && look.enabled) this.pin(i, x, z, look, scale);
+    else this.clear(i);
+    this.follow(i, x, z);
+  }
+
+  update(dt: number) {
+    for (const s of this.items) {
+      if (!s.group.visible) continue;
+      s.t += dt;
+      s.group.rotation.y += s.spin * dt;
+      s.group.position.y = s.y + Math.sin(s.t * s.bobSpeed) * s.bob;
+    }
+  }
+
+  dispose() {
+    for (const s of this.items) this.scene.remove(s.group);
+    this.items.length = 0;
+    this.cardGeo.dispose();
+    this.logoGeo.dispose();
+  }
+}
+
 /** 眩晕金星+转圈、减速脚底雾圈：跟在角色身上，样子锁在角色目录 */
 export class StatusMarks {
   private stuns: StunSlot[] = [];
@@ -2521,7 +3012,7 @@ export class StatusMarks {
         })
       );
       group.add(glow);
-      const ringGeo = new THREE.RingGeometry(0.78, 1, 1, 48);
+      const ringGeo = new THREE.RingGeometry(0.78, 1, 48, 1);
       ringGeo.rotateX(-Math.PI / 2);
       const ring = new THREE.Mesh(
         ringGeo,
@@ -2706,7 +3197,7 @@ export class StatusMarks {
     const inner = Math.max(0.2, Math.min(0.94, 1 - (cfg.ringWidth ?? 0.2)));
     if (Math.abs(inner - slot.ringInner) > 0.01) {
       slot.ring.geometry.dispose();
-      const g = new THREE.RingGeometry(inner, 1, 1, 48);
+      const g = new THREE.RingGeometry(inner, 1, 48, 1);
       g.rotateX(-Math.PI / 2);
       slot.ring.geometry = g;
       slot.ringInner = inner;

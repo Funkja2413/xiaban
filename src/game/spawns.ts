@@ -1,4 +1,5 @@
-import type { MapBounds, Xz } from '../levels';
+import type { MapBounds, MapVoid, Xz } from '../levels';
+import { isInVoid } from '../levels';
 
 type Rect = { minX: number; minZ: number; maxX: number; maxZ: number };
 
@@ -168,7 +169,8 @@ export function layoutSpawns(
   map: MapBounds,
   obstacles: Rect[],
   player: Xz,
-  elevator: Xz
+  elevator: Xz,
+  voids?: MapVoid[]
 ): AutoSpawns {
   const ox = map.minX;
   const oz = map.minZ;
@@ -185,16 +187,24 @@ export function layoutSpawns(
       for (let cx = ax; cx <= bx; cx++) blocked[cz * nx + cx] = 1;
     }
   };
+  const world = (cx: number, cz: number): Xz => ({
+    x: ox + (cx + 0.5) * CELL,
+    z: oz + (cz + 0.5) * CELL,
+  });
   for (const o of obstacles) mark(o.minX, o.minZ, o.maxX, o.maxZ);
+  if (voids?.length) {
+    for (let cz = 0; cz < nz; cz++) {
+      for (let cx = 0; cx < nx; cx++) {
+        const p = world(cx, cz);
+        if (isInVoid(p.x, p.z, voids, 0.2)) blocked[cz * nx + cx] = 1;
+      }
+    }
+  }
 
   const cellOf = (x: number, z: number) => [
     Math.min(nx - 1, Math.max(0, Math.floor((x - ox) / CELL))),
     Math.min(nz - 1, Math.max(0, Math.floor((z - oz) / CELL))),
   ] as const;
-  const world = (cx: number, cz: number): Xz => ({
-    x: ox + (cx + 0.5) * CELL,
-    z: oz + (cz + 0.5) * CELL,
-  });
 
   const [px, pz] = cellOf(player.x, player.z);
   const [ex, ez] = cellOf(elevator.x, elevator.z);
@@ -294,8 +304,24 @@ export function layoutSpawns(
     );
   }
 
+  let enemySpawns = pickSpaced(aCands, 22, 3.2);
+  if (enemySpawns.length < 8) {
+    const loose: { x: number; z: number; score: number }[] = [];
+    for (let cz = 1; cz < nz - 1; cz++) {
+      for (let cx = 1; cx < nx - 1; cx++) {
+        const i = cz * nx + cx;
+        if (blocked[i] || distP[i] < 0) continue;
+        const dPlayer = distP[i] * CELL;
+        if (dPlayer < 4) continue;
+        const { x, z } = world(cx, cz);
+        loose.push({ x, z, score: dPlayer });
+      }
+    }
+    enemySpawns = pickSpaced(loose, 22, 2.4);
+  }
+
   return {
-    enemySpawns: pickSpaced(aCands, 22, 3.2),
+    enemySpawns,
     heavyAnchors,
     interceptorSpawns,
   };

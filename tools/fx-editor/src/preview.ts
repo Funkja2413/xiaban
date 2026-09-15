@@ -1,8 +1,9 @@
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { commonFx, crowdFx, dashFx, dashImpulseOf, dashReactOf, skillFx, type ActorId, type CrowdActorId, type DashKey, type SkillKey } from '../../../src/fx/catalog';
-import { BATTLE_SLOT_IDS } from '../../../src/catalog';
+import { commonFx, crowdFx, dashFx, dashImpulseOf, dashReactOf, enemySkillFx, overtimePopText, overtimePreviewMin, skillFx, type ActorId, type CrowdActorId, type DashKey, type SkillKey } from '../../../src/fx/catalog';
+import type { EnemySkillId } from '../../../src/catalog';
+import { BATTLE_SLOT_IDS, ENEMY_SKILL_META } from '../../../src/catalog';
 import { rosterSlot } from '../../../src/roster';
 import {
   cloneBattleFigure,
@@ -11,7 +12,8 @@ import {
   type HumanoidFigure,
   type HumanoidKit,
 } from '../../../src/game/humanoid';
-import { DashTrail, HeadMark, ImpactMist, PaperBurst, SlowPulse, StatusMarks, spawnHitFx } from '../../../src/game/look';
+import { ChannelMarks, DashTrail, ImpactMist, OvertimePop, PaperBurst, SlowPulse, StatusMarks, spawnHitFx } from '../../../src/game/look';
+import { SkillChains, SkillShout, SHOUT_Y, figureChest, figureHand, figureHandL, figureNeck, setFigureGlow } from '../../../src/game/skillVfx';
 import { RagdollFactory, type RagdollHandle } from '../../../src/game/ragdoll';
 import { Slicks } from '../../../src/game/slicks';
 
@@ -30,12 +32,25 @@ const SHIRT_F = 0xe05252;
 interface Dummy {
   fig: HumanoidFigure;
   slot: number;
+  restX: number;
+  restZ: number;
   x: number;
   z: number;
   hit: boolean;
   heavy: boolean;
   shirt: number;
   rag: RagdollHandle | null;
+}
+
+interface SkillProp {
+  mesh: THREE.Group;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  flying: boolean;
 }
 
 /** 挤在冲刺廊道里，默认半径 1、时长 0.18 能扫到一整群 */
@@ -67,10 +82,12 @@ export class FxPreview {
   readonly camera: THREE.PerspectiveCamera;
   readonly orbit: OrbitControls;
   skillLv = 1;
-  track: 'common' | DashKey | SkillKey = 'none';
+  track: 'common' | DashKey | SkillKey | 'hazards' | 'enemySkills' = 'none';
   actorId: ActorId = 'player';
   /** 正在编角色被动时，不画冲刺判定辅助圈 */
   actorEdit = false;
+  /** 当前关这个角色挂的主动技能。播放角色时走技能预览。 */
+  actorSkill: EnemySkillId | null = null;
   castState: CastState = 'idle';
 
   private world: RAPIER.World;
@@ -78,9 +95,12 @@ export class FxPreview {
   private papers: PaperBurst;
   private trail: DashTrail;
   private mist: ImpactMist;
-  private heads: HeadMark;
+  private heads: OvertimePop;
   private pulses: SlowPulse;
+  private chains: SkillChains;
+  private skillShout: SkillShout;
   private status: StatusMarks;
+  private channel: ChannelMarks;
   private slicks: Slicks;
   private kit: HumanoidKit;
   private playerFig: HumanoidFigure;
@@ -100,9 +120,22 @@ export class FxPreview {
   private slumpPulsed = false;
   private commonFired = false;
   private actorFired = false;
+  private actorPhase: 'windup' | 'cast' | 'hold' = 'windup';
+  private actorHold = HOLD_AFTER_DASH;
+  private skillStaged = false;
+  private stagedActor: ActorId | null = null;
+  private stagedSkill: EnemySkillId | null = null;
+  private casterRunning = false;
+  private extrasRunning = false;
+  private playerLocked = false;
+  private skillProps: SkillProp[] = [];
   private overtimeAcc = 99;
   private lastOvertimeActor: ActorId | null = null;
   private onStatus: ((s: string) => void) | null = null;
+  private chainHand = new THREE.Vector3();
+  private chainHandL = new THREE.Vector3();
+  private chainNeck = new THREE.Vector3();
+  private glowFig: HumanoidFigure | null = null;
 
   constructor(host: HTMLElement, renderer: THREE.WebGPURenderer, kit: HumanoidKit, world: RAPIER.World) {
     this.renderer = renderer;
@@ -152,10 +185,35 @@ export class FxPreview {
     this.papers = new PaperBurst(this.scene);
     this.trail = new DashTrail(this.scene);
     this.mist = new ImpactMist(this.scene);
-    this.heads = new HeadMark(this.scene);
+    this.heads = new OvertimePop(this.scene);
     this.pulses = new SlowPulse(this.scene);
+    this.chains = new SkillChains(this.scene);
+    this.skillShout = new SkillShout(this.scene);
     this.status = new StatusMarks(this.scene, 16);
+    this.channel = new ChannelMarks(this.scene, 16);
     this.slicks = new Slicks(this.scene);
+    this.resetPose();
+  }
+
+  /** 角色清单变了：换人，不整页重载。 */
+  adoptKit(kit: HumanoidKit) {
+    this.play = null;
+    this.casterRunning = false;
+    this.extrasRunning = false;
+    this.playerLocked = false;
+    this.skillStaged = false;
+    this.stagedActor = null;
+    this.stagedSkill = null;
+    this.clearGlow();
+    this.clearRags();
+    this.clearSkillProps();
+    this.scene.remove(this.playerFig.group);
+    for (const d of this.dummies) this.scene.remove(d.fig.group);
+    this.dummies.length = 0;
+    this.kit = kit;
+    this.playerFig = clonePlayerFigure(kit);
+    this.scene.add(this.playerFig.group);
+    this.spawnDummies(kit);
     this.resetPose();
   }
 
@@ -186,6 +244,26 @@ export class FxPreview {
     this.overtimeAcc = 99;
   }
 
+  /** 选中带主动技能的同事时，把舞台收成「他对着玩家放技能」。 */
+  applyActorLayout() {
+    if (this.play) return;
+    if (this.actorEdit && this.actorSkill && this.actorId !== 'player') {
+      if (!this.skillStaged || this.stagedActor !== this.actorId || this.stagedSkill !== this.actorSkill) {
+        this.skillStaged = true;
+        this.stagedActor = this.actorId;
+        this.stagedSkill = this.actorSkill;
+        this.layoutSkillStage();
+      }
+      return;
+    }
+    if (this.skillStaged) {
+      this.skillStaged = false;
+      this.stagedActor = null;
+      this.stagedSkill = null;
+      this.restoreCrowdLayout();
+    }
+  }
+
   resize(w: number, h: number) {
     this.camera.aspect = w / Math.max(1, h);
     this.camera.updateProjectionMatrix();
@@ -198,15 +276,20 @@ export class FxPreview {
     this.mist.dispose();
     this.heads.dispose();
     this.pulses.dispose();
+    this.chains.dispose();
+    this.skillShout.dispose();
     this.papers = new PaperBurst(this.scene);
     this.trail = new DashTrail(this.scene);
     this.mist = new ImpactMist(this.scene);
-    this.heads = new HeadMark(this.scene);
+    this.heads = new OvertimePop(this.scene);
     this.pulses = new SlowPulse(this.scene);
+    this.chains = new SkillChains(this.scene);
+    this.skillShout = new SkillShout(this.scene);
     this.slicks.clear();
   }
 
   start(kind: PlayKind) {
+    this.clearGlow();
     this.clearActors();
     this.resetDummies();
     this.resetPose();
@@ -218,11 +301,26 @@ export class FxPreview {
     this.slumpPulsed = false;
     this.commonFired = false;
     this.actorFired = false;
+    this.actorPhase = 'windup';
+    this.actorHold = HOLD_AFTER_DASH;
+    this.casterRunning = false;
+    this.extrasRunning = false;
+    this.playerLocked = false;
+    this.skillStaged = false;
+    this.skillShout.clear();
     this.trail.setStyle(dashFx(this.dashKey(), this.skillLv).trail);
     if (kind === 'decoy') this.placeDecoy();
     if (kind === 'keyboard') this.placeKeyboard();
     if (kind === 'coffee') this.pourCoffee();
     if (kind === 'common') this.placeCrate();
+    if (kind === 'actor' && this.actorSkill && this.actorId !== 'player') {
+      this.layoutSkillStage();
+      this.skillStaged = true;
+      this.stagedActor = this.actorId;
+      this.stagedSkill = this.actorSkill;
+      this.onStatus?.(`播放 ${ENEMY_SKILL_META[this.actorSkill].name} · 同事打在玩家身上`);
+      return;
+    }
     this.onStatus?.(`播放 ${labelOf(kind)}`);
   }
 
@@ -239,16 +337,63 @@ export class FxPreview {
     this.mist.update(dt);
     this.heads.update(dt);
     this.pulses.update(dt);
-    if (this.actorEdit && this.actorId !== 'player') {
+    if (this.play === 'actor' && this.actorSkill === 'rally') {
+      this.skillShout.aim(this.px, SHOUT_Y, this.pz);
+    }
+    this.skillShout.update(dt);
+    this.chains.update(dt);
+    this.stepSkillProps(dt);
+    if (this.play === 'actor' && this.actorSkill === 'cut-in') {
+      const pack = enemySkillFx('cut-in');
+      const dummy = this.casterDummy();
+      if (dummy) {
+        figureHand(dummy.fig, this.chainHand);
+        figureHandL(dummy.fig, this.chainHandL);
+        figureNeck(this.playerFig, this.chainNeck);
+        this.chains.followHands(
+          0,
+          this.chainHand.x,
+          this.chainHand.y,
+          this.chainHand.z,
+          this.chainHandL.x,
+          this.chainHandL.y,
+          this.chainHandL.z,
+          this.chainNeck.x,
+          this.chainNeck.y,
+          this.chainNeck.z,
+          pack.chainStyle
+        );
+      }
+      const live = this.chains.live();
+      if (live) {
+        setFigureGlow(this.playerFig, true, live.color, pack.opacity * live.fade);
+        this.glowFig = this.playerFig;
+      } else if (this.glowFig === this.playerFig) {
+        setFigureGlow(this.playerFig, false);
+        this.glowFig = null;
+      }
+    }
+    const skillPlay = this.play === 'actor' && !!this.actorSkill;
+    if (this.actorEdit && this.actorId !== 'player' && !skillPlay) {
       this.syncEditStatus();
       this.stepOvertimePreview(dt);
-    } else {
+    } else if (!this.actorEdit) {
       this.overtimeAcc = 99;
       this.lastOvertimeActor = null;
-      if (!this.play) this.status.clearAll();
+      if (!this.play) {
+        this.status.clearAll();
+        this.channel.clearAll();
+      }
     }
-    this.dummies.forEach((d, i) => this.status.follow(100 + i, d.x, d.z));
+    this.dummies.forEach((d, i) => {
+      this.status.follow(100 + i, d.x, d.z);
+      this.channel.follow(100 + i, d.x, d.z);
+    });
+    if (this.play === 'actor' && (this.actorSkill === 'cut-in' || this.actorSkill === 'desk-slam' || this.actorSkill === 'rally')) {
+      this.status.follow(1000, this.px, this.pz);
+    }
     this.status.update(dt);
+    this.channel.update(dt);
     this.slicks.update(dt, emptyEnemies());
     this.syncRadius();
     const dashing = this.play === 'dash' && this.t <= dashFx(this.dashKey(), this.skillLv).hit.time + 0.02;
@@ -278,11 +423,11 @@ export class FxPreview {
     if (!look.overtime.enabled) return;
     let n = 0;
     for (const d of this.dummies) {
-      if (BATTLE_SLOT_IDS[d.slot] !== this.actorId) continue;
-      this.heads.spawn(d.x, d.z, look.overtime);
+      if (!d.fig.group.visible || BATTLE_SLOT_IDS[d.slot] !== this.actorId) continue;
+      this.heads.spawn(d.x, d.z, overtimePreviewMin(this.actorId as CrowdActorId), look.overtime);
       n++;
     }
-    if (n) this.onStatus?.('判定加时 · 头顶循环预览（不用贴近）');
+    if (n) this.onStatus?.(`判定加时 · ${overtimePopText(overtimePreviewMin(this.actorId as CrowdActorId))} 循环预览`);
   }
 
   private syncEditStatus() {
@@ -292,12 +437,14 @@ export class FxPreview {
     for (let i = 0; i < this.dummies.length; i++) {
       const d = this.dummies[i]!;
       const key = 100 + i;
-      if (BATTLE_SLOT_IDS[d.slot] !== id) {
+      if (BATTLE_SLOT_IDS[d.slot] !== id || !d.fig.group.visible) {
         this.status.clear(key);
+        this.channel.clear(key);
         continue;
       }
       this.status.pinStun(key, d.x, d.z, look.stun);
       this.status.pinSlow(key, d.x, d.z, look.slow);
+      this.channel.pin(key, d.x, d.z, look.channel, d.slot === 2 ? 1.38 : 1);
     }
   }
 
@@ -305,9 +452,20 @@ export class FxPreview {
     const pack = dashFx(this.dashKey(), this.skillLv);
     const dashing = this.play === 'dash';
     const playerMove = dashing && this.t <= pack.hit.time + 0.02;
-    setFigureGait(this.playerFig, this.castState === 'run' || playerMove, dt);
+    const playerRun = !this.playerLocked && (this.castState === 'run' || playerMove);
+    setFigureGait(this.playerFig, playerRun, dt);
+    const caster = this.casterDummy();
     for (const d of this.dummies) {
-      setFigureGait(d.fig, !d.hit && this.castState === 'run', dt);
+      if (!d.fig.group.visible || d.hit) {
+        setFigureGait(d.fig, false, dt);
+        continue;
+      }
+      const isCaster = d === caster;
+      const skillPlay = this.play === 'actor' && !!this.actorSkill;
+      const run = skillPlay
+        ? (isCaster && this.casterRunning) || (!isCaster && this.extrasRunning)
+        : this.castState === 'run';
+      setFigureGait(d.fig, run, dt);
     }
   }
 
@@ -316,7 +474,7 @@ export class FxPreview {
     this.t += dt;
     if (this.play === 'dash') this.stepDash(dt);
     else if (this.play === 'common') this.stepCommon();
-    else if (this.play === 'actor') this.stepActor();
+    else if (this.play === 'actor') this.stepActor(dt);
     else if (this.play === 'decoy') this.stepDecoy();
     else if (this.play === 'keyboard') this.stepKeyboard(dt);
     else if (this.play === 'coffee') this.stepCoffee();
@@ -330,24 +488,148 @@ export class FxPreview {
     if (this.t > HOLD_AFTER_DASH) this.finishPlay('撞物预览 · 已复位');
   }
 
-  private stepActor() {
+  private stepActor(dt: number) {
+    const skill = this.actorSkill;
+    if (!skill) {
+      this.stepActorPassive();
+      return;
+    }
+    const dummy = this.casterDummy();
+    if (!dummy) {
+      if (this.t > HOLD_AFTER_DASH) this.finishPlay('找不到施法角色');
+      return;
+    }
+    const pack = enemySkillFx(skill);
+    const wind = Math.max(0.08, pack.windup);
+    const base = dummy.heavy ? 1.38 : 1;
+    const name = ENEMY_SKILL_META[skill].name;
+
+    if (this.t < wind) {
+      if (!this.actorFired) {
+        this.actorFired = true;
+        if (skill !== 'cut-in' && skill !== 'rally') {
+          this.pulses.spawn(dummy.x, dummy.z, pack.radius * 0.32, pack.color, pack.opacity, wind, true);
+        }
+        this.onStatus?.(`${name} · 前摇`);
+      }
+      dummy.fig.group.scale.set(base, base * (pack.squash ?? 0.8), base);
+      this.faceToward(dummy, this.px, this.pz);
+      return;
+    }
+
+    dummy.fig.group.scale.setScalar(base);
+    if (this.actorPhase === 'windup') {
+      this.actorPhase = 'cast';
+      this.fireActorSkill(dummy, skill, pack, wind);
+    }
+
+    if (skill === 'cut-in' && this.actorPhase === 'cast') {
+      const elapsed = this.t - wind;
+      const reach = Math.hypot(this.px - dummy.x, this.pz - dummy.z);
+      if (elapsed < pack.duration && reach > 0.62) {
+        this.casterRunning = true;
+        const yaw = Math.atan2(this.px - dummy.x, this.pz - dummy.z);
+        const sp = pack.speed ?? 7.2;
+        dummy.x += Math.sin(yaw) * sp * dt;
+        dummy.z += Math.cos(yaw) * sp * dt;
+        dummy.fig.group.position.set(dummy.x, 0, dummy.z);
+        dummy.fig.group.rotation.y = yaw;
+        this.trail.emit(dummy.x, dummy.z, yaw, dt);
+      } else {
+        this.casterRunning = false;
+        this.actorPhase = 'hold';
+        this.faceToward(dummy, this.px, this.pz);
+      }
+    }
+
+    if (this.t > this.actorHold) this.finishPlay(`${name} · 已复位`);
+  }
+
+  private fireActorSkill(dummy: Dummy, skill: EnemySkillId, pack: ReturnType<typeof enemySkillFx>, wind: number) {
+    const victim = crowdFx('colleague-a-m');
+    const name = ENEMY_SKILL_META[skill].name;
+    if (skill === 'cut-in') {
+      figureHand(dummy.fig, this.chainHand);
+      figureHandL(dummy.fig, this.chainHandL);
+      figureNeck(this.playerFig, this.chainNeck);
+      this.chains.lockHands(
+        0,
+        this.chainHand.x,
+        this.chainHand.y,
+        this.chainHand.z,
+        this.chainHandL.x,
+        this.chainHandL.y,
+        this.chainHandL.z,
+        this.chainNeck.x,
+        this.chainNeck.y,
+        this.chainNeck.z,
+        pack.lock ?? 2,
+        pack.color,
+        pack.chainWidth ?? 0.08,
+        pack.chainSag ?? 0.42,
+        pack.chainStyle
+      );
+      this.status.pinStun(1000, this.px, this.pz, victim.stun);
+      this.playerLocked = true;
+      const trail = dashFx('none', 1).trail;
+      this.trail.setStyle({
+        ...trail,
+        color: pack.color,
+        ghost: true,
+        opacity: 0.5,
+        stretch: 2.4,
+        copies: 2,
+        interval: 0.028,
+      });
+      this.actorHold = wind + (pack.lock ?? 2) + 0.45;
+      this.onStatus?.(`${name} · 冲向玩家，锁链扣住脖子`);
+    } else if (skill === 'desk-slam') {
+      this.pulses.spawn(dummy.x, dummy.z, pack.radius, pack.color, pack.opacity, 0.4, true);
+      spawnHitFx(this.papers, this.mist, dummy.x, dummy.z, crowdFx('heavy').hit);
+      this.papers.spawn(dummy.x, 1.15, dummy.z, pack.paper ?? 10, crowdFx('heavy').hit.paper);
+      this.blastSkillProps(dummy.x, dummy.z, pack.knockImpulse ?? 420, pack.knockLift ?? 32);
+      this.status.pinSlow(1000, this.px, this.pz, victim.slow);
+      this.playerLocked = true;
+      this.actorHold = wind + pack.duration + 0.55;
+      this.onStatus?.(`${name} · 震飞周围，玩家减速`);
+    } else if (skill === 'rally') {
+      figureChest(dummy.fig, this.chainHand);
+      figureChest(this.playerFig, this.chainNeck);
+      this.skillShout.burst(
+        this.chainHand.x,
+        SHOUT_Y,
+        this.chainHand.z,
+        this.chainNeck.x,
+        SHOUT_Y,
+        this.chainNeck.z,
+        pack.color,
+        pack.opacity,
+        pack.waves ?? 3,
+        pack.waveGap ?? 0.14
+      );
+      this.status.pinSlow(1000, this.px, this.pz, victim.slow);
+      this.playerLocked = true;
+      this.actorHold = wind + pack.duration + 0.45;
+      this.onStatus?.(`${name} · 站住喊人，玩家减速`);
+    }
+  }
+
+  private stepActorPassive() {
+    const dummy = this.casterDummy() ?? this.dummies[0];
     if (!this.actorFired && this.t >= 0.08) {
       this.actorFired = true;
       if (this.actorId === 'player') {
         this.onStatus?.('玩家光环');
-      } else {
-        const dummy = this.dummies.find((d) => BATTLE_SLOT_IDS[d.slot] === this.actorId) ?? this.dummies[0];
-        if (dummy) {
-          const look = crowdFx(this.actorId);
-          const key = 100 + this.dummies.indexOf(dummy);
-          this.heads.spawn(dummy.x, dummy.z, look.overtime);
-          this.status.pinStun(key, dummy.x, dummy.z, look.stun);
-          this.status.pinSlow(key, dummy.x, dummy.z, look.slow);
-          spawnHitFx(this.papers, this.mist, dummy.x, dummy.z, look.hit);
-        }
+      } else if (dummy) {
+        const look = crowdFx(this.actorId);
+        const key = 100 + this.dummies.indexOf(dummy);
+        this.heads.spawn(dummy.x, dummy.z, overtimePreviewMin(this.actorId as CrowdActorId), look.overtime);
+        this.status.pinStun(key, dummy.x, dummy.z, look.stun);
+        this.status.pinSlow(key, dummy.x, dummy.z, look.slow);
+        spawnHitFx(this.papers, this.mist, dummy.x, dummy.z, look.hit);
       }
     }
-    if (this.t > HOLD_AFTER_DASH) this.finishPlay('角色被动 · 已复位');
+    if (this.t > this.actorHold) this.finishPlay('角色被动 · 已复位');
   }
 
   private stepDash(dt: number) {
@@ -462,11 +744,24 @@ export class FxPreview {
 
   private finishPlay(msg: string) {
     this.play = null;
+    this.casterRunning = false;
+    this.extrasRunning = false;
+    this.playerLocked = false;
+    this.clearGlow();
     this.clearRags();
-    this.resetDummies();
-    this.resetPose();
     this.clearActors();
     this.rebuildFx();
+    if (this.actorEdit && this.actorSkill && this.actorId !== 'player') {
+      this.layoutSkillStage();
+      this.skillStaged = true;
+      this.stagedActor = this.actorId;
+      this.stagedSkill = this.actorSkill;
+    } else {
+      this.restoreCrowdLayout();
+      this.skillStaged = false;
+      this.stagedActor = null;
+      this.stagedSkill = null;
+    }
     this.onStatus?.(msg);
   }
 
@@ -580,6 +875,8 @@ export class FxPreview {
       this.dummies.push({
         fig,
         slot: spot.slot,
+        restX: spot.x,
+        restZ: spot.z,
         x: spot.x,
         z: spot.z,
         hit: false,
@@ -594,10 +891,125 @@ export class FxPreview {
     this.clearRags();
     for (const d of this.dummies) {
       d.hit = false;
+      d.x = d.restX;
+      d.z = d.restZ;
       d.fig.group.visible = true;
       d.fig.group.rotation.set(0, 0, 0);
+      d.fig.group.scale.setScalar(d.heavy ? 1.38 : 1);
       d.fig.group.position.set(d.x, 0, d.z);
     }
+  }
+
+  private casterDummy() {
+    return this.dummies.find((d) => BATTLE_SLOT_IDS[d.slot] === this.actorId);
+  }
+
+  private faceToward(d: Dummy, x: number, z: number) {
+    d.fig.group.rotation.y = Math.atan2(x - d.x, z - d.z);
+  }
+
+  private restoreCrowdLayout() {
+    this.clearSkillProps();
+    this.resetDummies();
+    this.resetPose();
+    this.orbit.target.set(0, 0.55, 0.15);
+  }
+
+  private layoutSkillStage() {
+    const skill = this.actorSkill;
+    const pack = skill ? enemySkillFx(skill) : null;
+    this.px = 0;
+    this.pz = 1.45;
+    this.playerFig.group.position.set(0, 0, this.pz);
+    this.playerFig.group.rotation.y = Math.PI;
+
+    const dist =
+      skill === 'cut-in'
+        ? Math.min(4.4, Math.max(2.8, (pack?.radius ?? 8) * 0.42))
+        : skill === 'rally'
+          ? Math.min(3.2, Math.max(2.0, (pack?.radius ?? 5) * 0.45))
+          : Math.min(2.45, Math.max(1.65, (pack?.radius ?? 2.4) * 0.78));
+    const cz = this.pz - dist;
+    const caster = this.casterDummy();
+    for (const d of this.dummies) {
+      d.hit = false;
+      d.fig.group.scale.setScalar(d.heavy ? 1.38 : 1);
+      const isCaster = d === caster;
+      if (isCaster) {
+        d.x = 0;
+        d.z = cz;
+        d.fig.group.visible = true;
+        d.fig.group.position.set(0, 0, cz);
+        this.faceToward(d, this.px, this.pz);
+      } else {
+        d.x = d.restX;
+        d.z = d.restZ;
+        d.fig.group.visible = false;
+        d.fig.group.position.set(d.restX, 0, d.restZ);
+      }
+    }
+    this.clearSkillProps();
+    if (skill === 'desk-slam') this.placeSlamProps(0, cz, pack?.radius ?? 2.4);
+    this.orbit.target.set(0, 0.65, (this.pz + cz) * 0.5);
+  }
+
+  private placeSlamProps(cx: number, cz: number, radius: number) {
+    const r = Math.min(1.15, Math.max(0.7, radius * 0.48));
+    const spots = [
+      { x: cx - r, z: cz + 0.12 },
+      { x: cx + r, z: cz - 0.18 },
+      { x: cx + 0.28, z: cz + r * 0.72 },
+      { x: cx - 0.22, z: cz - r * 0.7 },
+    ];
+    for (const s of spots) {
+      const mesh = makeChair();
+      mesh.position.set(s.x, 0, s.z);
+      this.scene.add(mesh);
+      this.skillProps.push({ mesh, x: s.x, y: 0, z: s.z, vx: 0, vy: 0, vz: 0, flying: false });
+    }
+  }
+
+  private blastSkillProps(cx: number, cz: number, impulse: number, lift: number) {
+    for (const p of this.skillProps) {
+      const dx = p.x - cx;
+      const dz = p.z - cz;
+      const len = Math.hypot(dx, dz) || 0.2;
+      const k = (impulse / 420) * 4.4;
+      p.vx = (dx / len) * k;
+      p.vz = (dz / len) * k;
+      p.vy = (lift / 32) * 3.8;
+      p.flying = true;
+    }
+  }
+
+  private stepSkillProps(dt: number) {
+    for (const p of this.skillProps) {
+      if (!p.flying) continue;
+      p.vy -= 18 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.z += p.vz * dt;
+      p.vx *= Math.max(0, 1 - 1.15 * dt);
+      p.vz *= Math.max(0, 1 - 1.15 * dt);
+      if (p.y < 0) {
+        p.y = 0;
+        p.vy *= -0.22;
+        p.vx *= 0.55;
+        p.vz *= 0.55;
+        if (Math.abs(p.vy) < 0.35) {
+          p.vy = 0;
+          p.flying = Math.hypot(p.vx, p.vz) > 0.12;
+        }
+      }
+      p.mesh.position.set(p.x, p.y, p.z);
+      p.mesh.rotation.x += p.vz * dt * 0.7;
+      p.mesh.rotation.z -= p.vx * dt * 0.7;
+    }
+  }
+
+  private clearSkillProps() {
+    for (const p of this.skillProps) this.scene.remove(p.mesh);
+    this.skillProps.length = 0;
   }
 
   private resetPose() {
@@ -607,8 +1019,16 @@ export class FxPreview {
     this.playerFig.group.rotation.y = Math.PI;
   }
 
+  private clearGlow() {
+    if (!this.glowFig) return;
+    setFigureGlow(this.glowFig, false);
+    this.glowFig = null;
+  }
+
   private clearActors() {
     this.status.clearAll();
+    this.channel.clearAll();
+    this.clearSkillProps();
     if (this.decoy) {
       this.scene.remove(this.decoy);
       this.decoy = null;
@@ -622,6 +1042,29 @@ export class FxPreview {
       this.crate = null;
     }
   }
+}
+
+function makeChair() {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ color: 0x8a6a42 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.07, 0.4), wood);
+  seat.position.y = 0.42;
+  g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.06), wood);
+  back.position.set(0, 0.66, -0.17);
+  g.add(back);
+  const legGeo = new THREE.BoxGeometry(0.05, 0.4, 0.05);
+  for (const [x, z] of [
+    [-0.16, -0.14],
+    [0.16, -0.14],
+    [-0.16, 0.14],
+    [0.16, 0.14],
+  ] as const) {
+    const leg = new THREE.Mesh(legGeo, wood);
+    leg.position.set(x, 0.2, z);
+    g.add(leg);
+  }
+  return g;
 }
 
 function makeStandee() {

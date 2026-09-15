@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { skillFx } from '../fx/catalog';
 import { Enemies, EState } from './enemies';
+import { tex } from './style';
 
 interface Patch {
   x: number;
@@ -29,51 +30,6 @@ function splatRng(seed: number) {
   };
 }
 
-/** 预烘焙不规则水渍：启动时画 4 张，运行时只换贴图/拉伸/旋转 */
-function coffeeSplatTex(seed: number): THREE.CanvasTexture {
-  const size = 128;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d')!;
-  const rnd = splatRng(seed * 7919 + 17);
-  ctx.clearRect(0, 0, size, size);
-  ctx.globalCompositeOperation = 'lighter';
-  const blobs = 5 + ((rnd() * 3) | 0);
-  for (let i = 0; i < blobs; i++) {
-    const ox = (rnd() - 0.5) * size * 0.38;
-    const oy = (rnd() - 0.5) * size * 0.34;
-    const rad = size * (0.16 + rnd() * 0.28);
-    const g = ctx.createRadialGradient(size * 0.5 + ox, size * 0.5 + oy, 0, size * 0.5 + ox, size * 0.5 + oy, rad);
-    const core = 0.55 + rnd() * 0.4;
-    g.addColorStop(0, `rgba(255,255,255,${core})`);
-    g.addColorStop(0.42, `rgba(255,255,255,${core * 0.55})`);
-    g.addColorStop(0.78, 'rgba(255,255,255,0.12)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, size, size);
-  }
-  const drops = 6 + ((rnd() * 5) | 0);
-  for (let i = 0; i < drops; i++) {
-    const ang = rnd() * Math.PI * 2;
-    const dist = size * (0.2 + rnd() * 0.32);
-    const x = size * 0.5 + Math.cos(ang) * dist;
-    const y = size * 0.5 + Math.sin(ang) * dist;
-    const rad = size * (0.035 + rnd() * 0.07);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, 'rgba(255,255,255,0.7)');
-    g.addColorStop(0.55, 'rgba(255,255,255,0.28)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, rad, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.needsUpdate = true;
-  tex.colorSpace = THREE.NoColorSpace;
-  return tex;
-}
-
 /** 咖啡渍地形：追击中的同事踩到会滑倒（重量级免疫） */
 export class Slicks {
   private patches: Patch[] = [];
@@ -84,7 +40,7 @@ export class Slicks {
   constructor(private scene: THREE.Scene) {
     this.geo = new THREE.PlaneGeometry(2, 2);
     this.geo.rotateX(-Math.PI / 2);
-    this.maps = Array.from({ length: SPLAT_VARIANTS }, (_, i) => coffeeSplatTex(i + 1));
+    this.maps = Array.from({ length: SPLAT_VARIANTS }, (_, i) => tex.stain(i));
     for (let i = 0; i < MAX_PATCHES; i++) {
       const mat = new THREE.MeshBasicMaterial({
         map: this.maps[i % SPLAT_VARIANTS],

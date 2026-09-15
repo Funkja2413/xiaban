@@ -4,11 +4,14 @@ import { FlowField } from '../sim/flowfield';
 import { Input } from '../core/input';
 import { Hud } from '../core/hud';
 import { Level } from './level';
-import { levelById, loadLevelCatalog, type WeekdayId } from '../levels';
+import { levelById, loadLevelCatalog, pointInElevatorPad, type WeekdayId } from '../levels';
 import { addLightsToScene, applyAtmosphere, createLights, type SceneLights } from './atmosphere';
 import type { Atmosphere } from '../levels';
 import { Player } from './player';
-import { loadHumanoidKit } from './humanoid';
+import { loadHumanoidKit, type HumanoidKit } from './humanoid';
+import { AvatarStudio } from './avatarStudio';
+import { hideAvatarTune } from './avatarTune';
+import { layoutAvatarNames } from '../shell';
 import { Enemies, EState, EType } from './enemies';
 import { RagdollFactory } from './ragdoll';
 import { Chairs } from './chairs';
@@ -16,10 +19,16 @@ import { Bullets } from './bullets';
 import { Cards } from './cards';
 import { Skills } from './skills';
 import { Slicks } from './slicks';
-import { DashTrail, HeadMark, ImpactMist, PaperBurst, SlowPulse, StatusMarks, spawnHitFx } from './look';
+import { ChannelMarks, DashTrail, OvertimePop, ImpactMist, PaperBurst, SlowPulse, StatusMarks, spawnHitFx } from './look';
+import { SkillChains, SkillShout, SHOUT_Y } from './skillVfx';
 import { getStageSize, onStageResize } from '../core/stage';
-import { setPlayDayHint } from '../catalog';
-import { commonFx, crowdFx, dashFx, loadFxCatalog, watchFxCatalog, type CrowdActorId, type DashKey } from '../fx/catalog';
+import { lookForSlot, loadCatalog, setPlayDayHint } from '../catalog';
+import { loadPlayerSlot } from '../progress';
+import type { PlayerSlotId } from '../roster';
+import { commonFx, crowdFx, dashFx, enemySkillFx, loadFxCatalog, overtimeMinutesOf, watchFxCatalog, type CrowdActorId, type DashKey } from '../fx/catalog';
+import { dayPlayerLoadout } from '../fx/days';
+import { Hazards } from './hazards';
+import { bgm, sfx } from '../audio';
 
 const FIXED_DT = 1 / 60;
 const ENEMY_CAP = 80;
@@ -27,8 +36,10 @@ const FIRE_INTERVAL = 1 / 9;
 const FLOW_REBUILD = 0.15;
 const INTERCEPT_REBUILD = 0.3;
 const ELEVATOR_WAIT = 20;
+/** 开局从电梯滑到出生点的准备秒数 */
+const READY_DUR = 3;
 
-type Phase = 'menu' | 'playing' | 'won' | 'lost';
+type Phase = 'menu' | 'ready' | 'playing' | 'won' | 'lost';
 
 export class Game {
   private renderer!: THREE.WebGPURenderer;
@@ -49,6 +60,9 @@ export class Game {
   private lights!: SceneLights;
   private look!: Atmosphere;
   private player!: Player;
+  private kit!: HumanoidKit;
+  private studio: AvatarStudio | null = null;
+  private picking = false;
   private enemies!: Enemies;
   private chairs!: Chairs;
   private bullets!: Bullets;
@@ -60,13 +74,22 @@ export class Game {
   private papers!: PaperBurst;
   private dashTrail!: DashTrail;
   private mist!: ImpactMist;
-  private heads!: HeadMark;
+  private heads!: OvertimePop;
   private pulses!: SlowPulse;
+  private chains!: SkillChains;
+  private skillShout!: SkillShout;
+  private chainHand = new THREE.Vector3();
+  private chainHandL = new THREE.Vector3();
+  private chainNeck = new THREE.Vector3();
+  private playerChainGlow = false;
   private status!: StatusMarks;
+  private channel!: ChannelMarks;
+  private hazards!: Hazards;
   private objFx = new Set<number>();
 
   private phase: Phase = 'playing';
   private dayId: WeekdayId = 'monday';
+  private playerSlotId: PlayerSlotId = 'player';
   /** 胜负交给产品壳，不再直接弹旧 overlay */
   onSettled: ((kind: 'won' | 'lost', info: { day: WeekdayId; title: string; sub: string }) => void) | null = null;
   private elapsed = 0;
@@ -75,6 +98,8 @@ export class Game {
   private elevatorReady = false;
   private elevatorLeft = false;
   private elevatorOpening = false;
+  private elevTickSec = -1;
+  private clockWarned = false;
 
   private lastTime = 0;
   private acc = 0;
@@ -83,6 +108,7 @@ export class Game {
   private spawnTimer = 0;
   private stepMs = 0;
   private aiming = false;
+  private wasAiming = false;
   private heavyToastCd = 0;
 
   private guideArrow!: THREE.Mesh;
@@ -100,13 +126,27 @@ export class Game {
   private glideTo = new THREE.Vector3();
   private glideT = 0;
   private glideDur = 5;
+  private readyCamFrom = new THREE.Vector3();
+  private readyCamTo = new THREE.Vector3();
+  private readyLeft = 0;
+  private readySecShown = -1;
+  private readyGoFlash = 0;
 
   get day() {
     return this.dayId;
   }
 
-  async start(container: HTMLElement, day: WeekdayId = 'monday', opts: { menu?: boolean } = {}) {
+  get playerSlot() {
+    return this.playerSlotId;
+  }
+
+  async start(
+    container: HTMLElement,
+    day: WeekdayId = 'monday',
+    opts: { menu?: boolean; playerSlot?: PlayerSlotId } = {}
+  ) {
     this.dayId = day;
+    this.playerSlotId = opts.playerSlot ?? loadPlayerSlot();
     setPlayDayHint(day);
     await loadFxCatalog();
     watchFxCatalog();
@@ -136,7 +176,8 @@ export class Game {
     addLightsToScene(this.scene, this.lights);
     applyAtmosphere(this.scene, this.renderer, this.lights, def.atmosphere, def.pointLights);
 
-    const humans = await loadHumanoidKit();
+    const humans = await loadHumanoidKit(this.playerSlotId);
+    this.kit = humans;
     const { map, playerStart, elevatorPoint } = this.level;
 
     this.flow = new FlowField(map.minX, map.minZ, map.maxX, map.maxZ, 0.5);
@@ -160,34 +201,95 @@ export class Game {
     this.menuFlow = new FlowField(map.minX, map.minZ, map.maxX, map.maxZ, 0.5);
     this.level.applyToFlow(this.menuFlow);
 
-    this.player = new Player(this.scene, this.world, playerStart.x, playerStart.z, humans);
     const ragFactory = new RagdollFactory(this.scene, this.world);
+    this.player = new Player(this.scene, this.world, playerStart.x, playerStart.z, humans, ragFactory);
     this.enemies = new Enemies(this.scene, this.world, this.flow, ragFactory, ENEMY_CAP, humans);
+    const looks = await loadCatalog();
+    this.enemies.skillOf = (id) => lookForSlot(looks, id)?.enemySkill ?? null;
+    this.enemies.resetSkills();
     this.enemies.interceptFlow = this.interceptFlow;
     this.enemies.interceptAtX = firstCut.x;
     this.enemies.interceptAtZ = firstCut.z;
     this.enemies.onTaskDelivered = (type, x, z, gender) => {
-      const mins = type === EType.C ? 45 : type === EType.F ? 30 : [15, 15, 30][(Math.random() * 3) | 0];
+      const id = crowdActorOf(type, gender);
+      const mins = overtimeMinutesOf(id);
       this.hud.addOvertime(mins);
       this.cards.knockOneOut();
-      this.heads.spawn(x, z, crowdFx(crowdActorOf(type, gender)).overtime);
+      this.heads.spawn(x, z, mins, crowdFx(id).overtime);
+      sfx.play('stamp');
+      sfx.play('outlook');
       if (this.hud.overtimeMin >= 360) this.lose();
+      else if (!this.clockWarned && this.hud.overtimeMin >= 240) {
+        this.clockWarned = true;
+        sfx.play('clock_warn');
+      }
     };
     this.chairs = new Chairs(this.scene, this.world, this.level.chairSpawns, this.level.pushables);
     this.bullets = new Bullets(this.scene, this.level.bulletBlockers, this.level.map);
 
     // 构筑系统：击倒掉工牌 → 攒满抽卡 → 不暂停三选一
     this.cards = new Cards();
+    const loadout = dayPlayerLoadout(day);
+    this.cards.setDayKit(loadout.dashes, loadout.skills);
     this.cards.onApplied = (label) => this.hud.toast(`${label} 已装备`);
     this.player.cards = this.cards;
     this.enemies.onKnockdown = (type, x, z, gender) => {
       this.cards.addBadges(type === EType.C ? 3 : 1);
       spawnHitFx(this.papers, this.mist, x, z, crowdFx(crowdActorOf(type, gender)).hit);
+      sfx.play('knockdown');
     };
     this.slicks = new Slicks(this.scene);
     this.pulses = new SlowPulse(this.scene);
+    this.chains = new SkillChains(this.scene);
+    this.skillShout = new SkillShout(this.scene);
     this.player.onSlowPulse = (x, z, r, color, opacity, life) => {
       this.pulses.spawn(x, z, r, color, opacity, life);
+    };
+    this.hazards = new Hazards();
+    this.hazards.load(def, this.level.group);
+    this.hazards.onPulse = (x, z, r, color, opacity, life, outline) => {
+      this.pulses.spawn(x, z, r, color, opacity, life, outline);
+    };
+    this.enemies.onSkill = (id, phase, x, z, i) => {
+      const pack = enemySkillFx(id);
+      if (phase === 'windup') {
+        if (id === 'cut-in' || id === 'rally') return;
+        this.pulses.spawn(x, z, pack.radius * 0.32, pack.color, pack.opacity, pack.windup, true);
+        return;
+      }
+      if (id === 'cut-in') {
+        sfx.play('intercept');
+        this.enemies.handWorld(i, this.chainHand);
+        this.enemies.handWorld(i, this.chainHandL, true);
+        this.player.neckWorld(this.chainNeck);
+        this.chains.lockHands(
+          i,
+          this.chainHand.x,
+          this.chainHand.y,
+          this.chainHand.z,
+          this.chainHandL.x,
+          this.chainHandL.y,
+          this.chainHandL.z,
+          this.chainNeck.x,
+          this.chainNeck.y,
+          this.chainNeck.z,
+          pack.lock ?? 2,
+          pack.color,
+          pack.chainWidth ?? 0.08,
+          pack.chainSag ?? 0.42,
+          pack.chainStyle
+        );
+      } else if (id === 'desk-slam') {
+        sfx.play('desk_slam');
+        this.pulses.spawn(x, z, pack.radius, pack.color, pack.opacity, 0.4, true);
+        this.chairs.blast(x, z, pack.radius, pack.knockImpulse ?? 420, pack.knockLift ?? 32);
+        spawnHitFx(this.papers, this.mist, x, z, crowdFx('heavy').hit);
+        this.papers.spawn(x, 1.15, z, pack.paper ?? 10, crowdFx('heavy').hit.paper);
+      } else if (id === 'rally') {
+        sfx.play('rally');
+        const p = this.player.pos;
+        this.skillShout.burst(x, SHOUT_Y, z, p.x, SHOUT_Y, p.z, pack.color, pack.opacity, pack.waves ?? 3, pack.waveGap ?? 0.14);
+      }
     };
     this.skills = new Skills(this.scene, (x, z, r, life, look) => {
       this.slicks.spawn(x, z, r, life, look);
@@ -195,20 +297,10 @@ export class Game {
     this.papers = new PaperBurst(this.scene);
     this.dashTrail = new DashTrail(this.scene);
     this.mist = new ImpactMist(this.scene);
-    this.heads = new HeadMark(this.scene);
+    this.heads = new OvertimePop(this.scene);
     this.status = new StatusMarks(this.scene);
+    this.channel = new ChannelMarks(this.scene);
 
-    // 初始阵容：A 离玩家稍远，C 封必经窄口，F 蹲电梯路上（点位由布局自动算）
-    const start = this.level.playerStart;
-    for (const s of this.level.enemySpawns) {
-      const dx = s.x - start.x;
-      const dz = s.z - start.z;
-      if (dx * dx + dz * dz > 100) this.enemies.spawn(s.x, s.z, EType.A);
-    }
-    for (const s of this.level.heavyAnchors) this.enemies.spawn(s.x, s.z, EType.C);
-    for (const s of this.level.interceptorSpawns) this.enemies.spawn(s.x, s.z, EType.F);
-
-    // 导航箭头：沿电梯流场指路
     this.guideArrow = new THREE.Mesh(
       new THREE.ConeGeometry(0.22, 0.66, 8),
       new THREE.MeshBasicMaterial({ color: 0x7ef0a0, transparent: true, opacity: 0.9 })
@@ -221,7 +313,9 @@ export class Game {
     onStageResize(({ w, h }) => {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
+      this.studio?.setAspect(w, h);
       this.renderer.setSize(w, h);
+      if (this.picking) this.syncAvatarNameLayout();
     });
 
     this.renderer.setAnimationLoop((t) => this.tick(t));
@@ -231,45 +325,172 @@ export class Game {
   }
 
   enterMenu() {
+    this.picking = false;
+    hideAvatarTune();
     this.phase = 'menu';
+    sfx.setChannel(false);
+    sfx.setDecoy(false);
     this.acc = 0;
     this.menuWp = 0;
     this.menuStuck = 0;
-    this.enemies.restoreAnchors();
+    this.player.resetRun();
+    this.hud.resetRun();
+    this.cards.resetRun();
+    this.skills.reset();
+    this.slicks.clear();
+    this.hazards.rearm();
+    this.enemies.clearAll();
+    this.spawnOpeningCrowd();
+    this.level.elevator.setState('idle');
+    this.level.elevator.setFloor(1);
     this.player.group.visible = false;
     this.player.menuGhost = true;
     this.player.aimArrow.visible = false;
     this.guideArrow.visible = false;
     const pts = this.chasePath();
     const s = pts[0] ?? this.level.playerStart;
-    this.player.body.setTranslation({ x: s.x, y: this.player.pos.y, z: s.z }, true);
+    this.player.body.setTranslation({ x: s.x, y: 0.66, z: s.z }, true);
     this.player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.menuFlow.rebuild(s.x, s.z);
     this.camera.fov = 50;
     this.camera.updateProjectionMatrix();
     this.pickGlideTarget(true);
     this.pickGlideTarget(false);
+    bgm.play('home');
+  }
+
+  enterAvatarPick(selected: PlayerSlotId | null = null) {
+    this.picking = true;
+    const size = getStageSize();
+    this.studio = new AvatarStudio(this.kit, size.w / size.h);
+    this.studio.setAspect(size.w, size.h);
+    hideAvatarTune();
+    this.studio.setSelected(selected);
+    this.syncAvatarNameLayout();
+  }
+
+  selectAvatar(id: PlayerSlotId | null) {
+    this.studio?.setSelected(id);
+  }
+
+  exitAvatarPick() {
+    this.picking = false;
+    hideAvatarTune();
+  }
+
+  private syncAvatarNameLayout() {
+    if (!this.studio) return;
+    layoutAvatarNames({
+      player: this.studio.footNdc('player'),
+      'player-f': this.studio.footNdc('player-f'),
+    });
   }
 
   beginPlay() {
-    this.phase = 'playing';
+    this.picking = false;
+    hideAvatarTune();
+    this.phase = 'ready';
     this.elapsed = 0;
-    this.enemies.restoreAnchors();
+    this.acc = 0;
+    this.spawnTimer = 0;
+    this.elevatorCalled = false;
+    this.elevatorTimer = 0;
+    this.elevatorReady = false;
+    this.elevatorLeft = false;
+    this.elevatorOpening = false;
+    this.elevTickSec = -1;
+    this.clockWarned = false;
+    this.wasAiming = false;
+    this.readyLeft = READY_DUR;
+    this.readySecShown = -1;
+    this.readyGoFlash = 0;
+    sfx.setChannel(false);
+    sfx.setDecoy(false);
+    this.hud.resetRun();
+    this.cards.resetRun();
+    this.skills.reset();
+    this.slicks.clear();
+    this.hazards.rearm();
+    this.player.resetRun();
+    this.enemies.clearAll();
+    this.spawnOpeningCrowd();
+    this.level.elevator.setState('idle');
+    this.level.elevator.setFloor(1);
     this.player.menuGhost = false;
     this.player.group.visible = true;
+    this.guideArrow.visible = false;
     this.camera.fov = 55;
     this.camera.updateProjectionMatrix();
     const s = this.level.playerStart;
-    this.player.body.setTranslation({ x: s.x, y: this.player.pos.y, z: s.z }, true);
+    this.player.body.setTranslation({ x: s.x, y: 0.66, z: s.z }, true);
     this.player.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.beginReadyCamera();
+    this.syncReadyCount();
+    bgm.play(this.dayId);
+  }
+
+  /** 镜头先停在终点电梯，3 秒内滑翔回出生点，方便观察路线 */
+  private beginReadyCamera() {
+    const e = this.level.elevatorPoint;
+    const s = this.level.playerStart;
+    this.glideFrom.set(e.x * 0.7, 0, e.z - 3);
+    this.glideTo.set(s.x * 0.7, 0, s.z - 3);
+    this.readyCamFrom.set(e.x * 0.7, 17.5, e.z + 6.5);
+    this.readyCamTo.set(s.x * 0.7, 17.5, s.z + 6.5);
+    this.glideT = 0;
+    this.glideDur = READY_DUR;
+    this.camTarget.copy(this.glideFrom);
+    this.camera.position.copy(this.readyCamFrom);
+    this.camera.lookAt(this.camTarget);
+  }
+
+  private syncReadyCount() {
+    if (this.phase !== 'ready') {
+      if (this.readyGoFlash > 0) this.hud.setReadyCount('go');
+      else this.hud.setReadyCount(null);
+      return;
+    }
+    const sec = Math.max(1, Math.ceil(this.readyLeft));
+    this.hud.setReadyCount(sec);
+    if (sec !== this.readySecShown) {
+      this.readySecShown = sec;
+      sfx.play('ready_tick');
+    }
+  }
+
+  private finishReady() {
+    this.phase = 'playing';
+    this.readyLeft = 0;
+    this.readyGoFlash = 0.85;
+    this.hud.setReadyCount('go');
+    this.guideArrow.visible = true;
     this.snapGameplayCamera();
+    sfx.play('ready_go');
+  }
+
+  /** 初始阵容：A 离玩家稍远，C 封必经窄口，F 蹲电梯路上 */
+  private spawnOpeningCrowd() {
+    const start = this.level.playerStart;
+    for (const s of this.level.enemySpawns) {
+      const dx = s.x - start.x;
+      const dz = s.z - start.z;
+      if (dx * dx + dz * dz > 64) this.enemies.spawn(s.x, s.z, EType.A);
+    }
+    for (const s of this.level.heavyAnchors) this.enemies.spawn(s.x, s.z, EType.C);
+    for (const s of this.level.interceptorSpawns) this.enemies.spawn(s.x, s.z, EType.F);
   }
 
   private tick(timeMs: number) {
     const dt = Math.min((timeMs - this.lastTime) / 1000, 0.05);
     this.lastTime = timeMs;
 
-    if (this.phase === 'playing' || this.phase === 'menu') {
+    if (this.picking && this.studio) {
+      this.studio.update(dt);
+      this.renderer.render(this.studio.scene, this.studio.camera);
+      return;
+    }
+
+    if (this.phase === 'playing' || this.phase === 'menu' || this.phase === 'ready') {
       this.acc += dt;
       let sub = 0;
       while (this.acc >= FIXED_DT && sub < 4) {
@@ -278,6 +499,11 @@ export class Game {
         sub++;
       }
       if (sub === 4) this.acc = 0;
+    }
+
+    if (this.readyGoFlash > 0) {
+      this.readyGoFlash -= dt;
+      if (this.readyGoFlash <= 0) this.hud.setReadyCount(null);
     }
 
     const time = timeMs / 1000;
@@ -298,11 +524,51 @@ export class Game {
     } else {
       this.objFx.clear();
     }
+    const cutTrail = dashFx('none', 1).trail;
+    const cutPack = enemySkillFx('cut-in');
+    for (let i = 0; i < this.enemies.cap; i++) {
+      if (this.chains.casterOf(i)) {
+        if (this.enemies.state[i] !== EState.Chase) this.chains.breakCaster(i);
+        else {
+          this.enemies.handWorld(i, this.chainHand);
+          this.enemies.handWorld(i, this.chainHandL, true);
+          this.player.neckWorld(this.chainNeck);
+          this.chains.followHands(
+            i,
+            this.chainHand.x,
+            this.chainHand.y,
+            this.chainHand.z,
+            this.chainHandL.x,
+            this.chainHandL.y,
+            this.chainHandL.z,
+            this.chainNeck.x,
+            this.chainNeck.y,
+            this.chainNeck.z,
+            cutPack.chainStyle
+          );
+        }
+      }
+      if (this.enemies.bursting(i)) {
+        this.dashTrail.setStyle({ ...cutTrail, color: cutPack.color, ghost: true, opacity: 0.5, stretch: 2.4, copies: 2, interval: 0.028 });
+        this.dashTrail.emit(this.enemies.posX[i], this.enemies.posZ[i], this.enemies.yawOf(i), dt);
+      }
+    }
     this.dashTrail.update(dt);
     this.papers.update(dt);
     this.mist.update(dt);
     this.heads.update(dt);
+    this.skillShout.aim(this.player.pos.x, SHOUT_Y, this.player.pos.z);
+    this.skillShout.update(dt);
     this.pulses.update(dt);
+    this.chains.update(dt);
+    const chain = this.chains.live();
+    if (chain) {
+      this.player.setLockGlow(true, chain.color, enemySkillFx('cut-in').opacity * chain.fade);
+      this.playerChainGlow = true;
+    } else if (this.playerChainGlow) {
+      this.player.setLockGlow(false);
+      this.playerChainGlow = false;
+    }
     for (let i = 0; i < this.enemies.cap; i++) {
       const live = this.enemies.state[i] !== EState.Inactive;
       const fx = crowdFx(live ? this.enemies.actorId(i) : 'colleague-a-m');
@@ -315,8 +581,24 @@ export class Game {
         fx.stun,
         fx.slow
       );
+      this.channel.syncEnemy(
+        i,
+        this.enemies.posX[i],
+        this.enemies.posZ[i],
+        live && this.enemies.isChanneling(i),
+        this.enemies.bodyScale(i),
+        fx.channel
+      );
+    }
+    if (this.phase === 'menu') {
+      this.status.clear(1000);
+    } else {
+      const pfx = crowdFx('colleague-a-m');
+      const pp = this.player.pos;
+      this.status.syncEnemy(1000, pp.x, pp.z, this.player.stunT > 0 || this.player.ragdolled, this.player.slowed, pfx.stun, pfx.slow);
     }
     this.status.update(dt);
+    this.channel.update(dt);
     this.updateGuideArrow(time);
     this.level.elevator.update(dt, time);
     this.updateCamera(dt, time);
@@ -411,6 +693,10 @@ export class Game {
       this.fixedUpdateMenu(h);
       return;
     }
+    if (this.phase === 'ready') {
+      this.fixedUpdateReady(h);
+      return;
+    }
     this.elapsed += h;
     this.input.pollKeyboard();
     const p = this.player.pos;
@@ -444,9 +730,17 @@ export class Game {
       }
     }
 
-    if (this.input.consumeDash()) this.player.requestDash(mvX, mvZ);
-    if (this.input.consumeSkill()) this.castSkill();
+    if (this.player.ragdolled) {
+      this.input.consumeDash();
+      this.input.consumeSkill();
+    } else {
+      if (this.input.consumeDash() && !this.player.requestDash(mvX, mvZ)) sfx.play('ui_deny');
+      if (this.input.consumeSkill()) this.castSkill();
+    }
+    if (this.aiming && !this.wasAiming) sfx.play('aim');
+    this.wasAiming = this.aiming;
     this.player.update(h, mvX, mvZ, this.aiming, this.enemies);
+    this.hazards.update(h, this.player, this.enemies);
     this.cards.update(h);
 
     this.heavyToastCd = Math.max(0, this.heavyToastCd - h);
@@ -457,8 +751,9 @@ export class Game {
 
     // 射击
     this.player.fireCd -= h;
-    if (this.aiming && this.player.fireCd <= 0) {
+    if (this.aiming && !this.player.ragdolled && this.player.fireCd <= 0) {
       this.player.fireCd = FIRE_INTERVAL;
+      sfx.play('staple');
       this.bullets.spawn(
         p.x + this.player.aimDirX * 0.55,
         p.z + this.player.aimDirZ * 0.55,
@@ -471,11 +766,19 @@ export class Game {
     const dp = this.skills.decoyPos;
     const tx = dp ? dp.x : p.x;
     const tz = dp ? dp.z : p.z;
+    const pv = this.player.vel;
     this.enemies.update(h, tx, tz, {
-      suppressChannel: !!dp || this.player.phasedT > 0,
+      suppressChannel: !!dp || this.player.phasedT > 0 || this.player.ragdolled,
       bruteChain: this.cards.line === 'brute',
+      skillTarget: {
+        applySlow: (d, f) => this.player.applySlow(d, f),
+        stun: (d) => this.player.stun(d),
+        vx: pv.x,
+        vz: pv.z,
+      },
     });
     this.skills.update(h, p.x, p.z, this.enemies);
+    sfx.setChannel(this.phase === 'playing' && this.enemies.channelingCount > 0);
     this.slicks.update(h, this.enemies);
     this.chairs.checkHits(this.enemies);
     this.bullets.update(h, this.enemies);
@@ -502,25 +805,43 @@ export class Game {
     this.stepMs = this.stepMs * 0.9 + (performance.now() - t0) * 0.1;
   }
 
+  /** 准备阶段：冻结操作，只走镜头与倒计时 */
+  private fixedUpdateReady(h: number) {
+    this.input.pollKeyboard();
+    this.input.consumeDash();
+    this.input.consumeSkill();
+    this.aiming = false;
+    this.wasAiming = false;
+    this.player.update(h, 0, 0, false, this.enemies);
+    this.readyLeft -= h;
+    this.glideT += h;
+    this.syncReadyCount();
+    if (this.readyLeft <= 0) this.finishReady();
+    const t0 = performance.now();
+    this.world.step();
+    this.stepMs = this.stepMs * 0.9 + (performance.now() - t0) * 0.1;
+  }
+
   private castSkill() {
     if (!this.cards.skill) return;
     const p = this.player.pos;
     const dx = this.aiming ? this.player.aimDirX : Math.sin(this.player.yaw);
     const dz = this.aiming ? this.player.aimDirZ : Math.cos(this.player.yaw);
-    if (this.skills.cast(this.cards.skill, this.cards.skillLv, p.x, p.z, dx, dz)) {
-      if (this.cards.skill === 'decoy') {
-        // 放替身的同时玩家虚化 2 秒，方便脱身
-        this.player.phasedT = Math.max(this.player.phasedT, 2);
-        this.hud.toast('替身上岗！');
-      } else if (this.cards.skill === 'coffee') {
-        this.hud.toast('泼了一地！');
-      }
+    if (!this.skills.cast(this.cards.skill, this.cards.skillLv, p.x, p.z, dx, dz)) {
+      sfx.play('ui_deny');
+      return;
+    }
+    if (this.cards.skill === 'decoy') {
+      // 放替身的同时玩家虚化 2 秒，方便脱身
+      this.player.phasedT = Math.max(this.player.phasedT, 2);
+      this.hud.toast('替身上岗！');
+    } else if (this.cards.skill === 'coffee') {
+      this.hud.toast('泼了一地！');
     }
   }
 
   private inElevatorZone(x: number, z: number) {
-    const zone = this.level.elevatorZone;
-    return x >= zone.minX && x <= zone.maxX && z >= zone.minZ && z <= zone.maxZ;
+    return pointInElevatorPad(x, z, this.level.def.elevator);
   }
 
   private updateElevator(h: number, px: number, pz: number) {
@@ -531,6 +852,8 @@ export class Game {
         this.elevatorLeft = false;
         this.elevatorTimer = ELEVATOR_WAIT;
         this.level.elevator.setState('called');
+        this.elevTickSec = Math.ceil(ELEVATOR_WAIT);
+        sfx.play('elev_call');
         this.hud.toast('电梯已呼叫！墙钮亮了，先离开再靠近一次');
       }
       return;
@@ -541,11 +864,17 @@ export class Game {
       this.elevatorTimer -= h;
       const floor = 1 + Math.max(0, Math.round(17 * (this.elevatorTimer / ELEVATOR_WAIT)));
       this.level.elevator.setFloor(floor);
-      this.hud.setElevatorTimer(`电梯到达还需 ${Math.ceil(this.elevatorTimer)} 秒`);
+      const sec = Math.ceil(this.elevatorTimer);
+      this.hud.setElevatorTimer(`电梯到达还需 ${sec} 秒`);
+      if (sec !== this.elevTickSec && this.elevatorTimer > 0) {
+        this.elevTickSec = sec;
+        sfx.play('elev_tick');
+      }
       if (this.elevatorTimer <= 0) {
         this.elevatorReady = true;
         this.level.elevator.setState('ready');
         this.level.elevator.setFloor(1);
+        sfx.play('elev_ding');
         this.hud.setElevatorTimer(this.elevatorLeft ? '电梯到了！再靠近一次开门' : '电梯到了！先离开门口，再靠近一次开门');
       }
       return;
@@ -559,6 +888,7 @@ export class Game {
     if (inside && this.elevatorLeft) {
       this.elevatorOpening = true;
       this.level.elevator.setState('opening');
+      sfx.play('elev_open');
       this.hud.toast('电梯门开了！');
       this.hud.setElevatorTimer(null);
       return;
@@ -573,13 +903,17 @@ export class Game {
     if (this.spawnTimer >= interval && this.enemies.activeCount < ENEMY_CAP) {
       this.spawnTimer = 0;
       const spawns = this.level.enemySpawns;
+      if (!spawns.length) return;
       for (let tries = 0; tries < 8; tries++) {
         const s = spawns[(Math.random() * spawns.length) | 0];
+        if (!s) continue;
         if (this.elevatorCalled && s.z > -6) continue;
         const dx = s.x - px;
         const dz = s.z - pz;
         if (dx * dx + dz * dz > 81) {
-          this.enemies.spawn(s.x + (Math.random() - 0.5), s.z + (Math.random() - 0.5), EType.A);
+          if (this.enemies.spawn(s.x + (Math.random() - 0.5), s.z + (Math.random() - 0.5), EType.A)) {
+            sfx.play('spawn');
+          }
           break;
         }
       }
@@ -589,6 +923,7 @@ export class Game {
   private win() {
     if (this.phase !== 'playing') return;
     this.phase = 'won';
+    sfx.playResult('won');
     this.hud.setElevatorTimer(null);
     const mm = Math.floor(this.elapsed / 60);
     const ss = Math.floor(this.elapsed % 60);
@@ -599,6 +934,7 @@ export class Game {
   private lose() {
     if (this.phase !== 'playing') return;
     this.phase = 'lost';
+    sfx.playResult('lost');
     this.hud.setElevatorTimer(null);
     this.onSettled?.('lost', {
       day: this.dayId,
@@ -637,7 +973,7 @@ export class Game {
     this.elevFlow.sample(p.x, p.z, this.flowDir);
     const dx = this.flowDir.x;
     const dz = this.flowDir.z;
-    if (this.phase === 'menu' || (dx === 0 && dz === 0) || this.elevatorCalled) {
+    if (this.phase === 'menu' || this.phase === 'ready' || (dx === 0 && dz === 0) || this.elevatorCalled) {
       this.guideArrow.visible = false;
       return;
     }
@@ -667,6 +1003,14 @@ export class Game {
       this.tmpV2.set(this.camTarget.x, 21.5, this.camTarget.z + 3.2);
       const s = 1 - Math.pow(0.02, dt);
       this.camera.position.lerp(this.tmpV2, s);
+      this.camera.lookAt(this.camTarget);
+      return;
+    }
+    if (this.phase === 'ready') {
+      const u = this.glideDur > 0 ? Math.min(1, this.glideT / this.glideDur) : 1;
+      const k = u * u * (3 - 2 * u);
+      this.camTarget.lerpVectors(this.glideFrom, this.glideTo, k);
+      this.camera.position.lerpVectors(this.readyCamFrom, this.readyCamTo, k);
       this.camera.lookAt(this.camTarget);
       return;
     }

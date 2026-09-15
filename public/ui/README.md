@@ -3,4 +3,25 @@
 - `loading-bg.png` 加载页铺满背景
 - `loading-hero.png` 加载页角色立绘
 - `logo.png` 加载页 Logo
-- `home-title.png` 主页前景标题/Logo（背景是 3D 关卡）
+- `home-title.png` 主页标题（Figma `298:22`，透明底）
+- `home-btn-start.png` 主页「开始游戏」
+- `home-btn-levels.png` 主页「关卡」
+- `home-btn-roster.png` 主页「同事名册」
+- `home-btn-settings.png` 主页「设置」
+- `result-lose.png` 失败页整屏插画（男）
+- `result-lose-f.png` 失败页整屏插画（女）
+- `result-win.png` 成功页整屏插画（男）
+- `result-win-f.png` 成功页整屏插画（女）
+- `result-lose-btn-home.png` 结算「回主页」
+- `result-lose-btn-retry.png` 失败页「再试一次」
+- `levels-title.png` 关卡页标题「今天周几啦？」
+- `levels-day-monday.png` … `levels-day-friday.png` 关卡预览卡（锁定时灰阶）
+- `roster-title.png` 同事名册标题「同事花名册」
+- `avatar-title.png` 选角页标题「请问你是？」
+- `avatar-name-player.png` 选角名牌「小牛」
+- `avatar-name-player-f.png` 选角名牌「马姐」
+- `avatar-go.png` 选角「进入」按钮
+- `settings-back.png` 设置页返回箭头（选角/名册/关卡共用）
+- `settings-title.png` 设置页标题「设置」
+- `settings-check-on.png` / `settings-check-off.png` 音乐·音效勾选
+- `settings-credits.png` 设置页底部署名条

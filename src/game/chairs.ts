@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Enemies, EState } from './enemies';
 import type { ChairStyle, FurnitureTone } from '../levels';
 import { addOfficeChair } from './look';
+import { sfx } from '../audio';
 
 export interface LoosePropBody {
   group: THREE.Group;
@@ -20,7 +21,7 @@ export class Chairs {
   constructor(
     scene: THREE.Scene,
     world: RAPIER.World,
-    spawns: { x: number; z: number; style?: ChairStyle; rotY?: number; tone?: FurnitureTone }[],
+    spawns: { x: number; z: number; style?: ChairStyle; rotY?: number; tone?: FurnitureTone; color?: string }[],
     loose: LoosePropBody[] = []
   ) {
     for (const s of spawns) {
@@ -36,7 +37,7 @@ export class Chairs {
         RAPIER.ColliderDesc.cuboid(0.28, 0.45, 0.28).setMass(14).setFriction(0.4).setRestitution(0.2),
         body
       );
-      const group = addOfficeChair(scene, yaw, s.style ?? 'task', s.tone ?? 'dark');
+      const group = addOfficeChair(scene, yaw, s.style ?? 'task', s.tone ?? 'dark', s.color);
       this.items.push({ body, group, mass: 14, hitR: 0.85 });
     }
 
@@ -98,12 +99,35 @@ export class Chairs {
     return out;
   }
 
+  /** 拍桌：圈里的椅子/绿植/垃圾桶等向外弹开 */
+  blast(x: number, z: number, radius: number, impulse: number, lift: number) {
+    const rr = Math.max(0.4, radius);
+    const rr2 = rr * rr;
+    for (const { body } of this.items) {
+      const t = body.translation();
+      const dx = t.x - x;
+      const dz = t.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > rr2 || d2 < 1e-5) continue;
+      const d = Math.sqrt(d2);
+      const fall = 1 - d / rr;
+      const nx = dx / d;
+      const nz = dz / d;
+      const p = impulse * (0.45 + fall * 0.55);
+      body.wakeUp();
+      body.applyImpulse({ x: nx * p, y: lift * fall, z: nz * p }, true);
+      body.applyTorqueImpulse({ x: (Math.random() - 0.5) * p * 0.03, y: (Math.random() - 0.5) * p * 0.04, z: (Math.random() - 0.5) * p * 0.03 }, true);
+    }
+  }
+
   syncVisuals() {
     for (const { body, group } of this.items) {
       const t = body.translation();
       const r = body.rotation();
       group.position.set(t.x, t.y, t.z);
       group.quaternion.set(r.x, r.y, r.z, r.w);
+      const v = body.linvel();
+      if (Math.hypot(v.x, v.z) > 2.2) sfx.play('chair_roll');
     }
   }
 }

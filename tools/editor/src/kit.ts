@@ -14,6 +14,8 @@ export {
   applyKitHairMaps,
   applyKitSkirtMaps,
   findKitBody,
+  isBodyDeformQuatTrack,
+  retargetBodyQuats,
   isKitHairId,
   isKitSkinId,
   isKitSkirtId,

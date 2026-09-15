@@ -116,6 +116,108 @@ export async function loadHairFile(file: File | string): Promise<THREE.Group> {
   }
 }
 
+function toPropMaterial(src: THREE.Material, hasVertexColors: boolean): THREE.Material {
+  const std = src as THREE.MeshStandardMaterial;
+  if (std.isMeshStandardMaterial) {
+    const mat = std.clone();
+    if (hasVertexColors || mat.map) mat.color.setHex(0xffffff);
+    mat.vertexColors = hasVertexColors;
+    mat.metalness = Math.min(mat.metalness, 0.35);
+    mat.side = THREE.DoubleSide;
+    if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+    return mat;
+  }
+  const map = 'map' in src ? (src as THREE.MeshPhongMaterial).map : null;
+  const color =
+    'color' in src && !map && !hasVertexColors ? (src as THREE.MeshPhongMaterial).color.getHex() : 0xffffff;
+  const mat = new THREE.MeshPhongMaterial({
+    map: map ?? undefined,
+    color,
+    vertexColors: hasVertexColors,
+    shininess: 16,
+    specular: 0x333333,
+    side: THREE.DoubleSide,
+    transparent: !!('transparent' in src && src.transparent),
+    opacity: 'opacity' in src ? (src as THREE.MeshPhongMaterial).opacity : 1,
+  });
+  if (map) map.colorSpace = THREE.SRGBColorSpace;
+  return mat;
+}
+
+function recenterBottom(group: THREE.Group) {
+  const box = new THREE.Box3();
+  group.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.geometry) return;
+    m.geometry.computeBoundingBox();
+    if (m.geometry.boundingBox && !m.geometry.boundingBox.isEmpty()) box.union(m.geometry.boundingBox);
+  });
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3());
+  group.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    m.geometry.translate(-c.x, -box.min.y, -c.z);
+    m.geometry.computeBoundingBox();
+  });
+}
+
+/** 外挂道具：保原色，可压到挂点尺寸 */
+export function flattenProp(root: THREE.Object3D, fit?: number): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'propVisual';
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const geo = mesh.geometry.clone();
+    geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld));
+    const src = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    const hasVC = !!geo.getAttribute('color');
+    const out = new THREE.Mesh(geo, toPropMaterial(src as THREE.Material, hasVC));
+    out.castShadow = true;
+    group.add(out);
+  });
+  recenterBottom(group);
+  if (fit && fit > 0) {
+    const box = new THREE.Box3();
+    group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m.geometry?.boundingBox && !m.geometry.boundingBox.isEmpty()) {
+        box.union(m.geometry.boundingBox);
+      }
+    });
+    const size = box.getSize(new THREE.Vector3());
+    const max = Math.max(size.x, size.y, size.z);
+    if (max > 1e-4) {
+      const s = fit / max;
+      group.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        m.geometry.scale(s, s, s);
+      });
+      recenterBottom(group);
+    }
+  }
+  return group;
+}
+
+export async function loadPropFile(file: File | string, fit?: number): Promise<THREE.Group> {
+  const url = typeof file === 'string' ? file : URL.createObjectURL(file);
+  const name = typeof file === 'string' ? file : file.name;
+  try {
+    if (/\.fbx$/i.test(name)) {
+      const root = await fbxLoader.loadAsync(url);
+      return flattenProp(root, fit);
+    }
+    const gltf = await gltfLoader.loadAsync(url);
+    return flattenProp(gltf.scene, fit);
+  } finally {
+    if (typeof file !== 'string') URL.revokeObjectURL(url);
+  }
+}
+
 /** 盖住 Kenney 短发壳的占位波波头，原点在头皮附近 */
 export function makePlaceholderBob(): THREE.Group {
   const group = new THREE.Group();
@@ -172,8 +274,12 @@ export class HairRig {
     this.setPreRotation([0, 0, 0]);
   }
 
-  /** 用网格自身包围盒底中心对齐 Head 原点（Quaternius Origin at 0 的发在脚底坐标系里，约 y=1.5） */
+  /** 用网格自身包围盒底中心对齐骨原点；后背再把贴背那面（+Z）贴到骨上 */
   snapToHead() {
+    this.snapToAttach('bottom');
+  }
+
+  snapToAttach(mode: 'bottom' | 'back') {
     if (!this.visual) return;
     const box = new THREE.Box3();
     this.visual.traverse((o) => {
@@ -185,6 +291,10 @@ export class HairRig {
     });
     if (box.isEmpty()) return;
     const c = box.getCenter(new THREE.Vector3());
+    if (mode === 'back') {
+      this.root.position.set(-c.x, -box.min.y, -box.max.z);
+      return;
+    }
     this.root.position.set(-c.x, -box.min.y, -c.z);
   }
 

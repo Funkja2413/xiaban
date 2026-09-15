@@ -16,6 +16,14 @@ export class FlowField {
   private dirZ: Float32Array;
   private queue: Int32Array;
 
+  private lastGoodCx = 0;
+  private lastGoodCz = 0;
+  private lastReach = 0;
+  private hasLastGood = false;
+  private scratchCost: Int32Array;
+  private scratchDirX: Float32Array;
+  private scratchDirZ: Float32Array;
+
   constructor(minX: number, minZ: number, maxX: number, maxZ: number, cell = 0.5) {
     this.cell = cell;
     this.ox = minX;
@@ -28,6 +36,9 @@ export class FlowField {
     this.dirX = new Float32Array(n);
     this.dirZ = new Float32Array(n);
     this.queue = new Int32Array(n);
+    this.scratchCost = new Int32Array(n);
+    this.scratchDirX = new Float32Array(n);
+    this.scratchDirZ = new Float32Array(n);
   }
 
   private idx(cx: number, cz: number) {
@@ -51,6 +62,16 @@ export class FlowField {
     }
   }
 
+  blockIf(test: (x: number, z: number) => boolean) {
+    for (let cz = 0; cz < this.nz; cz++) {
+      for (let cx = 0; cx < this.nx; cx++) {
+        const x = this.ox + (cx + 0.5) * this.cell;
+        const z = this.oz + (cz + 0.5) * this.cell;
+        if (test(x, z)) this.blocked[this.idx(cx, cz)] = 1;
+      }
+    }
+  }
+
   isBlockedAt(x: number, z: number): boolean {
     if (x < this.ox || z < this.oz || x >= this.ox + this.nx * this.cell || z >= this.oz + this.nz * this.cell) {
       return true;
@@ -61,35 +82,86 @@ export class FlowField {
 
   /** 从目标位置（玩家）重建流场 */
   rebuild(targetX: number, targetZ: number) {
-    const { nx, nz, blocked, cost, queue } = this;
-    cost.fill(-1);
-
-    let [tx, tz] = this.cellOf(targetX, targetZ);
-    // 目标格若被障碍占用，向外找最近可走格
-    if (blocked[this.idx(tx, tz)]) {
-      outer: for (let r = 1; r < 8; r++) {
-        for (let dz = -r; dz <= r; dz++) {
-          for (let dx = -r; dx <= r; dx++) {
-            const cx = tx + dx;
-            const cz = tz + dz;
-            if (cx < 0 || cz < 0 || cx >= nx || cz >= nz) continue;
-            if (!blocked[this.idx(cx, cz)]) {
-              tx = cx;
-              tz = cz;
-              break outer;
-            }
+    const snap = this.snapWalkable(targetX, targetZ, 32);
+    if (snap) {
+      this.bfsFrom(snap.cx, snap.cz);
+      const reach = this.countReached();
+      const sameFloor = !this.hasLastGood || reach >= this.lastReach - 8;
+      if (sameFloor) {
+        this.lastGoodCx = snap.cx;
+        this.lastGoodCz = snap.cz;
+        this.lastReach = Math.max(this.lastReach, reach);
+        this.hasLastGood = true;
+        this.fillDirs();
+        return;
+      }
+      this.fillDirs();
+      this.scratchCost.set(this.cost);
+      this.scratchDirX.set(this.dirX);
+      this.scratchDirZ.set(this.dirZ);
+      if (this.hasLastGood && !this.blocked[this.idx(this.lastGoodCx, this.lastGoodCz)]) {
+        this.bfsFrom(this.lastGoodCx, this.lastGoodCz);
+        this.fillDirs();
+        for (let i = 0; i < this.cost.length; i++) {
+          if (this.scratchCost[i] >= 0) {
+            this.cost[i] = this.scratchCost[i];
+            this.dirX[i] = this.scratchDirX[i];
+            this.dirZ[i] = this.scratchDirZ[i];
           }
+        }
+        return;
+      }
+      return;
+    }
+    if (this.hasLastGood && !this.blocked[this.idx(this.lastGoodCx, this.lastGoodCz)]) {
+      this.bfsFrom(this.lastGoodCx, this.lastGoodCz);
+      this.fillDirs();
+      return;
+    }
+    const any = this.snapWalkable(targetX, targetZ, Math.max(this.nx, this.nz));
+    if (any) {
+      this.bfsFrom(any.cx, any.cz);
+      this.lastGoodCx = any.cx;
+      this.lastGoodCz = any.cz;
+      this.lastReach = this.countReached();
+      this.hasLastGood = true;
+    }
+    this.fillDirs();
+  }
+
+  private snapWalkable(x: number, z: number, maxR: number): { cx: number; cz: number } | null {
+    const { nx, nz, blocked } = this;
+    let [tx, tz] = this.cellOf(x, z);
+    if (!blocked[this.idx(tx, tz)]) return { cx: tx, cz: tz };
+    for (let r = 1; r <= maxR; r++) {
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+          const cx = tx + dx;
+          const cz = tz + dz;
+          if (cx < 0 || cz < 0 || cx >= nx || cz >= nz) continue;
+          if (!blocked[this.idx(cx, cz)]) return { cx, cz };
         }
       }
     }
+    return null;
+  }
 
+  private countReached() {
+    let n = 0;
+    for (let i = 0; i < this.cost.length; i++) if (this.cost[i] >= 0) n++;
+    return n;
+  }
+
+  private bfsFrom(tx: number, tz: number) {
+    const { nx, nz, blocked, cost, queue } = this;
+    cost.fill(-1);
     let head = 0;
     let tail = 0;
-    const start = this.idx(tx, tz);
+    const start = tz * nx + tx;
     cost[start] = 0;
     queue[tail++] = start;
 
-    // 8 邻域 BFS，禁止穿越障碍角
     while (head < tail) {
       const cur = queue[head++];
       const cx = cur % nx;
@@ -104,7 +176,6 @@ export class FlowField {
           const ni = nzz * nx + nxx;
           if (blocked[ni] || cost[ni] !== -1) continue;
           if (dx !== 0 && dz !== 0) {
-            // 对角移动要求两个直角邻格都可走，避免切角
             if (blocked[cz * nx + nxx] || blocked[nzz * nx + cx]) continue;
           }
           cost[ni] = c + 1;
@@ -112,9 +183,10 @@ export class FlowField {
         }
       }
     }
+  }
 
-    // 每格方向 = 指向 cost 最小的邻格
-    const { dirX, dirZ } = this;
+  private fillDirs() {
+    const { nx, nz, blocked, cost, dirX, dirZ } = this;
     for (let cz = 0; cz < nz; cz++) {
       for (let cx = 0; cx < nx; cx++) {
         const i = cz * nx + cx;

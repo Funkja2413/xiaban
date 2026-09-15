@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { Enemies } from './enemies';
 import type { MapBounds } from '../levels';
+import { sfx } from '../audio';
 
 const POOL = 48;
 const SPEED = 17;
@@ -74,6 +75,7 @@ export class Bullets {
         continue;
       }
       if (this.blockedAt(x1, z1)) {
+        sfx.play('staple_wall');
         this.kill(i);
         continue;
       }

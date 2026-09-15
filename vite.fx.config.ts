@@ -7,6 +7,7 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const editorRoot = path.join(projectRoot, 'tools/fx-editor');
 const fxDir = path.join(projectRoot, 'public/fx');
 const modelsDir = path.join(projectRoot, 'public/models');
+const levelsDir = path.join(projectRoot, 'public/levels');
 
 function readBody(req: import('node:http').IncomingMessage, limit = 2 * 1024 * 1024): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -95,6 +96,31 @@ function serveDir(mount: string, dir: string): Plugin {
   };
 }
 
+function rosterWatchPlugin(): Plugin {
+  const catalogFile = path.join(modelsDir, 'colleagues', 'catalog.json');
+  const skinsDir = path.join(modelsDir, 'colleagues', 'skins');
+  const ping = (file: string) => {
+    const n = path.normalize(file);
+    return n === path.normalize(catalogFile) || n.startsWith(path.normalize(skinsDir + path.sep));
+  };
+  return {
+    name: 'roster-watch',
+    configureServer(server) {
+      server.watcher.add(catalogFile);
+      server.watcher.add(skinsDir);
+      const send = () => server.ws.send({ type: 'custom', event: 'roster-catalog' });
+      server.watcher.on('change', (file) => {
+        if (ping(file)) send();
+      });
+    },
+    handleHotUpdate(ctx) {
+      if (!ping(ctx.file)) return;
+      ctx.server.ws.send({ type: 'custom', event: 'roster-catalog' });
+      return [];
+    },
+  };
+}
+
 function serveFx(): Plugin {
   return {
     name: 'serve-fx',
@@ -139,5 +165,5 @@ export default defineConfig({
     strictPort: true,
     fs: { allow: [projectRoot] },
   },
-  plugins: [serveDir('/models', modelsDir), serveFx(), fxSavePlugin()],
+  plugins: [serveDir('/models', modelsDir), serveDir('/levels', levelsDir), serveFx(), fxSavePlugin(), rosterWatchPlugin()],
 });

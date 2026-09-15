@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { RAGDOLL_GROUPS } from '../sim/physics';
 import { mats, phong } from './style';
-import { cloneBattleFigure, type HumanoidFigure, type HumanoidKit } from './humanoid';
+import { cloneBattleFigure, clonePlayerFigure, type HumanoidFigure, type HumanoidKit } from './humanoid';
 
 interface PartDef {
   kind: 'box' | 'ball' | 'capsule';
@@ -39,6 +39,8 @@ export interface RagdollVisual {
   kit: HumanoidKit;
   slot: number;
   yaw?: number;
+  /** 用玩家皮肤，而不是战场同事槽 */
+  player?: boolean;
 }
 
 interface BoneBind {
@@ -230,7 +232,10 @@ export class RagdollFactory {
     let binds: BoneBind[] = [];
     let skins: THREE.SkinnedMesh[] = [];
     if (visual) {
-      const fig = cloneBattleFigure(visual.kit, visual.slot);
+      const fig = visual.player
+        ? clonePlayerFigure(visual.kit, visual.kit.playerSlot)
+        : cloneBattleFigure(visual.kit, visual.slot);
+      if (fig.playerHalo) fig.playerHalo.group.visible = false;
       poseIdle(fig);
       fig.group.position.set(x, 0, z);
       fig.group.rotation.y = yaw;

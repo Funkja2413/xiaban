@@ -1,6 +1,9 @@
-import type { ActorId, CrowdActorId, DashKey, DashReactKind, SkillKey, Lv } from '../../../src/fx/catalog';
-import { CROWD_ACTOR_IDS, DASH_REACT_META, STUN_ELEM_META } from '../../../src/fx/catalog';
-import { ROSTER } from '../../../src/roster';
+import { BATTLE_SLOT_IDS, type EnemySkillId } from '../../../src/catalog';
+import type { ActorId, CrowdActorId, DashKey, DashReactKind, LineId, SkillKey, Lv } from '../../../src/fx/catalog';
+import { CHAIN_STYLE_META, CHANNEL_STAMP_META, CROWD_ACTOR_IDS, DASH_REACT_META, STUN_ELEM_META } from '../../../src/fx/catalog';
+import type { DayPlayKit } from '../../../src/fx/days';
+import type { HazardKind } from '../../../src/levels';
+import { rosterSlot } from '../../../src/roster';
 
 export type FieldKind = 'range' | 'int' | 'color' | 'bool' | 'select';
 
@@ -15,13 +18,13 @@ export interface Field {
   options?: { id: string; name: string }[];
 }
 
-export type TrackId = 'common' | DashKey | SkillKey;
+export type TrackId = 'common' | DashKey | SkillKey | 'hazards' | 'enemySkills';
 
 export interface TrackDef {
   id: TrackId;
   name: string;
   tag: string;
-  group: 'common' | 'dash' | 'skill';
+  group: 'common' | 'dash' | 'skill' | 'hazard' | 'enemy';
   hasLevel: boolean;
   blurb: string;
 }
@@ -91,7 +94,33 @@ export const TRACKS: TrackDef[] = [
     hasLevel: true,
     blurb: 'LV1 朝前泼一滩 · LV2 渍更大更久 · LV3 连泼三滩再溅一大摊。',
   },
+  {
+    id: 'hazards',
+    name: '陷阱',
+    tag: '场景',
+    group: 'hazard',
+    hasLevel: false,
+    blurb: '只显示本关场景里实际摆了的陷阱。数值五关共用，改一处全关生效。',
+  },
+  {
+    id: 'enemySkills',
+    name: '同事主动',
+    tag: '敌人',
+    group: 'enemy',
+    hasLevel: false,
+    blurb: '只显示本关角色规划里挂上的同事技能。冷却和前摇给玩法用，颜色给脉冲圈。',
+  },
 ];
+
+export function tracksForDay(kit: DayPlayKit): TrackDef[] {
+  return TRACKS.filter((t) => {
+    if (t.group === 'dash') return t.id === 'none' || kit.dashes.includes(t.id as LineId);
+    if (t.group === 'skill') return kit.skills.includes(t.id as SkillKey);
+    if (t.group === 'hazard') return kit.hazards.length > 0;
+    if (t.group === 'enemy') return false;
+    return true;
+  });
+}
 
 export interface ActorDef {
   id: ActorId;
@@ -100,19 +129,27 @@ export interface ActorDef {
   blurb: string;
 }
 
-export const ACTORS: ActorDef[] = ROSTER.map((s) => ({
-  id: s.id as ActorId,
-  name: s.label,
-  tag: s.kind === 'player' ? '你' : s.enemy ?? 'A',
-  blurb:
-    s.kind === 'player'
-      ? '先选圆环样式，再分别改内环和外环。冲刺残影仍在左侧构筑。'
-      : `${s.blurb} 判定加时会在预览区对应同事头顶循环播放，不用控制玩家贴近。空格/播放当前会再打一次（含倒地纸雾）。眩晕和减速也停在这些人头上。`,
-}));
+/** 与 BATTLE_SLOT_IDS 对齐：玩家 / 普通男 / 普通女 / 主管 / 拦截者 */
+const ACTOR_IDS: ActorId[] = ['player', ...BATTLE_SLOT_IDS];
+
+export const ACTORS: ActorDef[] = ACTOR_IDS.map((id) => {
+  const s = rosterSlot(id)!;
+  return {
+    id,
+    name: s.label,
+    tag: s.kind === 'player' ? '你' : s.enemy ?? 'A',
+    blurb:
+      s.kind === 'player'
+        ? '先选圆环样式，再分别改内环和外环。冲刺残影仍在左侧构筑。男女主角共用这一套。'
+        : `${s.blurb} 判定加时改为头顶飘 +N分钟（数字跟数值）。选中角色就会循环预览，不用贴近。读条文件夹仍在游戏里。`,
+  };
+});
 
 export interface FieldSection {
   title: string;
   fields: Field[];
+  /** 陷阱 kind / 同事技能 id，按关过滤用 */
+  id?: HazardKind | EnemySkillId;
 }
 
 function mistFields(p: string): Field[] {
@@ -224,7 +261,167 @@ export function dashReactFields(line: DashKey, lv: Lv, actor: CrowdActorId, kind
   ];
 }
 
-export function fieldSections(track: TrackDef, lv: Lv): FieldSection[] {
+const LOOK_FIELDS: Field[] = [
+  { path: 'color', label: '圈色', kind: 'color' },
+  { path: 'opacity', label: '圈透明', kind: 'range', min: 0.1, max: 1, step: 0.02 },
+  { path: 'squash', label: '前摇下蹲', kind: 'range', min: 0.55, max: 1, step: 0.01, hint: '1 = 不压扁。没有攻击动作，靠蹲一下表示前摇。' },
+];
+
+function withPrefix(prefix: string, fields: Field[]): Field[] {
+  return fields.map((f) => ({ ...f, path: `${prefix}.${f.path}` }));
+}
+
+/** 某个同事主动技能的配置。角色面板和（若打开）构筑轨道共用。 */
+export function enemySkillSections(id: EnemySkillId): FieldSection[] {
+  const p = `enemySkills.${id}`;
+  const look: FieldSection = { title: '样子', fields: withPrefix(p, LOOK_FIELDS) };
+  if (id === 'cut-in') {
+    return [
+      {
+        title: '截杀 · 判定',
+        fields: [
+          { path: `${p}.cooldown`, label: '冷却', kind: 'range', min: 3, max: 16, step: 0.5 },
+          { path: `${p}.windup`, label: '前摇', kind: 'range', min: 0.1, max: 1.2, step: 0.05 },
+          { path: `${p}.duration`, label: '冲刺时长', kind: 'range', min: 0.2, max: 1.2, step: 0.05 },
+          { path: `${p}.radius`, label: '起手距离', kind: 'range', min: 3, max: 14, step: 0.2 },
+          { path: `${p}.speed`, label: '冲刺速度', kind: 'range', min: 4, max: 12, step: 0.1 },
+          { path: `${p}.lock`, label: '锁链秒', kind: 'range', min: 0.4, max: 4, step: 0.05, hint: '扣住玩家、打断冲刺。' },
+        ],
+      },
+      {
+        title: '样子',
+        fields: [
+          { path: `${p}.color`, label: '光色', kind: 'color' },
+          { path: `${p}.opacity`, label: '光强', kind: 'range', min: 0.1, max: 1, step: 0.02, hint: '链条自发光 + 外发光；被栓住的玩家发光，释法的人不亮。' },
+          { path: `${p}.squash`, label: '前摇下蹲', kind: 'range', min: 0.55, max: 1, step: 0.01, hint: '1 = 不压扁。没有攻击动作，靠蹲一下表示前摇。' },
+        ],
+      },
+      {
+        title: '锁链',
+        fields: [
+          {
+            path: `${p}.chainStyle`,
+            label: '样式',
+            kind: 'select',
+            options: CHAIN_STYLE_META.map((m) => ({ id: m.id, name: `${m.name} · ${m.blurb}` })),
+            hint: '共享几何、对象池，不另载模型。',
+          },
+          { path: `${p}.chainWidth`, label: '链粗', kind: 'range', min: 0.04, max: 0.18, step: 0.005, hint: '从双手连到玩家脖子。' },
+          { path: `${p}.chainSag`, label: '下垂', kind: 'range', min: 0, max: 1.2, step: 0.02 },
+        ],
+      },
+    ];
+  }
+  if (id === 'desk-slam') {
+    return [
+      {
+        title: '拍桌 · 判定',
+        fields: [
+          { path: `${p}.cooldown`, label: '冷却', kind: 'range', min: 4, max: 18, step: 0.5 },
+          { path: `${p}.windup`, label: '前摇', kind: 'range', min: 0.1, max: 1.2, step: 0.05 },
+          { path: `${p}.duration`, label: '减速持续', kind: 'range', min: 0.4, max: 3, step: 0.05 },
+          { path: `${p}.radius`, label: '圈半径', kind: 'range', min: 1, max: 5, step: 0.05 },
+          { path: `${p}.factor`, label: '速度倍率', kind: 'range', min: 0.2, max: 0.8, step: 0.02 },
+        ],
+      },
+      look,
+      {
+        title: '周围道具',
+        fields: [
+          { path: `${p}.knockImpulse`, label: '弹飞冲量', kind: 'range', min: 80, max: 900, step: 10, hint: '圈里椅子/绿植/垃圾桶等向外弹。' },
+          { path: `${p}.knockLift`, label: '抬起', kind: 'range', min: 0, max: 80, step: 2 },
+          { path: `${p}.paper`, label: '纸片数量', kind: 'int', min: 0, max: 24, step: 1 },
+        ],
+      },
+    ];
+  }
+  return [
+    {
+      title: '喊人 · 判定',
+      fields: [
+        { path: `${p}.cooldown`, label: '冷却', kind: 'range', min: 4, max: 18, step: 0.5 },
+        { path: `${p}.windup`, label: '前摇', kind: 'range', min: 0.1, max: 1, step: 0.05 },
+        { path: `${p}.duration`, label: '减速持续', kind: 'range', min: 0.6, max: 4, step: 0.05 },
+        { path: `${p}.radius`, label: '喊人半径', kind: 'range', min: 2, max: 9, step: 0.1, hint: '玩家走进这圈就站住喊，不用贴身。' },
+        { path: `${p}.factor`, label: '减速倍率', kind: 'range', min: 0.2, max: 0.9, step: 0.05, hint: '越小越慢。' },
+      ],
+    },
+    look,
+    {
+      title: '喊人圈',
+      fields: [
+        { path: `${p}.waves`, label: '圈数', kind: 'int', min: 1, max: 5, step: 1, hint: '立着的光圈从胸口飞向玩家，不是铺在地上的圈。' },
+        { path: `${p}.waveGap`, label: '圈间隔', kind: 'range', min: 0.04, max: 0.4, step: 0.01, hint: '每圈错开飞出的时间。' },
+      ],
+    },
+  ];
+}
+
+export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldSection[] {
+  if (track.id === 'hazards') {
+    const all: FieldSection[] = [
+      {
+        id: 'wet',
+        title: '拖地未干',
+        fields: [
+          { path: 'hazards.wet.color', label: '水色', kind: 'color' },
+          { path: 'hazards.wet.opacity', label: '透明度', kind: 'range', min: 0.1, max: 1, step: 0.02 },
+          { path: 'hazards.wet.radius', label: '半径', kind: 'range', min: 0.4, max: 2, step: 0.05 },
+          { path: 'hazards.wet.duration', label: '减速持续', kind: 'range', min: 0.3, max: 3, step: 0.05 },
+          { path: 'hazards.wet.factor', label: '速度倍率', kind: 'range', min: 0.2, max: 0.9, step: 0.02 },
+        ],
+      },
+      {
+        id: 'pit',
+        title: '报纸',
+        fields: [
+          { path: 'hazards.pit.color', label: '颜色', kind: 'color' },
+          { path: 'hazards.pit.opacity', label: '透明度', kind: 'range', min: 0.1, max: 1, step: 0.02 },
+          { path: 'hazards.pit.radius', label: '半径', kind: 'range', min: 0.3, max: 1.4, step: 0.05 },
+          { path: 'hazards.pit.duration', label: '眩晕秒', kind: 'range', min: 0.6, max: 3, step: 0.05 },
+        ],
+      },
+      {
+        id: 'crate',
+        title: '文件箱',
+        fields: [
+          { path: 'hazards.crate.color', label: '颜色', kind: 'color' },
+          { path: 'hazards.crate.opacity', label: '透明度', kind: 'range', min: 0.1, max: 1, step: 0.02 },
+          { path: 'hazards.crate.radius', label: '半径', kind: 'range', min: 0.3, max: 1.4, step: 0.05 },
+          { path: 'hazards.crate.duration', label: '眩晕秒', kind: 'range', min: 0.6, max: 3, step: 0.05 },
+        ],
+      },
+      {
+        id: 'launch',
+        title: '弹簧门',
+        fields: [
+          { path: 'hazards.launch.color', label: '颜色', kind: 'color' },
+          { path: 'hazards.launch.opacity', label: '透明度', kind: 'range', min: 0.1, max: 1, step: 0.02 },
+          { path: 'hazards.launch.radius', label: '感应距离', kind: 'range', min: 0.35, max: 1.8, step: 0.05 },
+          { path: 'hazards.launch.impulse', label: '弹回冲量', kind: 'range', min: 200, max: 900, step: 10 },
+          { path: 'hazards.launch.lift', label: '抬起', kind: 'range', min: 8, max: 80, step: 2 },
+          { path: 'hazards.launch.duration', label: '摔倒秒', kind: 'range', min: 0.6, max: 2.2, step: 0.05 },
+        ],
+      },
+      {
+        id: 'alarm',
+        title: '隐藏地板',
+        fields: [
+          { path: 'hazards.alarm.color', label: '颜色', kind: 'color' },
+          { path: 'hazards.alarm.opacity', label: '透明度', kind: 'range', min: 0.04, max: 0.4, step: 0.02 },
+          { path: 'hazards.alarm.radius', label: '地板半径', kind: 'range', min: 0.35, max: 1.8, step: 0.05 },
+          { path: 'hazards.alarm.impulse', label: '弹飞冲量', kind: 'range', min: 200, max: 900, step: 10 },
+          { path: 'hazards.alarm.lift', label: '弹飞高度', kind: 'range', min: 40, max: 220, step: 2 },
+          { path: 'hazards.alarm.duration', label: '失控秒', kind: 'range', min: 0.5, max: 2.2, step: 0.05 },
+        ],
+      },
+    ];
+    return kit ? all.filter((s) => !s.id || kit.hazards.includes(s.id as HazardKind)) : all;
+  }
+  if (track.id === 'enemySkills') {
+    const ids: EnemySkillId[] = kit?.enemySkills?.length ? kit.enemySkills : ['cut-in', 'desk-slam', 'rally'];
+    return ids.flatMap((id) => enemySkillSections(id));
+  }
   if (track.id === 'common') {
     return [
       { title: '撞物碎片', fields: paperFields('common.hitObject.paper', true) },
@@ -334,16 +531,38 @@ export function actorSections(id: ActorId): FieldSection[] {
   const p = `actors.${id}`;
   return [
     {
-      title: '判定加时 · 头顶',
+      title: '读条 · 头顶文件',
       fields: [
-        { path: `${p}.overtime.enabled`, label: '启用头顶光', kind: 'bool', hint: '游戏里是交任务加时。这里选中角色就会在他头顶循环飘，拖滑条马上重放。' },
-        { path: `${p}.overtime.color`, label: '颜色', kind: 'color' },
-        { path: `${p}.overtime.opacity`, label: '透明度', kind: 'range', min: 0.1, max: 1, step: 0.02 },
-        { path: `${p}.overtime.additive`, label: '加色发光', kind: 'bool' },
-        { path: `${p}.overtime.duration`, label: '持续', kind: 'range', min: 0.2, max: 2, step: 0.05 },
-        { path: `${p}.overtime.size`, label: '大小', kind: 'range', min: 0.1, max: 0.8, step: 0.02 },
-        { path: `${p}.overtime.rise`, label: '上飘', kind: 'range', min: 0.2, max: 3, step: 0.05 },
-        { path: `${p}.overtime.y`, label: '起始高度', kind: 'range', min: 1.1, max: 2.6, step: 0.05 },
+        { path: `${p}.channel.enabled`, label: '显示文件', kind: 'bool', hint: '贴身读条时头顶平躺转着的文件卡。Logo 只有图标、透明底，叠在纸色上。' },
+        {
+          path: `${p}.channel.stamp`,
+          label: '贴图',
+          kind: 'select',
+          options: CHANNEL_STAMP_META.map((m) => ({ id: m.id, name: `${m.name} · ${m.blurb}` })),
+        },
+        { path: `${p}.channel.color`, label: '纸色', kind: 'color', hint: '卡片本体颜色。Logo 是透明底叠上去的，周围会露出这个颜色。' },
+        { path: `${p}.channel.opacity`, label: '透明度', kind: 'range', min: 0.15, max: 1, step: 0.02 },
+        { path: `${p}.channel.width`, label: '宽', kind: 'range', min: 0.08, max: 0.7, step: 0.01 },
+        { path: `${p}.channel.height`, label: '高', kind: 'range', min: 0.08, max: 0.8, step: 0.01 },
+        { path: `${p}.channel.thick`, label: '厚度', kind: 'range', min: 0.01, max: 0.18, step: 0.005 },
+        { path: `${p}.channel.y`, label: '高度', kind: 'range', min: 1.4, max: 2.8, step: 0.02 },
+        { path: `${p}.channel.spin`, label: '转速', kind: 'range', min: 0, max: 8, step: 0.05, hint: '绕竖轴水平转。上下晃、晃速还是原来那套。' },
+        { path: `${p}.channel.bob`, label: '上下晃', kind: 'range', min: 0, max: 0.2, step: 0.005 },
+        { path: `${p}.channel.bobSpeed`, label: '晃速', kind: 'range', min: 0, max: 20, step: 0.2 },
+      ],
+    },
+    {
+      title: '判定加时 · 飘字',
+      fields: [
+        { path: `${p}.overtime.enabled`, label: '启用飘字', kind: 'bool', hint: '交任务完成时头顶飘 +N分钟。读条转文件在上一栏单独编。' },
+        { path: `${p}.overtime.color`, label: '字色', kind: 'color' },
+        { path: `${p}.overtime.opacity`, label: '透明度', kind: 'range', min: 0.15, max: 1, step: 0.02 },
+        { path: `${p}.overtime.outline`, label: '描边', kind: 'bool' },
+        { path: `${p}.overtime.outlineColor`, label: '描边色', kind: 'color' },
+        { path: `${p}.overtime.duration`, label: '持续', kind: 'range', min: 0.3, max: 2.4, step: 0.05 },
+        { path: `${p}.overtime.size`, label: '字号', kind: 'range', min: 0.18, max: 1.1, step: 0.02 },
+        { path: `${p}.overtime.rise`, label: '上飘', kind: 'range', min: 0.15, max: 2.2, step: 0.05 },
+        { path: `${p}.overtime.y`, label: '起始高度', kind: 'range', min: 1.4, max: 2.8, step: 0.05 },
       ],
     },
     { title: '倒地 · 纸片', fields: paperFields(`${p}.hit.paper`, false) },

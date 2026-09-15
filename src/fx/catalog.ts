@@ -1,5 +1,10 @@
 /** 特效目录：按冲刺属性 / 主动技能 × 等级管理。游戏和编辑器读同一份。 */
 
+import type { EnemySkillId } from '../catalog';
+import type { HazardKind, HazardTune } from '../levels';
+
+export type { EnemySkillId, HazardKind };
+
 export type LineId = 'brute' | 'slump' | 'phantom';
 export type DashKey = 'none' | LineId;
 export type SkillKey = 'decoy' | 'keyboard' | 'coffee';
@@ -52,20 +57,42 @@ export interface HitFx {
   mist: ImpactMistFx;
 }
 
-export interface HeadFx {
+export interface OvertimeFx {
   enabled: boolean;
   color: number;
   opacity: number;
-  additive: boolean;
   duration: number;
   size: number;
   rise: number;
   y: number;
+  outline: boolean;
+  outlineColor: number;
 }
+
+/** @deprecated 用 OvertimeFx */
+export type HeadFx = OvertimeFx;
 
 export const CROWD_ACTOR_IDS = ['colleague-a-m', 'colleague-a-f', 'heavy', 'interceptor'] as const;
 export type CrowdActorId = (typeof CROWD_ACTOR_IDS)[number];
 export type ActorId = 'player' | CrowdActorId;
+
+/** 交任务加到下班钟上的分钟。普通同事 15 或 30，拦截者 30，重量级 45。 */
+export function overtimeMinutesOf(id: CrowdActorId, rng = Math.random): number {
+  if (id === 'heavy') return 45;
+  if (id === 'interceptor') return 30;
+  return rng() < 2 / 3 ? 15 : 30;
+}
+
+/** 编辑器预览用稳定值，不随机 */
+export function overtimePreviewMin(id: CrowdActorId): number {
+  if (id === 'heavy') return 45;
+  if (id === 'interceptor') return 30;
+  return 15;
+}
+
+export function overtimePopText(min: number): string {
+  return `+${min}分钟`;
+}
 
 export const STUN_ELEM_IDS = ['spark', 'star', 'disc'] as const;
 export type StunElem = (typeof STUN_ELEM_IDS)[number];
@@ -115,9 +142,71 @@ export interface SlowLookFx {
   additive: boolean;
 }
 
+export const CHANNEL_STAMP_IDS = [
+  'paper',
+  'word',
+  'excel',
+  'ppt',
+  'outlook',
+  'keynote',
+  'pages',
+  'numbers',
+  'docs',
+  'sheets',
+  'slides',
+  'figma',
+  'notion',
+  'feishu',
+  'slack',
+  'teams',
+  'vscode',
+  'sketch',
+] as const;
+export type ChannelStampId = (typeof CHANNEL_STAMP_IDS)[number];
+
+export const CHANNEL_STAMP_META: { id: ChannelStampId; name: string; blurb: string }[] = [
+  { id: 'paper', name: '空白文稿', blurb: '横线纸' },
+  { id: 'word', name: 'Word', blurb: '蓝 W' },
+  { id: 'excel', name: 'Excel', blurb: '绿表' },
+  { id: 'ppt', name: 'PowerPoint', blurb: '橙 P' },
+  { id: 'outlook', name: 'Outlook', blurb: '信封' },
+  { id: 'keynote', name: 'Keynote', blurb: '讲台' },
+  { id: 'pages', name: 'Pages', blurb: '苹果文稿' },
+  { id: 'numbers', name: 'Numbers', blurb: '苹果表' },
+  { id: 'docs', name: 'Docs', blurb: '在线文档' },
+  { id: 'sheets', name: 'Sheets', blurb: '在线表' },
+  { id: 'slides', name: 'Slides', blurb: '在线片' },
+  { id: 'figma', name: 'Figma', blurb: '四色点' },
+  { id: 'notion', name: 'Notion', blurb: '黑 N' },
+  { id: 'feishu', name: '飞书', blurb: '办公' },
+  { id: 'slack', name: 'Slack', blurb: '井号' },
+  { id: 'teams', name: 'Teams', blurb: '紫人' },
+  { id: 'vscode', name: 'VS Code', blurb: '尖括号' },
+  { id: 'sketch', name: 'Sketch', blurb: '钻石' },
+];
+
+export function isChannelStampId(id: string | null | undefined): id is ChannelStampId {
+  return !!id && (CHANNEL_STAMP_IDS as readonly string[]).includes(id);
+}
+
+export interface ChannelLookFx {
+  enabled: boolean;
+  stamp: ChannelStampId;
+  color: number;
+  opacity: number;
+  width: number;
+  height: number;
+  thick: number;
+  y: number;
+  spin: number;
+  bob: number;
+  bobSpeed: number;
+}
+
 export interface ActorPassiveFx {
   hit: HitFx;
-  overtime: HeadFx;
+  overtime: OvertimeFx;
+  channel: ChannelLookFx;
   stun: StunLookFx;
   slow: SlowLookFx;
 }
@@ -284,6 +373,55 @@ export interface PoolsFx {
   trail: number;
 }
 
+export interface HazardFx {
+  color: number;
+  opacity: number;
+  radius: number;
+  duration: number;
+  factor?: number;
+  impulse?: number;
+  lift?: number;
+}
+
+export const CHAIN_STYLE_IDS = ['links', 'rings', 'beam', 'rope'] as const;
+export type ChainStyleId = (typeof CHAIN_STYLE_IDS)[number];
+
+export const CHAIN_STYLE_META: { id: ChainStyleId; name: string; blurb: string }[] = [
+  { id: 'links', name: '方节', blurb: '短盒铁链' },
+  { id: 'rings', name: '环扣', blurb: '圆环相扣' },
+  { id: 'beam', name: '光索', blurb: '发光管束' },
+  { id: 'rope', name: '缆绳', blurb: '细软垂绳' },
+];
+
+export function chainStyleOf(id: unknown): ChainStyleId {
+  return CHAIN_STYLE_IDS.includes(id as ChainStyleId) ? (id as ChainStyleId) : 'links';
+}
+
+export interface EnemySkillFx {
+  cooldown: number;
+  windup: number;
+  duration: number;
+  radius: number;
+  speed?: number;
+  factor?: number;
+  color: number;
+  opacity: number;
+  /** 前摇时竖直压扁，1 = 不压 */
+  squash: number;
+  /** 截杀：锁链扣住玩家的秒数 */
+  lock?: number;
+  chainStyle?: ChainStyleId;
+  chainWidth?: number;
+  chainSag?: number;
+  /** 拍桌：弹飞周围可碰飞道具 */
+  knockImpulse?: number;
+  knockLift?: number;
+  paper?: number;
+  /** 喊人：声波圈数 / 间隔 */
+  waves?: number;
+  waveGap?: number;
+}
+
 export type Levels<T> = { 1: T; 2: T; 3: T };
 
 type DeepPartial<T> = {
@@ -301,6 +439,8 @@ export interface FxCatalog {
   } & Record<CrowdActorId, ActorPassiveFx>;
   lines: Record<DashKey, Levels<DashLevelFx>>;
   skills: Record<SkillKey, Levels<SkillLevelFx>>;
+  hazards: Record<HazardKind, HazardFx>;
+  enemySkills: Record<EnemySkillId, EnemySkillFx>;
 }
 
 function isRec(v: unknown): v is Record<string, unknown> {
@@ -382,15 +522,16 @@ const HIT_OBJECT = hitOf({
   mist: { color: 0x8a7a66, opacity: 0.32, count: 5, flatten: 0.22, rise: 0.45 },
 });
 
-const HEAD: HeadFx = {
+const HEAD: OvertimeFx = {
   enabled: true,
   color: 0xffe080,
-  opacity: 0.88,
-  additive: true,
-  duration: 0.95,
-  size: 0.32,
-  rise: 1.1,
-  y: 1.72,
+  opacity: 1,
+  duration: 1.15,
+  size: 0.48,
+  rise: 0.9,
+  y: 2.08,
+  outline: true,
+  outlineColor: 0x3a2410,
 };
 
 const STUN_LOOK: StunLookFx = {
@@ -417,6 +558,20 @@ const STUN_LOOK: StunLookFx = {
   glowSize: 0.52,
 };
 
+const CHANNEL_LOOK: ChannelLookFx = {
+  enabled: true,
+  stamp: 'word',
+  color: 0xf3ead2,
+  opacity: 1,
+  width: 0.22,
+  height: 0.28,
+  thick: 0.04,
+  y: 2.05,
+  spin: 1.8,
+  bob: 0.04,
+  bobSpeed: 10,
+};
+
 const SLOW_LOOK: SlowLookFx = {
   enabled: true,
   color: 0x7a90a8,
@@ -435,6 +590,7 @@ function crowdActor(over: DeepPartial<ActorPassiveFx> = {}): ActorPassiveFx {
     {
       hit: hitOf(),
       overtime: clone(HEAD),
+      channel: clone(CHANNEL_LOOK),
       stun: clone(STUN_LOOK),
       slow: clone(SLOW_LOOK),
     } satisfies ActorPassiveFx,
@@ -647,10 +803,11 @@ export const DEFAULT_FX: FxCatalog = {
   },
   actors: {
     player: { ring: clone(PLAYER_RING) },
-    'colleague-a-m': crowdActor(),
+    'colleague-a-m': crowdActor({ channel: { stamp: 'word' } }),
     'colleague-a-f': crowdActor({
       hit: { mist: { color: 0xffd4e8, opacity: 0.4 } },
       overtime: { color: 0xffc8e0, size: 0.28 },
+      channel: { stamp: 'ppt' },
       stun: { starColor: 0xffd0ea, ringColor: 0xff9ad4, glowColor: 0xffb0d4 },
       slow: { color: 0xc89ab0 },
     }),
@@ -660,12 +817,14 @@ export const DEFAULT_FX: FxCatalog = {
         mist: { color: 0xffb080, count: 9, size: 0.42 },
       },
       overtime: { color: 0xff6b57, size: 0.42, duration: 1.2, y: 2.05 },
+      channel: { stamp: 'excel', y: 2.38, width: 0.28, height: 0.34 },
       stun: { y: 2.18, orbit: 0.42, starCount: 5, starSize: 0.3, ringSize: 0.48, glowSize: 0.7 },
       slow: { size: 0.88 },
     }),
     interceptor: crowdActor({
       hit: { paper: { count: 6 }, mist: { color: 0xe05252, opacity: 0.38 } },
       overtime: { color: 0xff5a5a, size: 0.3, rise: 1.4, duration: 0.8 },
+      channel: { stamp: 'figma' },
       stun: { starColor: 0xff8a8a, ringColor: 0xff5050, glowColor: 0xff6a6a },
       slow: { color: 0xc06060 },
     }),
@@ -748,6 +907,54 @@ export const DEFAULT_FX: FxCatalog = {
       { coffee: { count: 3, splashRadius: 1.8, splashLife: 3.2 } }
     ),
   },
+  hazards: {
+    wet: { color: 0x7ec8e8, opacity: 0.5, radius: 0.85, duration: 1.2, factor: 0.55 },
+    pit: { color: 0xc8b48a, opacity: 0.45, radius: 0.58, duration: 1.8 },
+    crate: { color: 0x6b3d1f, opacity: 0.55, radius: 0.58, duration: 1.8 },
+    launch: { color: 0xff8a3a, opacity: 0.55, radius: 0.85, duration: 1.15, impulse: 620, lift: 36 },
+    alarm: { color: 0x5a564f, opacity: 0.12, radius: 0.9, duration: 1.05, impulse: 520, lift: 140 },
+  },
+  enemySkills: {
+    'cut-in': {
+      cooldown: 8,
+      windup: 0.4,
+      duration: 0.45,
+      radius: 8,
+      speed: 7.2,
+      color: 0xff5050,
+      opacity: 0.55,
+      squash: 0.78,
+      lock: 2,
+      chainStyle: 'links',
+      chainWidth: 0.08,
+      chainSag: 0.42,
+    },
+    'desk-slam': {
+      cooldown: 10,
+      windup: 0.35,
+      duration: 1.5,
+      radius: 2.4,
+      factor: 0.45,
+      color: 0xffb080,
+      opacity: 0.5,
+      squash: 0.72,
+      knockImpulse: 420,
+      knockLift: 32,
+      paper: 10,
+    },
+    rally: {
+      cooldown: 12,
+      windup: 0.3,
+      duration: 2,
+      radius: 5.5,
+      factor: 0.5,
+      color: 0xffc14d,
+      opacity: 0.5,
+      squash: 0.85,
+      waves: 3,
+      waveGap: 0.14,
+    },
+  },
 };
 
 let current: FxCatalog = clone(DEFAULT_FX);
@@ -779,6 +986,8 @@ export function mergeFx(base: FxCatalog, over: unknown): FxCatalog {
   ensureDashReact(merged);
   liftSharedImpulse(merged);
   ensureActorStates(merged, o);
+  merged.hazards = mergeDeep(clone(DEFAULT_FX.hazards), merged.hazards);
+  merged.enemySkills = mergeDeep(clone(DEFAULT_FX.enemySkills), merged.enemySkills);
   return merged;
 }
 
@@ -833,6 +1042,8 @@ function ensureActorStates(merged: FxCatalog, over: Record<string, unknown> = {}
     const staleOcta = isRec(rawStun) && !('elem' in rawStun) && !('glowOn' in rawStun);
     a.stun = a.stun ? mergeDeep(clone(fb.stun), a.stun) : clone(fb.stun);
     a.slow = a.slow ? mergeDeep(clone(fb.slow), a.slow) : clone(fb.slow);
+    a.overtime = a.overtime ? mergeDeep(clone(fb.overtime), a.overtime) : clone(fb.overtime);
+    a.channel = a.channel ? mergeDeep(clone(fb.channel), a.channel) : clone(fb.channel);
     if (!staleOcta) continue;
     a.stun.elem = fb.stun.elem;
     a.stun.starSize = fb.stun.starSize;
@@ -900,6 +1111,28 @@ export function dashFx(line: DashKey | null | undefined, lv = 1): DashLevelFx {
 
 export function skillFx(id: SkillKey, lv = 1): SkillLevelFx {
   return current.skills[id][clampLv(lv)];
+}
+
+export function hazardFx(id: HazardKind): HazardFx {
+  return current.hazards[id] ?? DEFAULT_FX.hazards[id];
+}
+
+/** 关卡里这一件的覆盖 + 特效目录默认值 */
+export function mergeHazardFx(kind: HazardKind, tune?: HazardTune): HazardFx {
+  const base = hazardFx(kind);
+  return {
+    color: base.color,
+    opacity: base.opacity,
+    radius: tune?.radius ?? base.radius,
+    duration: tune?.duration ?? base.duration,
+    factor: tune?.factor ?? base.factor,
+    impulse: tune?.impulse ?? base.impulse,
+    lift: tune?.lift ?? base.lift ?? 48,
+  };
+}
+
+export function enemySkillFx(id: EnemySkillId): EnemySkillFx {
+  return current.enemySkills[id] ?? DEFAULT_FX.enemySkills[id];
 }
 
 export function commonFx() {

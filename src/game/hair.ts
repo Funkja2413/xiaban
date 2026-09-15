@@ -31,7 +31,10 @@ export function findBone(root: THREE.Object3D, name: string): THREE.Object3D | n
 }
 
 export const BONE_HEAD = ['Head', 'head', 'mixamorigHead'];
+export const BONE_NECK = ['Neck', 'mixamorigNeck', 'neck', 'Head', 'head', 'mixamorigHead'];
 export const BONE_HAND = ['RightHand', 'Hand_R', 'mixamorigRightHand', 'Right_Hand', 'hand_r'];
+export const BONE_HAND_L = ['LeftHand', 'Hand_L', 'mixamorigLeftHand', 'Left_Hand', 'hand_l'];
+export const BONE_BACK = ['Chest', 'Spine', 'UpperChest', 'mixamorigSpine2', 'mixamorigSpine1', 'mixamorigSpine'];
 
 export function findBoneAny(root: THREE.Object3D, names: string[]): THREE.Object3D | null {
   for (const n of names) {
@@ -101,6 +104,94 @@ export async function loadHairVisual(file: string): Promise<THREE.Group> {
   }
   const gltf = await gltfLoader().loadAsync(url);
   return flattenHair(gltf.scene);
+}
+
+function toPropMaterial(src: THREE.Material, hasVertexColors: boolean): THREE.MeshPhongMaterial {
+  const map = 'map' in src ? (src as THREE.MeshPhongMaterial).map : null;
+  const readyMap = map && (map.image || map.source?.data) ? map : null;
+  const color =
+    'color' in src && !readyMap && !hasVertexColors ? (src as THREE.MeshPhongMaterial).color.getHex() : 0xffffff;
+  const mat = new THREE.MeshPhongMaterial({
+    map: readyMap ?? undefined,
+    color,
+    vertexColors: hasVertexColors,
+    shininess: 16,
+    specular: 0x333333,
+    side: THREE.DoubleSide,
+    transparent: !!('transparent' in src && src.transparent),
+    opacity: 'opacity' in src ? (src as THREE.MeshPhongMaterial).opacity : 1,
+  });
+  if (readyMap) readyMap.colorSpace = THREE.SRGBColorSpace;
+  return mat;
+}
+
+function recenterProp(group: THREE.Group) {
+  const box = new THREE.Box3();
+  group.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.geometry) return;
+    m.geometry.computeBoundingBox();
+    if (m.geometry.boundingBox && !m.geometry.boundingBox.isEmpty()) box.union(m.geometry.boundingBox);
+  });
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3());
+  group.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    m.geometry.translate(-c.x, -box.min.y, -c.z);
+    m.geometry.computeBoundingBox();
+  });
+}
+
+/** 外挂道具：保原色 / 顶点色，不染发型棕。fit 与编辑器预设一致，避免源文件单位把挂件撑爆。 */
+export function flattenProp(root: THREE.Object3D, fit?: number): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'propVisual';
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const geo = mesh.geometry.clone();
+    geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld));
+    const src = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    const hasVC = !!geo.getAttribute('color');
+    const out = new THREE.Mesh(geo, toPropMaterial(src as THREE.Material, hasVC));
+    out.castShadow = true;
+    group.add(out);
+  });
+  recenterProp(group);
+  if (fit && fit > 0) {
+    const box = new THREE.Box3();
+    group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m.geometry?.boundingBox && !m.geometry.boundingBox.isEmpty()) {
+        box.union(m.geometry.boundingBox);
+      }
+    });
+    const size = box.getSize(new THREE.Vector3());
+    const max = Math.max(size.x, size.y, size.z);
+    if (max > 1e-4) {
+      const s = fit / max;
+      group.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        m.geometry.scale(s, s, s);
+      });
+      recenterProp(group);
+    }
+  }
+  return group;
+}
+
+export async function loadPropVisual(file: string, fit?: number): Promise<THREE.Group> {
+  const url = assetUrl(file);
+  if (/\.fbx$/i.test(file)) {
+    const root = await fbxLoader().loadAsync(url);
+    return flattenProp(root, fit);
+  }
+  const gltf = await gltfLoader().loadAsync(url);
+  return flattenProp(gltf.scene, fit);
 }
 
 export function hairAttachMatrix(transform: HairTransform, preRotation: [number, number, number]): THREE.Matrix4 {

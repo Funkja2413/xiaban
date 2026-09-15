@@ -16,14 +16,15 @@
         "z": 25.50445595260285
       },
       "elevator": {
-        "minX": -2,
-        "maxX": 2,
-        "minZ": -28,
-        "maxZ": -26,
+        "minX": -1.5,
+        "maxX": 1.5,
+        "minZ": -27.82,
+        "maxZ": -26.290000000000003,
         "point": {
           "x": 0,
-          "z": -27
-        }
+          "z": -27.94
+        },
+        "rotY": 0
       },
       "atmosphere": {
         "background": "#3a322b",
@@ -95,7 +96,10 @@
           "maxZ": 12.1,
           "h": 1.7,
           "faces": {
-            "pz": "#3d94ff"
+            "pz": {
+              "color": "#3d94ff",
+              "map": "/levels/textures/monday-face-maze-1-pz.png"
+            }
           }
         },
         {
@@ -107,7 +111,9 @@
           "maxZ": 11.6,
           "h": 1.7,
           "faces": {
-            "px": "#4d82ff"
+            "px": {
+              "color": "#4d82ff"
+            }
           }
         },
         {
@@ -119,7 +125,9 @@
           "maxZ": 8.1,
           "h": 1.7,
           "faces": {
-            "pz": "#428bff"
+            "pz": {
+              "color": "#428bff"
+            }
           }
         },
         {
@@ -131,7 +139,9 @@
           "maxZ": 8.1,
           "h": 1.7,
           "faces": {
-            "pz": "#4785ff"
+            "pz": {
+              "color": "#4785ff"
+            }
           }
         },
         {
@@ -1207,45 +1217,47 @@
           "x": -6.2,
           "z": 23.6
         }
-      ]
+      ],
+      "voids": []
     },
     {
       "id": "tuesday",
       "label": "周二",
       "map": {
         "minX": -12,
-        "maxX": 12,
+        "maxX": 16,
         "minZ": -28,
         "maxZ": 28
       },
       "playerStart": {
-        "x": 0,
-        "z": 25.5
+        "x": -2.0593973951481477,
+        "z": 25.86375341052003
       },
       "elevator": {
-        "minX": -2,
-        "maxX": 2,
-        "minZ": -28,
-        "maxZ": -26,
+        "minX": -0.8846628963653806,
+        "maxX": 2.1153371036346194,
+        "minZ": -27.82,
+        "maxZ": -26.290000000000003,
         "point": {
-          "x": 0,
-          "z": -27
-        }
+          "x": 0.6153371036346194,
+          "z": -27.94
+        },
+        "rotY": 0
       },
       "atmosphere": {
-        "background": "#2c3238",
-        "fogColor": "#2c3238",
-        "fogNear": 16,
-        "fogFar": 46,
-        "exposure": 1,
+        "background": "#3d4a58",
+        "fogColor": "#3d4a58",
+        "fogNear": 60,
+        "fogFar": 76,
+        "exposure": 1.64,
         "ambient": {
           "color": "#d8e6f4",
-          "intensity": 0.04
+          "intensity": 0.735
         },
         "hemisphere": {
-          "sky": "#fff4e4",
-          "ground": "#8a7a66",
-          "intensity": 0.4
+          "sky": "#e8f2ff",
+          "ground": "#9a8a78",
+          "intensity": 0.6
         },
         "sun": {
           "color": "#fff2dc",
@@ -1267,24 +1279,24 @@
           ]
         },
         "lampColor": "#e8f2ff",
-        "lampIntensity": 72,
+        "lampIntensity": 56,
         "overheadHeight": 2.3,
-        "lampDistance": 5.2,
+        "lampDistance": 4.2,
         "overheadSpacing": 8,
         "followEnabled": false,
         "followColor": "#fff2dc",
         "followIntensity": 1.2,
         "followHeight": 7.2,
         "floor": {
-          "color": "#ffffff",
-          "shininess": 8,
+          "color": "#c4b8a8",
+          "shininess": 22,
           "bumpScale": 1.2,
-          "map": null,
-          "kind": "carpet",
+          "map": "/levels/textures/tuesday-floor.png",
+          "kind": "image",
           "repeat": 8
         },
         "wall": {
-          "color": "#ffffff",
+          "color": "#d8d0c4",
           "shininess": 8,
           "map": null
         },
@@ -1292,281 +1304,418 @@
         "sky": "day",
         "furnitureTone": "dark"
       },
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": 3.579410638049149,
+          "z": 23.251768727118478,
+          "y": 3.2,
+          "intensity": 64,
+          "distance": 10,
+          "color": "#ffd79e"
+        },
+        {
+          "id": "pl-desks",
+          "x": -4.33644927670044,
+          "z": 14.641665823963404,
+          "y": 3.2,
+          "intensity": 70,
+          "distance": 10,
+          "color": "#ffd79e"
+        },
+        {
+          "id": "pl-elbow",
+          "x": 0.36442744254090753,
+          "z": 3.362245868657075,
+          "y": 3.2,
+          "intensity": 56,
+          "distance": 10,
+          "color": "#ffd79e"
+        },
+        {
+          "id": "pl-wing",
+          "x": 12.09822974544332,
+          "z": -13.800931132373515,
+          "y": 2.75,
+          "intensity": 60,
+          "distance": 10,
+          "color": "#ffd79e"
+        },
+        {
+          "id": "pl-hall",
+          "x": -7.584133323299506,
+          "z": -21.992195735639502,
+          "y": 2.9,
+          "intensity": 52,
+          "distance": 10,
+          "color": "#ffd79e"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0.6179284623798498,
+          "z": -24.923485657816222,
+          "y": 2.5,
+          "intensity": 70,
+          "distance": 5,
+          "color": "#c8ffd8"
+        }
+      ],
+      "voids": [
+        {
+          "id": "cut-se",
+          "minX": 5.192163950869709,
+          "minZ": 12.227772464940973,
+          "maxX": 18.192163950869727,
+          "maxZ": 20.727772464940948
+        },
+        {
+          "id": "cut-0j3656",
+          "minX": -13.5,
+          "minZ": 4.5,
+          "maxX": -6,
+          "maxZ": 9
+        },
+        {
+          "id": "cut-q1grix",
+          "minX": 2.0029471230834197,
+          "minZ": -3.8798566602609363,
+          "maxX": 18.50294712308342,
+          "maxZ": 2.120143339739062
+        },
+        {
+          "id": "cut-n3mr88",
+          "minX": 9,
+          "minZ": -1.5,
+          "maxX": 18,
+          "maxZ": 0
+        },
+        {
+          "id": "cut-jby4n2",
+          "minX": -17.5,
+          "minZ": -12.302123408954655,
+          "maxX": -12.533261965523113,
+          "maxZ": -7.802123408954655
+        },
+        {
+          "id": "cut-dv6azl",
+          "minX": -2.5,
+          "minZ": -13,
+          "maxX": 9,
+          "maxZ": -7.5
+        },
+        {
+          "id": "cut-i1o6cn",
+          "minX": -2.4966592157892027,
+          "minZ": -22.558903441072236,
+          "maxX": 5.5033407842107875,
+          "maxZ": -11.558903441072236
+        }
+      ],
+      "enemySpawns": [],
       "walls": [
         {
-          "id": "maze-1",
+          "id": "baffle-c",
           "kind": "wall",
-          "minX": -7,
-          "minZ": 11.6,
-          "maxX": 5,
-          "maxZ": 12.1,
-          "h": 1.7
+          "minX": -3.4,
+          "minZ": 8,
+          "maxX": 2.4,
+          "maxZ": 8.5,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "color": "#f2812a"
+            }
+          }
         },
         {
-          "id": "maze-2",
-          "kind": "wall",
-          "minX": -7,
-          "minZ": 8.1,
-          "maxX": -6.5,
-          "maxZ": 11.6,
-          "h": 1.7
-        },
-        {
-          "id": "maze-3",
-          "kind": "wall",
-          "minX": -9.5,
-          "minZ": 7.6,
-          "maxX": -3,
-          "maxZ": 8.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-4",
-          "kind": "wall",
-          "minX": 0,
-          "minZ": 7.6,
-          "maxX": 9,
-          "maxZ": 8.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-5",
-          "kind": "wall",
-          "minX": -9,
-          "minZ": 3.6,
-          "maxX": 1,
-          "maxZ": 4.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-6",
-          "kind": "wall",
-          "minX": 4.5,
-          "minZ": 3.6,
-          "maxX": 12,
-          "maxZ": 4.1,
-          "h": 1.7
-        },
-        {
-          "id": "meet-1",
+          "id": "meet-w",
           "kind": "wall",
           "minX": -12,
-          "minZ": -4.4,
-          "maxX": -8.5,
-          "maxZ": -3.9,
+          "minZ": -5.2,
+          "maxX": -3.8,
+          "maxZ": -4.7,
           "h": 1.7
-        },
-        {
-          "id": "meet-2",
-          "kind": "wall",
-          "minX": -6.5,
-          "minZ": -4.4,
-          "maxX": -1,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "meet-3",
-          "kind": "wall",
-          "minX": 1,
-          "minZ": -4.4,
-          "maxX": 8.5,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "hall-desk",
-          "kind": "wood",
-          "minX": -3,
-          "minZ": -15.8,
-          "maxX": 3,
-          "maxZ": -14.6,
-          "h": 1
         },
         {
           "id": "pillar-1",
           "kind": "pillar",
           "minX": -6.9,
-          "minZ": -18.4,
+          "minZ": -19.2,
           "maxX": -6.1,
-          "maxZ": -17.6,
+          "maxZ": -18.4,
           "h": 1.7
         },
         {
           "id": "pillar-2",
           "kind": "pillar",
           "minX": 6.1,
-          "minZ": -18.4,
+          "minZ": -19.2,
           "maxX": 6.9,
-          "maxZ": -17.6,
+          "maxZ": -18.4,
           "h": 1.7
         },
         {
-          "id": "pillar-3",
-          "kind": "pillar",
-          "minX": -6.9,
-          "minZ": -24.4,
-          "maxX": -6.1,
-          "maxZ": -23.6,
+          "id": "wall-pyq1b0",
+          "kind": "wall",
+          "minX": -2.4822843252562645,
+          "minZ": -28.474893404429395,
+          "maxX": -1.9822843252562645,
+          "maxZ": -25.35,
           "h": 1.7
         },
         {
-          "id": "pillar-4",
-          "kind": "pillar",
-          "minX": 6.1,
-          "minZ": -24.4,
-          "maxX": 6.9,
-          "maxZ": -23.6,
+          "id": "wall-rv9qsr",
+          "kind": "wall",
+          "minX": -0.5,
+          "minZ": 5,
+          "maxX": 13,
+          "maxZ": 5.5,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/tuesday-face-wall-rv9qsr-pz.png"
+            }
+          }
+        },
+        {
+          "id": "wall-wcealv",
+          "kind": "wall",
+          "minX": -6.5,
+          "minZ": -5,
+          "maxX": -6,
+          "maxZ": 2.5,
+          "h": 1.7
+        },
+        {
+          "id": "wall-d0loem",
+          "kind": "wall",
+          "minX": 8.5,
+          "minZ": 20.5,
+          "maxX": 9,
+          "maxZ": 26,
           "h": 1.7
         }
       ],
       "desks": [
         {
           "id": "d1",
-          "minX": -11,
-          "minZ": 20.8,
-          "maxX": -6.5,
-          "maxZ": 22.4,
-          "top": "oak",
-          "kit": "simple",
+          "minX": -10.447542229457051,
+          "minZ": 23.135255482918666,
+          "maxX": -5.847542229457044,
+          "maxZ": 24.735255482918667,
+          "top": "steel",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d2",
-          "minX": -4,
-          "minZ": 20.8,
-          "maxX": 0.5,
-          "maxZ": 22.4,
-          "top": "dark",
-          "kit": "dual",
+          "minX": -5.806627406425314,
+          "minZ": 23.089710546197487,
+          "maxX": -1.0066274064253133,
+          "maxZ": 24.68971054619749,
+          "top": "steel",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d3",
-          "minX": 3,
-          "minZ": 20.8,
-          "maxX": 7.5,
-          "maxZ": 22.4,
-          "top": "white",
-          "kit": "clutter",
+          "minX": -10.547059712776575,
+          "minZ": 20.045662338425384,
+          "maxX": -5.54705971277658,
+          "maxZ": 21.64566233842538,
+          "top": "steel",
+          "kit": "simple",
           "face": "pz"
         },
         {
           "id": "d4",
-          "minX": -9,
-          "minZ": 16.2,
-          "maxX": -4.5,
-          "maxZ": 17.8,
-          "top": "bench",
+          "minX": 2.526273213175677,
+          "minZ": -5.923214520173778,
+          "maxX": 7.526273213175673,
+          "maxZ": -4.123214520173777,
+          "top": "steel",
           "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d5",
-          "minX": -2,
-          "minZ": 16.2,
-          "maxX": 2.5,
-          "maxZ": 17.8,
-          "top": "oak",
-          "kit": "simple",
-          "face": "pz"
-        },
-        {
-          "id": "d6",
-          "minX": 5,
-          "minZ": 16.2,
-          "maxX": 9.5,
-          "maxZ": 17.8,
-          "top": "dark",
-          "kit": "dual",
-          "face": "pz"
-        },
-        {
-          "id": "d7",
-          "minX": -7,
-          "minZ": -9.6,
-          "maxX": -2,
-          "maxZ": -7.6,
-          "top": "white",
-          "kit": "clutter",
-          "face": "pz"
-        },
-        {
-          "id": "d8",
-          "minX": 2,
-          "minZ": -9.6,
-          "maxX": 7,
-          "maxZ": -7.6,
-          "top": "bench",
+          "minX": 10.805187439572428,
+          "minZ": -11.779941645973874,
+          "maxX": 15.805187439572428,
+          "maxZ": -9.979941645973875,
+          "top": "steel",
           "kit": "packed",
-          "face": "pz"
+          "face": "pz",
+          "tone": "light"
+        },
+        {
+          "id": "desk-nhuejc",
+          "minX": 12.5,
+          "minZ": 23,
+          "maxX": 13.5,
+          "maxZ": 25.5,
+          "top": "steel",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-oups28",
+          "minX": 11.33503223952968,
+          "minZ": 23.004715067877093,
+          "maxX": 12.33503223952968,
+          "maxZ": 25.504715067877093,
+          "top": "steel",
+          "kit": "packed",
+          "face": "px",
+          "rotY": -1.5729069657402732,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-x8mhiv",
+          "minX": -10.322901824829163,
+          "minZ": -9.106501844654295,
+          "maxX": -4.322901824829165,
+          "maxZ": -7.606501844654295,
+          "top": "steel",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": -0.013044510781609061,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-tfi5n1",
+          "minX": -10.293160968589369,
+          "minZ": -11.751200652352058,
+          "maxX": -4.29316096858937,
+          "maxZ": -10.251200652352058,
+          "top": "steel",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": -0.013044510781609061,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-g79dl1",
+          "minX": -10.5,
+          "minZ": -15,
+          "maxX": -4,
+          "maxZ": -13,
+          "top": "steel",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": -0.013044510781609061,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-qa8uu6",
+          "minX": -10.5,
+          "minZ": -18.5,
+          "maxX": -4,
+          "maxZ": -16.5,
+          "top": "steel",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": -0.013044510781609061,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-65j553",
+          "minX": -10.651990169285803,
+          "minZ": -23.24339703009517,
+          "maxX": -3.651990169285803,
+          "maxZ": -20.74339703009517,
+          "top": "steel",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": -0.013044510781609061,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-yacgcm",
+          "minX": 5.5,
+          "minZ": 5.5,
+          "maxX": 7.5,
+          "maxZ": 9.5,
+          "top": "steel",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 1.540732546803955,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-ea2nbi",
+          "minX": 9.5,
+          "minZ": 5,
+          "maxX": 11.5,
+          "maxZ": 9.5,
+          "top": "steel",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 1.5563568971921307,
+          "tone": "dark"
         }
       ],
       "props": [
         {
           "id": "plant-1",
           "kind": "plant",
-          "x": -10.8,
-          "z": 25.5,
+          "x": -11.091465651358973,
+          "z": 26.341545433262016,
           "plantKit": "grove"
         },
         {
           "id": "plant-2",
           "kind": "plant",
-          "x": 10.8,
-          "z": 25.5,
-          "plantKit": "cluster"
+          "x": 10.293039587235866,
+          "z": 26.59390400090524,
+          "plantKit": "trio"
         },
         {
           "id": "plant-3",
           "kind": "plant",
-          "x": -10.6,
-          "z": -25.5,
+          "x": 14.4,
+          "z": -25.6,
           "plantKit": "trio"
-        },
-        {
-          "id": "plant-4",
-          "kind": "plant",
-          "x": 10.6,
-          "z": -25.5,
-          "plantKit": "pair"
-        },
-        {
-          "id": "plant-5",
-          "kind": "plant",
-          "x": -10.8,
-          "z": -6.5,
-          "plantKit": "pot"
         },
         {
           "id": "cooler-1",
           "kind": "cooler",
-          "x": 10.6,
-          "z": 13.5
+          "x": -10.8,
+          "z": 11.6
         },
         {
-          "id": "cooler-2",
-          "kind": "cooler",
-          "x": -10.6,
-          "z": -12.2
+          "id": "wet-1",
+          "kind": "wet",
+          "x": -4.69866986616065,
+          "z": 6.907890757034847,
+          "hazard": {
+            "radius": 1.45
+          }
+        },
+        {
+          "id": "wet-2",
+          "kind": "wet",
+          "x": -2.8607245795820724,
+          "z": -6.181389086528279,
+          "hazard": {
+            "radius": 1.5
+          }
+        },
+        {
+          "id": "wet-3",
+          "kind": "wet",
+          "x": 8.8,
+          "z": -8.2
         },
         {
           "id": "win-w-0",
           "kind": "window",
           "x": -11.98,
-          "z": -20,
+          "z": -15.680000000000001,
           "y": 1.15,
           "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-e-0",
-          "kind": "window",
-          "x": 11.98,
-          "z": -20,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
@@ -1574,27 +1723,7 @@
           "id": "win-w-1",
           "kind": "window",
           "x": -11.98,
-          "z": -8,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-e-1",
-          "kind": "window",
-          "x": 11.98,
-          "z": -8,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-w-2",
-          "kind": "window",
-          "x": -11.98,
-          "z": 4,
+          "z": 15.680000000000001,
           "y": 1.15,
           "rotY": 1.5707963267948966,
           "w": 2.4,
@@ -1603,199 +1732,796 @@
         {
           "id": "win-e-2",
           "kind": "window",
-          "x": 11.98,
-          "z": 4,
+          "x": 15.98,
+          "z": -20.96,
           "y": 1.15,
           "rotY": -1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-w-3",
-          "kind": "window",
-          "x": -11.98,
-          "z": 16,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
         {
           "id": "win-e-3",
           "kind": "window",
-          "x": 11.98,
-          "z": 16,
+          "x": 15.98,
+          "z": -3.039999999999999,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "sofa-13d12c",
+          "kind": "sofa",
+          "x": 2,
+          "z": 18.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "sofa-lh05qj",
+          "kind": "sofa",
+          "x": 10,
+          "z": -11.5,
+          "rotY": 0,
+          "tone": "light",
+          "color": "#e07a3a"
+        },
+        {
+          "id": "sofa-xmw1v5",
+          "kind": "sofa",
+          "x": 10,
+          "z": -11.5,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#e07a3a"
+        },
+        {
+          "id": "sofa-z21ah2",
+          "kind": "sofa",
+          "x": 2,
+          "z": 18.5,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ff7024"
+        },
+        {
+          "id": "sofa-rphvxu",
+          "kind": "sofa",
+          "x": 3.794641401508603,
+          "z": 13.426587797112447,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ff7024"
+        },
+        {
+          "id": "sofa-t4emwt",
+          "kind": "sofa",
+          "x": -2.6749133004857586,
+          "z": 12.485069398688633,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ff7024"
+        },
+        {
+          "id": "wet-nhrqpd",
+          "kind": "wet",
+          "x": 0.34442740207053246,
+          "z": 25.90485094300165,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ff7024",
+          "hazard": {
+            "radius": 1.55
+          }
+        },
+        {
+          "id": "whiteboard-2rbctr",
+          "kind": "whiteboard",
+          "x": 7.016922443078641,
+          "z": 21.59682934649931,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "whiteboard-ec03im",
+          "kind": "whiteboard",
+          "x": 14.25741310954144,
+          "z": -5.180098527344239,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-phyim1",
+          "kind": "tv",
+          "x": -9.5,
+          "z": -4.62,
+          "y": 1.38,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "table-585r2d",
+          "kind": "table",
+          "x": -9.434300654790503,
+          "z": -0.5246035492801191,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-d96tmg",
+          "kind": "bin",
+          "x": -11,
+          "z": -3.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "plant-5rg3ko",
+          "kind": "plant",
+          "x": -11.5,
+          "z": -4,
+          "rotY": 0,
+          "tone": "dark",
+          "plantKit": "trio"
+        },
+        {
+          "id": "win-6a17ep",
+          "kind": "window",
+          "x": -11.96,
+          "z": -3,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-mrv1r3",
+          "kind": "window",
+          "x": -11.96,
+          "z": -0.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-k63jt6",
+          "kind": "window",
+          "x": -11.96,
+          "z": 2,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-qek1hj",
+          "kind": "window",
+          "x": -6.54,
+          "z": 1,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-wwj3oi",
+          "kind": "window",
+          "x": -6.54,
+          "z": -1.5,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-n28md3",
+          "kind": "window",
+          "x": -5.96,
+          "z": 1,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-n6nong",
+          "kind": "window",
+          "x": -5.96,
+          "z": -1.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "shelf-z9nw4r",
+          "kind": "shelf",
+          "x": -5.756858243303224,
+          "z": -4.261095907292784,
+          "rotY": 1.5707963267948966,
+          "tone": "dark"
+        },
+        {
+          "id": "shelf-67fr81",
+          "kind": "shelf",
+          "x": -5.8012395417021665,
+          "z": -3.2549534778655245,
+          "rotY": 1.5707963267948966,
+          "tone": "dark"
+        },
+        {
+          "id": "fridge-byr51b",
+          "kind": "fridge",
+          "x": -4.129553253944826,
+          "z": -4.331484300751986,
+          "rotY": 1.5707963267948966,
+          "tone": "dark"
+        },
+        {
+          "id": "fridge-4zjr4l",
+          "kind": "fridge",
+          "x": -4.876393420042644,
+          "z": -4.466082846181361,
+          "rotY": 1.5707963267948966,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-7yfje7",
+          "kind": "tv",
+          "x": 11.5,
+          "z": 20.807772464940946,
+          "y": 1.38,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-s5ll01",
+          "kind": "tv",
+          "x": 13,
+          "z": 20.807772464940946,
+          "y": 1.38,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "plant-lr8hk5",
+          "kind": "plant",
+          "x": 15.5,
+          "z": 21.5,
+          "rotY": 1.5657504153943693,
+          "tone": "dark",
+          "plantKit": "trio"
+        },
+        {
+          "id": "plant-qnamdu",
+          "kind": "plant",
+          "x": 14.5,
+          "z": 21.5,
+          "rotY": 1.5657504153943693,
+          "tone": "dark",
+          "plantKit": "trio"
+        },
+        {
+          "id": "printer-2gy1ie",
+          "kind": "printer",
+          "x": 9,
+          "z": 21,
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-cs8m7p",
+          "kind": "bin",
+          "x": 10,
+          "z": 21.5,
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "coffee-hyt8ou",
+          "kind": "coffee",
+          "x": 9,
+          "z": 22,
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "sofa-ajbawt",
+          "kind": "sofa",
+          "x": 15.5,
+          "z": 26.5,
+          "rotY": 1.5657504153943693,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-il5ijb",
+          "kind": "sofa",
+          "x": 8.5,
+          "z": -22.5,
+          "rotY": -2.641891592630991,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-m3isb2",
+          "kind": "sofa",
+          "x": 11,
+          "z": -22.5,
+          "rotY": -0.28179415217628184,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-qr6544",
+          "kind": "sofa",
+          "x": 14,
+          "z": -22,
+          "rotY": -2.5692679582118845,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-wf0s4w",
+          "kind": "sofa",
+          "x": 11,
+          "z": -19.5,
+          "rotY": 0.9510229296241342,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-oku1hr",
+          "kind": "sofa",
+          "x": 13,
+          "z": -19,
+          "rotY": 1.5657504153943693,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-zkbznd",
+          "kind": "sofa",
+          "x": 8.5,
+          "z": -19,
+          "rotY": 1.5657504153943693,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-4hp8q0",
+          "kind": "sofa",
+          "x": 10,
+          "z": -17,
+          "rotY": -1.4641336372573392,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-24ogv1",
+          "kind": "sofa",
+          "x": 12.5,
+          "z": -16.5,
+          "rotY": -2.704576615709135,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-d56t0c",
+          "kind": "sofa",
+          "x": 15,
+          "z": -18,
+          "rotY": -1.023409528765622,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-qysmcb",
+          "kind": "sofa",
+          "x": 7.5,
+          "z": -16,
+          "rotY": 1.183066729454977,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "sofa-hftwsw",
+          "kind": "sofa",
+          "x": 14,
+          "z": -14,
+          "rotY": 0.16856923091098355,
+          "tone": "dark",
+          "color": "#ff6a1a"
+        },
+        {
+          "id": "bin-2sqx74",
+          "kind": "bin",
+          "x": 10,
+          "z": -26,
+          "rotY": -0.28179415217628184,
+          "tone": "light"
+        },
+        {
+          "id": "bin-qj9r3m",
+          "kind": "bin",
+          "x": 12,
+          "z": -25.5,
+          "rotY": -0.28179415217628184,
+          "tone": "light"
+        },
+        {
+          "id": "bin-v1a99y",
+          "kind": "bin",
+          "x": 12.5,
+          "z": -22,
+          "rotY": -0.28179415217628184,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-t450gn",
+          "kind": "bin",
+          "x": 12,
+          "z": -25.5,
+          "rotY": -0.28179415217628184,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-mtckok",
+          "kind": "bin",
+          "x": 6.5,
+          "z": -17.5,
+          "rotY": -0.28179415217628184,
+          "tone": "dark"
+        },
+        {
+          "id": "win-fgyem0",
+          "kind": "window",
+          "x": 15.96,
+          "z": -23.5,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-1y4rk9",
+          "kind": "window",
+          "x": 15.96,
+          "z": -26,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-8f8483",
+          "kind": "window",
+          "x": 15.96,
+          "z": -18.5,
           "y": 1.15,
           "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         }
       ],
-      "pointLights": [
-        {
-          "id": "pl-start",
-          "x": 0,
-          "z": 24.8,
-          "y": 2.3,
-          "intensity": 80,
-          "distance": 5.6,
-          "color": "#fff1b8"
-        },
-        {
-          "id": "pl-elev",
-          "x": 0,
-          "z": -24.2,
-          "y": 2.5,
-          "intensity": 80,
-          "distance": 5.8,
-          "color": "#c8ffd8"
-        },
-        {
-          "id": "pl-meet-l",
-          "x": -4.5,
-          "z": -8.6,
-          "y": 2.3,
-          "intensity": 76,
-          "distance": 5.4,
-          "color": "#ffe0a8"
-        },
-        {
-          "id": "pl-d6",
-          "x": 7.2,
-          "z": 17,
-          "y": 2.15,
-          "intensity": 66,
-          "distance": 4.7,
-          "color": "#fff1b8"
-        },
-        {
-          "id": "pl-d4",
-          "x": -6.6,
-          "z": 17,
-          "y": 2.25,
-          "intensity": 60,
-          "distance": 4.5,
-          "color": "#ffd889"
-        },
-        {
-          "id": "pl-meet-r",
-          "x": 4.5,
-          "z": -8.6,
-          "y": 2.2,
-          "intensity": 62,
-          "distance": 4.8,
-          "color": "#fff1b8"
-        }
-      ],
       "chairSpawns": [
         {
           "id": "ch1",
-          "x": -5.2,
-          "z": 19.5,
+          "x": -8.4,
+          "z": 19,
           "style": "task"
         },
         {
           "id": "ch2",
-          "x": 1.5,
-          "z": 19.5,
+          "x": -1.8,
+          "z": 19,
           "style": "mesh"
         },
         {
           "id": "ch3",
-          "x": 8,
-          "z": 19.3,
+          "x": -7.8,
+          "z": 13.6,
           "style": "guest"
-        },
-        {
-          "id": "ch4",
-          "x": -3,
-          "z": 15,
-          "style": "stool"
         },
         {
           "id": "ch5",
-          "x": 4,
-          "z": 15.2,
-          "style": "exec"
-        },
-        {
-          "id": "ch6",
-          "x": -10,
-          "z": 14.5,
-          "style": "task"
-        },
-        {
-          "id": "ch7",
-          "x": -4.5,
-          "z": -6.5,
-          "style": "mesh"
-        },
-        {
-          "id": "ch8",
-          "x": 4.5,
-          "z": -6.5,
+          "x": 9.590181804522663,
+          "z": -9.469432178322467,
           "style": "guest"
         },
         {
-          "id": "ch9",
-          "x": 0,
-          "z": -10.8,
-          "style": "stool"
-        },
-        {
-          "id": "ch10",
-          "x": 5,
-          "z": -16.5,
+          "id": "ch6",
+          "x": -4.856608327669692,
+          "z": -12.439108416239993,
           "style": "exec"
         },
         {
-          "id": "ch11",
-          "x": -5,
-          "z": -19,
-          "style": "task"
+          "id": "chair-viikk5",
+          "x": -3.5,
+          "z": 21,
+          "style": "task",
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-lxns4h",
+          "x": -8,
+          "z": 22,
+          "style": "task",
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-6kadxm",
+          "x": -6,
+          "z": 22,
+          "style": "task",
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-udiaer",
+          "x": -2.5,
+          "z": 22,
+          "style": "task",
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-98crbq",
+          "x": -4,
+          "z": 25,
+          "style": "task",
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-7qtu70",
+          "x": -7,
+          "z": 25,
+          "style": "task",
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-dlft7q",
+          "x": -10,
+          "z": 12.5,
+          "style": "task",
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-g8k9cf",
+          "x": -11.5,
+          "z": -1,
+          "style": "task",
+          "rotY": 2.189729357842012,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-qd9pkp",
+          "x": -10,
+          "z": -3,
+          "style": "task",
+          "rotY": -0.8202072889892691,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-66vwep",
+          "x": -8,
+          "z": -1,
+          "style": "task",
+          "rotY": -0.9044149282598597,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-wzsfba",
+          "x": -9,
+          "z": 1,
+          "style": "task",
+          "rotY": 2.919255751642618,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-77j7zc",
+          "x": -10,
+          "z": 0.5,
+          "style": "task",
+          "rotY": 2.411473700714813,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-4dbj3z",
+          "x": 10.5,
+          "z": 23,
+          "style": "task",
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-ib7dup",
+          "x": 10.5,
+          "z": 24.5,
+          "style": "task",
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-dha2xu",
+          "x": 14.5,
+          "z": 23,
+          "style": "task",
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-zro0q9",
+          "x": 14,
+          "z": 24.5,
+          "style": "task",
+          "rotY": 1.5657504153943693,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-5jjcdx",
+          "x": 8.5,
+          "z": 6.5,
+          "style": "exec",
+          "rotY": -1.7671077922886176,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-2pekng",
+          "x": 8.5,
+          "z": 8.5,
+          "style": "exec",
+          "rotY": -1.8768666223934292,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-g08amv",
+          "x": 12.5,
+          "z": 6.5,
+          "style": "mesh",
+          "rotY": -1.8450680314587984,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-dhund1",
+          "x": 12.5,
+          "z": 8,
+          "style": "exec",
+          "rotY": -1.8450680314587984,
+          "tone": "dark"
         }
       ],
-      "enemySpawns": [],
-      "heavyAnchors": [],
-      "interceptorSpawns": []
+      "heavyAnchors": [
+        {
+          "id": "hv-ud9jj2",
+          "x": -4.5,
+          "z": 8.5
+        },
+        {
+          "id": "hv-jfu70p",
+          "x": 14,
+          "z": 4
+        },
+        {
+          "id": "hv-4twc9w",
+          "x": 5.5,
+          "z": -25.5
+        }
+      ],
+      "interceptorSpawns": [],
+      "menuChase": [
+        {
+          "x": -9.6,
+          "z": 23
+        },
+        {
+          "x": -9.8,
+          "z": 12
+        },
+        {
+          "x": -9.6,
+          "z": 2
+        },
+        {
+          "x": -8.8,
+          "z": -8
+        },
+        {
+          "x": -4,
+          "z": -16.5
+        },
+        {
+          "x": 0,
+          "z": -24
+        },
+        {
+          "x": 8.8,
+          "z": -16
+        },
+        {
+          "x": 10.4,
+          "z": -6
+        },
+        {
+          "x": 2.4,
+          "z": 1.6
+        },
+        {
+          "x": -2,
+          "z": 12
+        },
+        {
+          "x": -2.2,
+          "z": 22
+        }
+      ],
+      "boundFaces": {
+        "bound-5": {
+          "pz": {
+            "color": "#fb7c13"
+          }
+        },
+        "bound-9": {
+          "pz": {
+            "map": "/levels/textures/tuesday-face-bound-9-pz.png"
+          }
+        },
+        "bound-3": {
+          "pz": {
+            "map": "/levels/textures/tuesday-face-bound-3-pz.png"
+          }
+        },
+        "bound-21": {
+          "nx": {
+            "map": "/levels/textures/tuesday-face-bound-21-nx.png"
+          }
+        }
+      }
     },
     {
       "id": "wednesday",
       "label": "周三",
       "map": {
-        "minX": -12,
-        "maxX": 12,
+        "minX": -16,
+        "maxX": 16,
         "minZ": -28,
         "maxZ": 28
       },
       "playerStart": {
         "x": 0,
-        "z": 25.5
+        "z": 24.8
       },
       "elevator": {
-        "minX": -2,
-        "maxX": 2,
-        "minZ": -28,
-        "maxZ": -26,
+        "minX": -1.5,
+        "maxX": 1.5,
+        "minZ": -27.82,
+        "maxZ": -26.290000000000003,
         "point": {
           "x": 0,
-          "z": -27
-        }
+          "z": -27.94
+        },
+        "rotY": 0
       },
       "atmosphere": {
-        "background": "#2a1c14",
-        "fogColor": "#2a1c14",
-        "fogNear": 16,
-        "fogFar": 46,
-        "exposure": 1,
+        "background": "#4a2818",
+        "fogColor": "#4a2818",
+        "fogNear": 60,
+        "fogFar": 90,
+        "exposure": 1.7,
         "ambient": {
-          "color": "#ffc080",
-          "intensity": 0.03
+          "color": "#ffb070",
+          "intensity": 0.7
         },
         "hemisphere": {
-          "sky": "#fff4e4",
-          "ground": "#8a7a66",
-          "intensity": 0.4
+          "sky": "#ffb070",
+          "ground": "#6a3a28",
+          "intensity": 0.38
         },
         "sun": {
           "color": "#fff2dc",
@@ -1817,324 +2543,517 @@
           ]
         },
         "lampColor": "#ffd089",
-        "lampIntensity": 80,
+        "lampIntensity": 70,
         "overheadHeight": 2.3,
-        "lampDistance": 5.2,
+        "lampDistance": 4.5,
         "overheadSpacing": 8,
         "followEnabled": false,
         "followColor": "#fff2dc",
         "followIntensity": 1.2,
         "followHeight": 7.2,
         "floor": {
-          "color": "#ffffff",
-          "shininess": 8,
+          "color": "#c4b8a8",
+          "shininess": 22,
           "bumpScale": 1.2,
-          "map": null,
-          "kind": "carpet",
+          "map": "/levels/textures/wednesday-floor.webp",
+          "kind": "image",
           "repeat": 8
         },
         "wall": {
-          "color": "#ffffff",
-          "shininess": 8,
+          "color": "#d8d0c4",
+          "shininess": 12,
           "map": null
         },
         "elevatorGlow": "#7ef0a0",
         "sky": "dusk",
         "furnitureTone": "dark"
       },
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": 0,
+          "z": 22.5,
+          "y": 3.2,
+          "intensity": 64,
+          "distance": 10,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-stem",
+          "x": 3.066045353619612,
+          "z": 9.812685352339635,
+          "y": 3,
+          "intensity": 56,
+          "distance": 10,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-bar-w",
+          "x": -9.068748319893386,
+          "z": -1.2675209187278682,
+          "y": 3.2,
+          "intensity": 62,
+          "distance": 10,
+          "color": "#ffe0a8"
+        },
+        {
+          "id": "pl-bar-e",
+          "x": 7.183778236201606,
+          "z": -6.984971064652164,
+          "y": 3.2,
+          "intensity": 62,
+          "distance": 10,
+          "color": "#ffe0a8"
+        },
+        {
+          "id": "pl-hall",
+          "x": -2.417664917975358,
+          "z": -17.409463809977133,
+          "y": 3.2,
+          "intensity": 52,
+          "distance": 10,
+          "color": "#fff4d0"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0.8009194589906627,
+          "z": -26.381447764482544,
+          "y": 2.5,
+          "intensity": 70,
+          "distance": 5,
+          "color": "#c8ffd8"
+        }
+      ],
+      "voids": [
+        {
+          "id": "cut-sw",
+          "minX": -16,
+          "minZ": 6,
+          "maxX": -6,
+          "maxZ": 28
+        },
+        {
+          "id": "cut-se",
+          "minX": 7.475260106226241,
+          "minZ": 5.956335067851558,
+          "maxX": 17.47526010622625,
+          "maxZ": 27.95633506785156
+        },
+        {
+          "id": "cut-hw97tr",
+          "minX": -12.360305995384408,
+          "minZ": 11.82651510285983,
+          "maxX": -3.8603059953844108,
+          "maxZ": 21,
+          "shape": "circle",
+          "rotY": 3.141592653589793
+        },
+        {
+          "id": "cut-1wsacn",
+          "minX": -24.696458841066658,
+          "minZ": -34.60500164926182,
+          "maxX": -11.396188594170983,
+          "maxZ": -22.74508719482115,
+          "shape": "circle",
+          "rotY": 1.5707963267948966
+        },
+        {
+          "id": "cut-soi3xz",
+          "minX": 10.5,
+          "minZ": -35,
+          "maxX": 23.5,
+          "maxZ": -23.5,
+          "shape": "circle",
+          "rotY": 1.5707963267948966
+        },
+        {
+          "id": "cut-rbx1uy",
+          "minX": 4.990483658106463,
+          "minZ": 11.326998730408949,
+          "maxX": 15,
+          "maxZ": 21,
+          "shape": "circle",
+          "rotY": 1.5707963267948966
+        },
+        {
+          "id": "cut-3gxaz1",
+          "minX": -4.216371776165631,
+          "minZ": -5.349221787113387,
+          "maxX": 4.783628223834369,
+          "maxZ": 3.150778212886613,
+          "shape": "circle",
+          "rotY": 1.5707963267948966
+        }
+      ],
+      "enemySpawns": [],
       "walls": [
         {
-          "id": "maze-1",
+          "id": "store-n",
           "kind": "wall",
-          "minX": -7,
-          "minZ": 11.6,
-          "maxX": 5,
-          "maxZ": 12.1,
+          "minX": -16.00761614156457,
+          "minZ": 1.292168133592369,
+          "maxX": -9.20761614156456,
+          "maxZ": 1.792168133592369,
           "h": 1.7
         },
         {
-          "id": "maze-2",
+          "id": "store-s",
           "kind": "wall",
-          "minX": -7,
-          "minZ": 8.1,
-          "maxX": -6.5,
-          "maxZ": 11.6,
+          "minX": -16.086596938275672,
+          "minZ": -8.574400105245198,
+          "maxX": -9.286596938275675,
+          "maxZ": -8.074400105245198,
           "h": 1.7
         },
         {
-          "id": "maze-3",
+          "id": "store-e",
           "kind": "wall",
-          "minX": -9.5,
-          "minZ": 7.6,
-          "maxX": -3,
-          "maxZ": 8.1,
+          "minX": -9.305111482887545,
+          "minZ": -8.55843486981036,
+          "maxX": -8.805111482887545,
+          "maxZ": -2.6584348698103613,
           "h": 1.7
         },
         {
-          "id": "maze-4",
+          "id": "meet-e",
           "kind": "wall",
-          "minX": 0,
-          "minZ": 7.6,
-          "maxX": 9,
-          "maxZ": 8.1,
+          "minX": 7.4,
+          "minZ": -10.8,
+          "maxX": 16,
+          "maxZ": -10.3,
           "h": 1.7
-        },
-        {
-          "id": "maze-5",
-          "kind": "wall",
-          "minX": -9,
-          "minZ": 3.6,
-          "maxX": 1,
-          "maxZ": 4.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-6",
-          "kind": "wall",
-          "minX": 4.5,
-          "minZ": 3.6,
-          "maxX": 12,
-          "maxZ": 4.1,
-          "h": 1.7
-        },
-        {
-          "id": "meet-1",
-          "kind": "wall",
-          "minX": -12,
-          "minZ": -4.4,
-          "maxX": -8.5,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "meet-2",
-          "kind": "wall",
-          "minX": -6.5,
-          "minZ": -4.4,
-          "maxX": -1,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "meet-3",
-          "kind": "wall",
-          "minX": 1,
-          "minZ": -4.4,
-          "maxX": 8.5,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "hall-desk",
-          "kind": "wood",
-          "minX": -3,
-          "minZ": -15.8,
-          "maxX": 3,
-          "maxZ": -14.6,
-          "h": 1
         },
         {
           "id": "pillar-1",
           "kind": "pillar",
-          "minX": -6.9,
-          "minZ": -18.4,
-          "maxX": -6.1,
-          "maxZ": -17.6,
+          "minX": -5.2,
+          "minZ": -21,
+          "maxX": -4.4,
+          "maxZ": -20.2,
           "h": 1.7
         },
         {
           "id": "pillar-2",
           "kind": "pillar",
-          "minX": 6.1,
-          "minZ": -18.4,
-          "maxX": 6.9,
-          "maxZ": -17.6,
+          "minX": 4.05311443576593,
+          "minZ": -24.100069072926672,
+          "maxX": 4.85311443576593,
+          "maxZ": -23.30006907292667,
           "h": 1.7
         },
         {
-          "id": "pillar-3",
-          "kind": "pillar",
-          "minX": -6.9,
-          "minZ": -24.4,
-          "maxX": -6.1,
-          "maxZ": -23.6,
+          "id": "wall-e0b2mq",
+          "kind": "wall",
+          "minX": 0,
+          "minZ": 3,
+          "maxX": 0.5,
+          "maxZ": 10,
           "h": 1.7
         },
         {
-          "id": "pillar-4",
+          "id": "wall-sbe2pu",
+          "kind": "wall",
+          "minX": -6.5,
+          "minZ": 0.5,
+          "maxX": -6,
+          "maxZ": 6,
+          "h": 1.7
+        },
+        {
+          "id": "wall-7cazdf",
+          "kind": "wall",
+          "minX": -6.60497917925996,
+          "minZ": -2.5460859553823383,
+          "maxX": -3.60497917925996,
+          "maxZ": -2.0460859553823383,
+          "h": 1.7
+        },
+        {
+          "id": "wall-5709hj",
+          "kind": "wall",
+          "minX": -6.21446631665599,
+          "minZ": 9.455309593620061,
+          "maxX": 0.28553368334400986,
+          "maxZ": 9.955309593620061,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/wednesday-face-wall-5709hj-pz.png"
+            }
+          }
+        },
+        {
+          "id": "wall-d4v8cz",
+          "kind": "wall",
+          "minX": 4.288363170359047,
+          "minZ": -2.0469988149414746,
+          "maxX": 12.288363170359055,
+          "maxZ": -1.5469988149414746,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/wednesday-face-wall-d4v8cz-pz.png"
+            }
+          }
+        },
+        {
+          "id": "wall-0b05br",
+          "kind": "wall",
+          "minX": 7.410991281679859,
+          "minZ": -10.71358660786878,
+          "maxX": 7.910991281679859,
+          "maxZ": -4.7135866078687805,
+          "h": 1.7
+        },
+        {
+          "id": "wall-dordg9",
+          "kind": "wall",
+          "minX": -12.878824741785515,
+          "minZ": -11.979400209143066,
+          "maxX": 6.121175258214484,
+          "maxZ": -11.479400209143066,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/wednesday-face-wall-dordg9-pz.png"
+            }
+          }
+        },
+        {
+          "id": "wall-9zo6b6",
+          "kind": "wall",
+          "minX": 4.436027704391186,
+          "minZ": -16.002690415208818,
+          "maxX": 11.936027704391186,
+          "maxZ": -15.502690415208818,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/wednesday-face-wall-9zo6b6-pz.png"
+            }
+          }
+        },
+        {
+          "id": "pillar-2cqc2t",
           "kind": "pillar",
-          "minX": 6.1,
-          "minZ": -24.4,
-          "maxX": 6.9,
-          "maxZ": -23.6,
+          "minX": -10,
+          "minZ": 3.5,
+          "maxX": -9,
+          "maxZ": 4,
+          "h": 1.7
+        },
+        {
+          "id": "wall-z2v95f",
+          "kind": "wall",
+          "minX": -7,
+          "minZ": -28.5,
+          "maxX": -6.5,
+          "maxZ": -21,
+          "h": 1.7
+        },
+        {
+          "id": "wall-olvwcv",
+          "kind": "wall",
+          "minX": -2.8941807791549587,
+          "minZ": -23.956401793169114,
+          "maxX": 4.105819220845041,
+          "maxZ": -23.456401793169114,
+          "h": 1.7
+        },
+        {
+          "id": "wall-gc1b1q",
+          "kind": "wall",
+          "minX": 4.5,
+          "minZ": -28.5,
+          "maxX": 5,
+          "maxZ": -25.5,
           "h": 1.7
         }
       ],
       "desks": [
         {
           "id": "d1",
-          "minX": -11,
-          "minZ": 20.8,
-          "maxX": -6.5,
-          "maxZ": 22.4,
-          "top": "oak",
-          "kit": "simple",
+          "minX": -5.303459215202089,
+          "minZ": 20.99809776600097,
+          "maxX": -0.7034592152020961,
+          "maxZ": 22.59809776600097,
+          "top": "dark",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d2",
-          "minX": -4,
-          "minZ": 20.8,
-          "maxX": 0.5,
-          "maxZ": 22.4,
+          "minX": 0.7597188676808644,
+          "minZ": 20.973338809511702,
+          "maxX": 5.15971886768086,
+          "maxZ": 22.5733388095117,
           "top": "dark",
           "kit": "dual",
           "face": "pz"
         },
         {
           "id": "d3",
-          "minX": 3,
-          "minZ": 20.8,
-          "maxX": 7.5,
-          "maxZ": 22.4,
-          "top": "white",
-          "kit": "clutter",
+          "minX": -15.930494858052295,
+          "minZ": -4.743385859664367,
+          "maxX": -10.930494858052295,
+          "maxZ": -2.9433858596643674,
+          "top": "dark",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d4",
-          "minX": -9,
-          "minZ": 16.2,
-          "maxX": -4.5,
-          "maxZ": 17.8,
-          "top": "bench",
-          "kit": "packed",
-          "face": "pz"
-        },
-        {
-          "id": "d5",
-          "minX": -2,
-          "minZ": 16.2,
-          "maxX": 2.5,
-          "maxZ": 17.8,
-          "top": "oak",
-          "kit": "simple",
-          "face": "pz"
-        },
-        {
-          "id": "d6",
-          "minX": 5,
-          "minZ": 16.2,
-          "maxX": 9.5,
-          "maxZ": 17.8,
-          "top": "dark",
-          "kit": "dual",
-          "face": "pz"
-        },
-        {
-          "id": "d7",
-          "minX": -7,
-          "minZ": -9.6,
-          "maxX": -2,
-          "maxZ": -7.6,
+          "minX": 8.4,
+          "minZ": -6.8,
+          "maxX": 13.4,
+          "maxZ": -5,
           "top": "white",
           "kit": "clutter",
           "face": "pz"
         },
         {
-          "id": "d8",
-          "minX": 2,
-          "minZ": -9.6,
-          "maxX": 7,
-          "maxZ": -7.6,
+          "id": "d5",
+          "minX": -3.2,
+          "minZ": -8.2,
+          "maxX": 1.6,
+          "maxZ": -6.4,
           "top": "bench",
           "kit": "packed",
           "face": "pz"
+        },
+        {
+          "id": "desk-2rgoxg",
+          "minX": -10,
+          "minZ": -18.5,
+          "maxX": -8,
+          "maxZ": -15,
+          "top": "dark",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 1.6960219328544672,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "desk-fgde8v",
+          "minX": -6,
+          "minZ": -19.5,
+          "maxX": -4,
+          "maxZ": -15,
+          "top": "dark",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 1.7054602344879015,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "desk-kfomvu",
+          "minX": 5.74952451445894,
+          "minZ": -22.04310528414873,
+          "maxX": 11.249524514458942,
+          "maxZ": -20.04310528414873,
+          "top": "oak",
+          "kit": "clutter",
+          "face": "nx",
+          "rotY": 2.3066812825713545,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "desk-d6fmvb",
+          "minX": 10,
+          "minZ": -1.5,
+          "maxX": 12,
+          "maxZ": 3.5,
+          "top": "dark",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 1.5661630791920331,
+          "tone": "dark",
+          "color": "#ffd60a"
         }
       ],
       "props": [
         {
           "id": "plant-1",
           "kind": "plant",
-          "x": -10.8,
-          "z": 25.5,
+          "x": -5.030086252825017,
+          "z": 27.20764555278179,
           "plantKit": "grove"
         },
         {
           "id": "plant-2",
           "kind": "plant",
-          "x": 10.8,
-          "z": 25.5,
+          "x": 5.233393641775875,
+          "z": 27.286572348908305,
           "plantKit": "cluster"
         },
         {
           "id": "plant-3",
           "kind": "plant",
-          "x": -10.6,
-          "z": -25.5,
+          "x": -11.56522533647259,
+          "z": -26.608956313304116,
           "plantKit": "trio"
         },
         {
-          "id": "plant-4",
-          "kind": "plant",
-          "x": 10.6,
-          "z": -25.5,
-          "plantKit": "pair"
+          "id": "cabinet-1",
+          "kind": "cabinet",
+          "x": -15.474863616659439,
+          "z": -7.405672686064577
         },
         {
-          "id": "plant-5",
-          "kind": "plant",
-          "x": -10.8,
-          "z": -6.5,
-          "plantKit": "pot"
+          "id": "cabinet-2",
+          "kind": "cabinet",
+          "x": -14.755578773610292,
+          "z": -7.342930067306883
         },
         {
           "id": "cooler-1",
           "kind": "cooler",
-          "x": 10.6,
-          "z": 13.5
+          "x": 14.4,
+          "z": 2.8
         },
         {
-          "id": "cooler-2",
-          "kind": "cooler",
-          "x": -10.6,
-          "z": -12.2
+          "id": "wet-1",
+          "kind": "wet",
+          "x": 6.431181162224352,
+          "z": 5.521017485374017,
+          "hazard": {
+            "radius": 1.45,
+            "factor": 0.7
+          }
         },
         {
-          "id": "win-w-0",
-          "kind": "window",
-          "x": -11.98,
-          "z": -20,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
+          "id": "wet-2",
+          "kind": "wet",
+          "x": -7.729740311191766,
+          "z": -2.313473968637867,
+          "hazard": {
+            "radius": 1.35
+          }
+        },
+        {
+          "id": "pit-1",
+          "kind": "pit",
+          "x": -12.4,
+          "z": -0.6
         },
         {
           "id": "win-e-0",
           "kind": "window",
-          "x": 11.98,
-          "z": -20,
+          "x": 15.98,
+          "z": -20.520000000000003,
           "y": 1.15,
           "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
         {
-          "id": "win-w-1",
-          "kind": "window",
-          "x": -11.98,
-          "z": -8,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
           "id": "win-e-1",
           "kind": "window",
-          "x": 11.98,
-          "z": -8,
+          "x": 15.98,
+          "z": -1.4799999999999986,
           "y": 1.15,
           "rotY": -1.5707963267948966,
           "w": 2.4,
@@ -2143,209 +3062,516 @@
         {
           "id": "win-w-2",
           "kind": "window",
-          "x": -11.98,
-          "z": 4,
+          "x": -15.98,
+          "z": -20.520000000000003,
           "y": 1.15,
           "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-e-2",
-          "kind": "window",
-          "x": 11.98,
-          "z": 4,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
         {
           "id": "win-w-3",
           "kind": "window",
-          "x": -11.98,
-          "z": 16,
+          "x": -15.98,
+          "z": -1.4799999999999986,
           "y": 1.15,
           "rotY": 1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
         {
-          "id": "win-e-3",
+          "id": "win-w-4",
           "kind": "window",
-          "x": 11.98,
-          "z": 16,
+          "x": -5.98,
+          "z": 10.84,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-w-5",
+          "kind": "window",
+          "x": -5.96,
+          "z": 25.305759344477927,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-6",
+          "kind": "window",
+          "x": 5.98,
+          "z": 10.84,
           "y": 1.15,
           "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
-        }
-      ],
-      "pointLights": [
-        {
-          "id": "pl-start",
-          "x": 0,
-          "z": 24.8,
-          "y": 2.3,
-          "intensity": 80,
-          "distance": 5.6,
-          "color": "#fff1b8"
         },
         {
-          "id": "pl-elev",
-          "x": 0,
-          "z": -24.2,
-          "y": 2.5,
-          "intensity": 80,
-          "distance": 5.8,
-          "color": "#c8ffd8"
+          "id": "sofa-z460vj",
+          "kind": "sofa",
+          "x": -1,
+          "z": 17.5,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ffcc14"
         },
         {
-          "id": "pl-meet-l",
+          "id": "sofa-c8ftk9",
+          "kind": "sofa",
+          "x": 3,
+          "z": 12.5,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ffcc14"
+        },
+        {
+          "id": "sofa-0cejxw",
+          "kind": "sofa",
+          "x": 4,
+          "z": 15,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ffcc14"
+        },
+        {
+          "id": "sofa-alxczl",
+          "kind": "sofa",
           "x": -4.5,
-          "z": -8.6,
-          "y": 2.3,
-          "intensity": 76,
-          "distance": 5.4,
-          "color": "#ffe0a8"
+          "z": 12.5,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ffcc14"
         },
         {
-          "id": "pl-d6",
-          "x": 7.2,
-          "z": 17,
-          "y": 2.15,
-          "intensity": 66,
-          "distance": 4.7,
-          "color": "#fff1b8"
+          "id": "pit-8w43ks",
+          "kind": "pit",
+          "x": -2,
+          "z": 23.5,
+          "rotY": 0,
+          "tone": "dark",
+          "color": "#ffcc14"
         },
         {
-          "id": "pl-d4",
-          "x": -6.6,
-          "z": 17,
-          "y": 2.25,
-          "intensity": 60,
-          "distance": 4.5,
-          "color": "#ffd889"
+          "id": "door-wdup2n",
+          "kind": "launch",
+          "x": 2.4492935982947064e-18,
+          "z": 27.98,
+          "rotY": 3.141592653589793
         },
         {
-          "id": "pl-meet-r",
+          "id": "door-mlx2pe",
+          "kind": "launch",
+          "x": -1.5,
+          "z": 9.97530959362006,
+          "rotY": 0
+        },
+        {
+          "id": "door-tan8qv",
+          "kind": "launch",
+          "x": -6,
+          "z": -11.459400209143066,
+          "rotY": 0
+        },
+        {
+          "id": "crate-t4yhr2",
+          "kind": "crate",
+          "x": 6.5,
+          "z": 3,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-fmisov",
+          "kind": "crate",
+          "x": 0,
+          "z": 20.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-9pnldc",
+          "kind": "crate",
+          "x": 0.5,
+          "z": 19.5,
+          "rotY": -0.8824131733503964,
+          "tone": "dark"
+        },
+        {
+          "id": "pit-vl7ovc",
+          "kind": "pit",
+          "x": 12.5,
+          "z": -3.5,
+          "rotY": -0.8824131733503964,
+          "tone": "dark"
+        },
+        {
+          "id": "pit-jd7cuq",
+          "kind": "pit",
+          "x": -14.380057468969468,
+          "z": -13.341284609020747,
+          "rotY": -0.8824131733503964,
+          "tone": "dark"
+        },
+        {
+          "id": "pit-yzol1e",
+          "kind": "pit",
           "x": 4.5,
-          "z": -8.6,
-          "y": 2.2,
-          "intensity": 62,
-          "distance": 4.8,
-          "color": "#fff1b8"
+          "z": -22.5,
+          "rotY": -0.8824131733503964,
+          "tone": "dark"
+        },
+        {
+          "id": "pit-57v9rv",
+          "kind": "pit",
+          "x": -3.6253969638153665,
+          "z": -22.421721066517474,
+          "rotY": 1.3532525256261851,
+          "tone": "dark"
+        },
+        {
+          "id": "plant-ebimvn",
+          "kind": "plant",
+          "x": -5.5,
+          "z": 8.5,
+          "rotY": 1.3532525256261851,
+          "tone": "dark",
+          "plantKit": "trio"
+        },
+        {
+          "id": "plant-16z5ol",
+          "kind": "plant",
+          "x": -5.5,
+          "z": 7.5,
+          "rotY": 1.3532525256261851,
+          "tone": "dark",
+          "plantKit": "trio"
+        },
+        {
+          "id": "coffee-zwshts",
+          "kind": "coffee",
+          "x": -6,
+          "z": 4.5,
+          "rotY": 1.3532525256261851,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-v4qkws",
+          "kind": "bin",
+          "x": -4.5,
+          "z": 5.5,
+          "rotY": 1.3532525256261851,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-crm70v",
+          "kind": "bin",
+          "x": -3,
+          "z": 3,
+          "rotY": 1.3532525256261851,
+          "tone": "dark"
+        },
+        {
+          "id": "sofa-qd5030",
+          "kind": "sofa",
+          "x": -14.5,
+          "z": 3,
+          "rotY": -2.8161048426548927,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "sofa-4np6v1",
+          "kind": "sofa",
+          "x": 4,
+          "z": -8.5,
+          "rotY": -2.8161048426548927,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "sofa-ztybgl",
+          "kind": "sofa",
+          "x": 3,
+          "z": -16,
+          "rotY": -2.8161048426548927,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "sofa-s48d6a",
+          "kind": "sofa",
+          "x": -15,
+          "z": -16,
+          "rotY": -2.8161048426548927,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "sofa-ztk7s3",
+          "kind": "sofa",
+          "x": 13,
+          "z": -23,
+          "rotY": -2.8161048426548927,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "sofa-di4rzx",
+          "kind": "sofa",
+          "x": 11.5,
+          "z": -24,
+          "rotY": 0.9414205318676089,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "locker-bo1kl9",
+          "kind": "locker",
+          "x": 10.5,
+          "z": -27.5,
+          "rotY": 0.9414205318676089,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "table-pjpzy2",
+          "kind": "table",
+          "x": -12.5,
+          "z": 3.5,
+          "rotY": 0.9414205318676089,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "table-7doe2j",
+          "kind": "table",
+          "x": -13.5,
+          "z": -20.5,
+          "rotY": 0.9414205318676089,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "table-won1r5",
+          "kind": "table",
+          "x": -11,
+          "z": -22.5,
+          "rotY": 2.3066812825713545,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "door-7ov5hj",
+          "kind": "launch",
+          "x": -1,
+          "z": -23.436401793169114,
+          "rotY": 0
+        },
+        {
+          "id": "bin-n89o2x",
+          "kind": "bin",
+          "x": 12.5,
+          "z": 4,
+          "rotY": 1.5661630791920331,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "bin-i1ysh1",
+          "kind": "bin",
+          "x": 15.5,
+          "z": 4.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark",
+          "color": "#ffd60a"
         }
       ],
       "chairSpawns": [
         {
           "id": "ch1",
-          "x": -5.2,
-          "z": 19.5,
+          "x": -2.6,
+          "z": 19.2,
           "style": "task"
         },
         {
           "id": "ch2",
-          "x": 1.5,
-          "z": 19.5,
+          "x": 3,
+          "z": 19.2,
           "style": "mesh"
         },
         {
           "id": "ch3",
-          "x": 8,
-          "z": 19.3,
+          "x": -11.8,
+          "z": -2,
           "style": "guest"
         },
         {
           "id": "ch4",
-          "x": -3,
-          "z": 15,
+          "x": 10.6,
+          "z": -3.8,
           "style": "stool"
         },
         {
           "id": "ch5",
-          "x": 4,
-          "z": 15.2,
-          "style": "exec"
-        },
-        {
-          "id": "ch6",
-          "x": -10,
-          "z": 14.5,
-          "style": "task"
-        },
-        {
-          "id": "ch7",
-          "x": -4.5,
-          "z": -6.5,
-          "style": "mesh"
-        },
-        {
-          "id": "ch8",
-          "x": 4.5,
-          "z": -6.5,
-          "style": "guest"
-        },
-        {
-          "id": "ch9",
           "x": 0,
-          "z": -10.8,
-          "style": "stool"
-        },
-        {
-          "id": "ch10",
-          "x": 5,
-          "z": -16.5,
+          "z": -18.4,
           "style": "exec"
         },
         {
-          "id": "ch11",
-          "x": -5,
+          "id": "chair-8qnn37",
+          "x": -2,
+          "z": 5,
+          "style": "task",
+          "rotY": 1.3532525256261851,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-v3zrdu",
+          "x": -0.5,
+          "z": 8,
+          "style": "task",
+          "rotY": 1.3532525256261851,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-crd59v",
+          "x": -1,
+          "z": 6,
+          "style": "task",
+          "rotY": -2.8161048426548927,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-6dw4re",
+          "x": -12,
           "z": -19,
-          "style": "task"
+          "style": "task",
+          "rotY": 2.3066812825713545,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "chair-9qhkag",
+          "x": -11.5,
+          "z": -20.5,
+          "style": "task",
+          "rotY": 2.3066812825713545,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "chair-jjjv1g",
+          "x": -9,
+          "z": -21,
+          "style": "task",
+          "rotY": 2.3066812825713545,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "chair-xtszrd",
+          "x": 13.5,
+          "z": -15.5,
+          "style": "task",
+          "rotY": 2.3066812825713545,
+          "tone": "dark",
+          "color": "#ffd60a"
         }
       ],
-      "enemySpawns": [],
-      "heavyAnchors": [],
-      "interceptorSpawns": []
+      "heavyAnchors": [
+        {
+          "id": "hv-1",
+          "x": 0,
+          "z": -16.8
+        }
+      ],
+      "interceptorSpawns": [
+        {
+          "id": "ic-1",
+          "x": 0.2,
+          "z": -22.6
+        }
+      ],
+      "menuChase": [
+        {
+          "x": 0,
+          "z": 23
+        },
+        {
+          "x": 0.2,
+          "z": 12
+        },
+        {
+          "x": -10.4,
+          "z": 2.4
+        },
+        {
+          "x": -12.6,
+          "z": -6
+        },
+        {
+          "x": 0,
+          "z": -14
+        },
+        {
+          "x": 0,
+          "z": -24
+        },
+        {
+          "x": 11.6,
+          "z": -6
+        },
+        {
+          "x": 10.8,
+          "z": 2
+        },
+        {
+          "x": 0.2,
+          "z": 8
+        }
+      ]
     },
     {
       "id": "thursday",
       "label": "周四",
       "map": {
-        "minX": -12,
-        "maxX": 12,
-        "minZ": -28,
+        "minX": -16,
+        "maxX": 16,
+        "minZ": -30,
         "maxZ": 28
       },
       "playerStart": {
-        "x": 0,
-        "z": 25.5
+        "x": 10.4,
+        "z": 24.6
       },
       "elevator": {
-        "minX": -2,
-        "maxX": 2,
-        "minZ": -28,
-        "maxZ": -26,
+        "minX": 4.509767238384618,
+        "maxX": 7.509767238384618,
+        "minZ": -29.82,
+        "maxZ": -28.290000000000003,
         "point": {
-          "x": 0,
-          "z": -27
-        }
+          "x": 6.009767238384618,
+          "z": -29.94
+        },
+        "rotY": 0
       },
       "atmosphere": {
-        "background": "#2a3036",
-        "fogColor": "#2a3036",
-        "fogNear": 12,
-        "fogFar": 38,
-        "exposure": 1,
+        "background": "#0d1421",
+        "fogColor": "#0c1018",
+        "fogNear": 60,
+        "fogFar": 90,
+        "exposure": 2.08,
         "ambient": {
-          "color": "#c5d4de",
-          "intensity": 0.035
+          "color": "#8aa0c8",
+          "intensity": 0.79
         },
         "hemisphere": {
-          "sky": "#fff4e4",
-          "ground": "#8a7a66",
-          "intensity": 0.4
+          "sky": "#6a88b0",
+          "ground": "#1a2230",
+          "intensity": 0.38
         },
         "sun": {
           "color": "#fff2dc",
@@ -2367,238 +3593,312 @@
           ]
         },
         "lampColor": "#dce8f2",
-        "lampIntensity": 72,
+        "lampIntensity": 56,
         "overheadHeight": 2.3,
-        "lampDistance": 5.2,
+        "lampDistance": 4.5,
         "overheadSpacing": 8,
         "followEnabled": false,
         "followColor": "#fff2dc",
         "followIntensity": 1.2,
         "followHeight": 7.2,
         "floor": {
-          "color": "#ffffff",
-          "shininess": 8,
+          "color": "#c4b8a8",
+          "shininess": 22,
           "bumpScale": 1.2,
-          "map": null,
-          "kind": "carpet",
+          "map": "/levels/textures/thursday-floor.jpeg",
+          "kind": "image",
           "repeat": 8
         },
         "wall": {
-          "color": "#ffffff",
+          "color": "#d8d0c4",
           "shininess": 8,
           "map": null
         },
-        "elevatorGlow": "#7ef0a0",
+        "elevatorGlow": "#ce2fee",
         "sky": "night",
         "furnitureTone": "dark"
       },
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": 10.541158117443569,
+          "z": 20.533561525326327,
+          "y": 3.15,
+          "intensity": 64,
+          "distance": 10,
+          "color": "#8ff2ff"
+        },
+        {
+          "id": "pl-east",
+          "x": 11.028442748658446,
+          "z": 3.9774423559330003,
+          "y": 2.75,
+          "intensity": 56,
+          "distance": 10,
+          "color": "#8ff2ff"
+        },
+        {
+          "id": "pl-west",
+          "x": -10.701331584328987,
+          "z": 14.705341647044072,
+          "y": 3.2,
+          "intensity": 80,
+          "distance": 16.2,
+          "color": "#8ff2ff"
+        },
+        {
+          "id": "pl-base",
+          "x": 0,
+          "z": -8,
+          "y": 2.8,
+          "intensity": 64,
+          "distance": 20,
+          "color": "#8ff2ff"
+        },
+        {
+          "id": "pl-hall",
+          "x": -4.198816188383476,
+          "z": -23.04383492567211,
+          "y": 3,
+          "intensity": 52,
+          "distance": 17.9,
+          "color": "#8ff2ff"
+        },
+        {
+          "id": "pl-elev",
+          "x": 5.950247493549054,
+          "z": -27.355953690271924,
+          "y": 2.6,
+          "intensity": 73,
+          "distance": 5.4,
+          "color": "#fcaffd"
+        }
+      ],
+      "voids": [
+        {
+          "id": "cut-mouth",
+          "minX": -5.325309670901272,
+          "minZ": 5.608497619434953,
+          "maxX": 5.67469032909873,
+          "maxZ": 29.00871914708627
+        },
+        {
+          "id": "cut-whd2lt",
+          "minX": -11.5,
+          "minZ": 11.452965024214002,
+          "maxX": 0.5,
+          "maxZ": 23,
+          "shape": "tri",
+          "rotY": 0
+        },
+        {
+          "id": "cut-yt7kh9",
+          "minX": -0.2069028768493233,
+          "minZ": 13,
+          "maxX": 10.5,
+          "maxZ": 28.5,
+          "shape": "tri",
+          "rotY": 0
+        },
+        {
+          "id": "cut-o6qpy7",
+          "minX": -22.97413160610429,
+          "minZ": 11.035982260561706,
+          "maxX": -10.119551524650852,
+          "maxZ": 23.606364520151388,
+          "shape": "tri",
+          "rotY": 3.1378651524488963
+        },
+        {
+          "id": "cut-kv02r3",
+          "minX": -5.5,
+          "minZ": -0.48966080143422297,
+          "maxX": 5.5,
+          "maxZ": 6.510339198565776,
+          "shape": "tri",
+          "rotY": 3.1378651524488963
+        },
+        {
+          "id": "cut-8w90yh",
+          "minX": -19,
+          "minZ": -31,
+          "maxX": -13.5,
+          "maxZ": -20.5,
+          "shape": "tri",
+          "rotY": 3.1378651524488963
+        },
+        {
+          "id": "cut-v7y29b",
+          "minX": 4.5,
+          "minZ": -3.868432793512893,
+          "maxX": 20.48280593250054,
+          "maxZ": 1,
+          "shape": "tri",
+          "rotY": 3.1378651524488963
+        },
+        {
+          "id": "cut-h2x8m6",
+          "minX": 4.5,
+          "minZ": -32.5,
+          "maxX": 22.5,
+          "maxZ": -21.5,
+          "shape": "tri",
+          "rotY": 3.1378651524488963
+        },
+        {
+          "id": "cut-5ei22t",
+          "minX": 12,
+          "minZ": 13,
+          "maxX": 20.5,
+          "maxZ": 24,
+          "shape": "tri",
+          "rotY": 3.1378651524488963
+        },
+        {
+          "id": "cut-48mexs",
+          "minX": -29.022793138310114,
+          "minZ": -17.99896041880938,
+          "maxX": -5.546358333996249,
+          "maxZ": -10.001613836085223,
+          "shape": "tri",
+          "rotY": 0.00822328415652648
+        },
+        {
+          "id": "cut-d60u0a",
+          "minX": -5.538830954427994,
+          "minZ": -15.32508270926901,
+          "maxX": 12.565889858255005,
+          "maxZ": -9.490416480901585,
+          "shape": "tri",
+          "rotY": 3.141592653589793
+        }
+      ],
+      "enemySpawns": [],
       "walls": [
         {
-          "id": "maze-1",
+          "id": "gate-e",
           "kind": "wall",
-          "minX": -7,
-          "minZ": 11.6,
-          "maxX": 5,
-          "maxZ": 12.1,
+          "minX": 6.2,
+          "minZ": 8.6,
+          "maxX": 12.8,
+          "maxZ": 9.1,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/thursday-face-gate-e-pz.png"
+            }
+          }
+        },
+        {
+          "id": "baffle-w",
+          "kind": "wall",
+          "minX": -13.2,
+          "minZ": 7.2,
+          "maxX": -7,
+          "maxZ": 7.7,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/thursday-face-baffle-w-pz.png"
+            }
+          }
+        },
+        {
+          "id": "store-e",
+          "kind": "wall",
+          "minX": -8.8,
+          "minZ": -8.4,
+          "maxX": -8.3,
+          "maxZ": 0.4,
           "h": 1.7
         },
         {
-          "id": "maze-2",
+          "id": "store-n",
           "kind": "wall",
-          "minX": -7,
-          "minZ": 8.1,
-          "maxX": -6.5,
-          "maxZ": 11.6,
-          "h": 1.7
+          "minX": -16,
+          "minZ": 0.4,
+          "maxX": -8.3,
+          "maxZ": 0.9,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/thursday-face-store-n-pz.png"
+            }
+          }
         },
         {
-          "id": "maze-3",
+          "id": "pinch",
           "kind": "wall",
-          "minX": -9.5,
-          "minZ": 7.6,
-          "maxX": -3,
-          "maxZ": 8.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-4",
-          "kind": "wall",
-          "minX": 0,
-          "minZ": 7.6,
-          "maxX": 9,
-          "maxZ": 8.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-5",
-          "kind": "wall",
-          "minX": -9,
-          "minZ": 3.6,
-          "maxX": 1,
-          "maxZ": 4.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-6",
-          "kind": "wall",
-          "minX": 4.5,
-          "minZ": 3.6,
-          "maxX": 12,
-          "maxZ": 4.1,
-          "h": 1.7
-        },
-        {
-          "id": "meet-1",
-          "kind": "wall",
-          "minX": -12,
-          "minZ": -4.4,
-          "maxX": -8.5,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "meet-2",
-          "kind": "wall",
-          "minX": -6.5,
-          "minZ": -4.4,
-          "maxX": -1,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "meet-3",
-          "kind": "wall",
-          "minX": 1,
-          "minZ": -4.4,
-          "maxX": 8.5,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "hall-desk",
-          "kind": "wood",
-          "minX": -3,
-          "minZ": -15.8,
-          "maxX": 3,
-          "maxZ": -14.6,
-          "h": 1
+          "minX": -1.6,
+          "minZ": -21.4,
+          "maxX": 1.6,
+          "maxZ": -21,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/thursday-face-pinch-pz.png"
+            }
+          }
         },
         {
           "id": "pillar-1",
           "kind": "pillar",
-          "minX": -6.9,
-          "minZ": -18.4,
-          "maxX": -6.1,
-          "maxZ": -17.6,
-          "h": 1.7
-        },
-        {
-          "id": "pillar-2",
-          "kind": "pillar",
-          "minX": 6.1,
-          "minZ": -18.4,
-          "maxX": 6.9,
-          "maxZ": -17.6,
-          "h": 1.7
-        },
-        {
-          "id": "pillar-3",
-          "kind": "pillar",
-          "minX": -6.9,
-          "minZ": -24.4,
-          "maxX": -6.1,
-          "maxZ": -23.6,
-          "h": 1.7
-        },
-        {
-          "id": "pillar-4",
-          "kind": "pillar",
-          "minX": 6.1,
-          "minZ": -24.4,
-          "maxX": 6.9,
-          "maxZ": -23.6,
+          "minX": -6.4,
+          "minZ": -24.2,
+          "maxX": -5.6,
+          "maxZ": -23.4,
           "h": 1.7
         }
       ],
       "desks": [
         {
           "id": "d1",
-          "minX": -11,
-          "minZ": 20.8,
-          "maxX": -6.5,
-          "maxZ": 22.4,
-          "top": "oak",
-          "kit": "simple",
+          "minX": 7.197575943752548,
+          "minZ": 17.51951047675237,
+          "maxX": 12.197575943752547,
+          "maxZ": 19.11951047675237,
+          "top": "dark",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d2",
-          "minX": -4,
-          "minZ": 20.8,
-          "maxX": 0.5,
-          "maxZ": 22.4,
-          "top": "dark",
+          "minX": -14.4,
+          "minZ": 20.2,
+          "maxX": -9.2,
+          "maxZ": 21.8,
+          "top": "oak",
           "kit": "dual",
           "face": "pz"
         },
         {
           "id": "d3",
-          "minX": 3,
-          "minZ": 20.8,
-          "maxX": 7.5,
-          "maxZ": 22.4,
-          "top": "white",
-          "kit": "clutter",
+          "minX": -3.2,
+          "minZ": -4.8,
+          "maxX": 2,
+          "maxZ": -3,
+          "top": "walnut",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d4",
-          "minX": -9,
-          "minZ": 16.2,
-          "maxX": -4.5,
-          "maxZ": 17.8,
-          "top": "bench",
-          "kit": "packed",
-          "face": "pz"
-        },
-        {
-          "id": "d5",
-          "minX": -2,
-          "minZ": 16.2,
-          "maxX": 2.5,
-          "maxZ": 17.8,
-          "top": "oak",
+          "minX": 7.4,
+          "minZ": -7.6,
+          "maxX": 12.6,
+          "maxZ": -5.8,
+          "top": "white",
           "kit": "simple",
           "face": "pz"
         },
         {
-          "id": "d6",
-          "minX": 5,
-          "minZ": 16.2,
-          "maxX": 9.5,
-          "maxZ": 17.8,
-          "top": "dark",
-          "kit": "dual",
-          "face": "pz"
-        },
-        {
-          "id": "d7",
-          "minX": -7,
-          "minZ": -9.6,
-          "maxX": -2,
-          "maxZ": -7.6,
-          "top": "white",
-          "kit": "clutter",
-          "face": "pz"
-        },
-        {
-          "id": "d8",
-          "minX": 2,
-          "minZ": -9.6,
-          "maxX": 7,
-          "maxZ": -7.6,
+          "id": "d5",
+          "minX": -14.6,
+          "minZ": -6.8,
+          "maxX": -9.6,
+          "maxZ": -5,
           "top": "bench",
-          "kit": "packed",
+          "kit": "clutter",
           "face": "pz"
         }
       ],
@@ -2606,296 +3906,205 @@
         {
           "id": "plant-1",
           "kind": "plant",
-          "x": -10.8,
-          "z": 25.5,
-          "plantKit": "grove"
+          "x": 14.4,
+          "z": 25.6,
+          "plantKit": "cluster"
         },
         {
           "id": "plant-2",
           "kind": "plant",
-          "x": 10.8,
-          "z": 25.5,
-          "plantKit": "cluster"
+          "x": -14.4,
+          "z": 25.6,
+          "plantKit": "trio"
         },
         {
           "id": "plant-3",
           "kind": "plant",
-          "x": -10.6,
-          "z": -25.5,
-          "plantKit": "trio"
-        },
-        {
-          "id": "plant-4",
-          "kind": "plant",
-          "x": 10.6,
-          "z": -25.5,
+          "x": 14.4,
+          "z": -27.6,
           "plantKit": "pair"
-        },
-        {
-          "id": "plant-5",
-          "kind": "plant",
-          "x": -10.8,
-          "z": -6.5,
-          "plantKit": "pot"
         },
         {
           "id": "cooler-1",
           "kind": "cooler",
-          "x": 10.6,
-          "z": 13.5
+          "x": 14.4,
+          "z": 12.4
         },
         {
-          "id": "cooler-2",
-          "kind": "cooler",
-          "x": -10.6,
-          "z": -12.2
+          "id": "wet-1",
+          "kind": "wet",
+          "x": 10.2,
+          "z": 12.6
         },
         {
-          "id": "win-w-0",
-          "kind": "window",
-          "x": -11.98,
-          "z": -20,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
+          "id": "wet-2",
+          "kind": "wet",
+          "x": 0.2,
+          "z": -13.4
         },
         {
-          "id": "win-e-0",
-          "kind": "window",
-          "x": 11.98,
-          "z": -20,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
+          "id": "pit-1",
+          "kind": "pit",
+          "x": -12.8,
+          "z": -2.2
         },
         {
-          "id": "win-w-1",
-          "kind": "window",
-          "x": -11.98,
-          "z": -8,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
+          "id": "pit-2",
+          "kind": "pit",
+          "x": -12.8,
+          "z": -7.4
         },
         {
-          "id": "win-e-1",
-          "kind": "window",
-          "x": 11.98,
-          "z": -8,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
+          "id": "launch-1",
+          "kind": "launch",
+          "x": 9.6,
+          "z": 8.58,
+          "rotY": 3.141592653589793
         },
         {
-          "id": "win-w-2",
-          "kind": "window",
-          "x": -11.98,
-          "z": 4,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
+          "id": "launch-2",
+          "kind": "launch",
+          "x": -8.280000000000001,
+          "z": -2.8,
+          "rotY": 1.5707963267948966
         },
         {
           "id": "win-e-2",
           "kind": "window",
-          "x": 11.98,
-          "z": 4,
+          "x": 15.98,
+          "z": -17.240000000000002,
           "y": 1.15,
           "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
-        },
-        {
-          "id": "win-w-3",
-          "kind": "window",
-          "x": -11.98,
-          "z": 16,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-e-3",
-          "kind": "window",
-          "x": 11.98,
-          "z": 16,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        }
-      ],
-      "pointLights": [
-        {
-          "id": "pl-start",
-          "x": 0,
-          "z": 24.8,
-          "y": 2.3,
-          "intensity": 80,
-          "distance": 5.6,
-          "color": "#fff1b8"
-        },
-        {
-          "id": "pl-elev",
-          "x": 0,
-          "z": -24.2,
-          "y": 2.5,
-          "intensity": 80,
-          "distance": 5.8,
-          "color": "#c8ffd8"
-        },
-        {
-          "id": "pl-meet-l",
-          "x": -4.5,
-          "z": -8.6,
-          "y": 2.3,
-          "intensity": 76,
-          "distance": 5.4,
-          "color": "#ffe0a8"
-        },
-        {
-          "id": "pl-d6",
-          "x": 7.2,
-          "z": 17,
-          "y": 2.15,
-          "intensity": 66,
-          "distance": 4.7,
-          "color": "#fff1b8"
-        },
-        {
-          "id": "pl-d4",
-          "x": -6.6,
-          "z": 17,
-          "y": 2.25,
-          "intensity": 60,
-          "distance": 4.5,
-          "color": "#ffd889"
-        },
-        {
-          "id": "pl-meet-r",
-          "x": 4.5,
-          "z": -8.6,
-          "y": 2.2,
-          "intensity": 62,
-          "distance": 4.8,
-          "color": "#fff1b8"
         }
       ],
       "chairSpawns": [
         {
           "id": "ch1",
-          "x": -5.2,
-          "z": 19.5,
+          "x": 9.4,
+          "z": 18.8,
           "style": "task"
         },
         {
           "id": "ch2",
-          "x": 1.5,
-          "z": 19.5,
+          "x": -11.6,
+          "z": 18.8,
           "style": "mesh"
         },
         {
           "id": "ch3",
-          "x": 8,
-          "z": 19.3,
-          "style": "guest"
+          "x": 0,
+          "z": -1.8,
+          "style": "exec"
         },
         {
           "id": "ch4",
-          "x": -3,
-          "z": 15,
-          "style": "stool"
-        },
-        {
-          "id": "ch5",
-          "x": 4,
-          "z": 15.2,
-          "style": "exec"
-        },
-        {
-          "id": "ch6",
-          "x": -10,
-          "z": 14.5,
-          "style": "task"
-        },
-        {
-          "id": "ch7",
-          "x": -4.5,
-          "z": -6.5,
-          "style": "mesh"
-        },
-        {
-          "id": "ch8",
-          "x": 4.5,
-          "z": -6.5,
+          "x": 9.8,
+          "z": -4.6,
           "style": "guest"
         },
         {
-          "id": "ch9",
+          "id": "ch5",
           "x": 0,
-          "z": -10.8,
+          "z": -19.2,
           "style": "stool"
-        },
-        {
-          "id": "ch10",
-          "x": 5,
-          "z": -16.5,
-          "style": "exec"
-        },
-        {
-          "id": "ch11",
-          "x": -5,
-          "z": -19,
-          "style": "task"
         }
       ],
-      "enemySpawns": [],
-      "heavyAnchors": [],
-      "interceptorSpawns": []
+      "heavyAnchors": [
+        {
+          "id": "hv-1",
+          "x": 0,
+          "z": -20.6
+        }
+      ],
+      "interceptorSpawns": [
+        {
+          "id": "ic-1",
+          "x": 0.2,
+          "z": -25.4
+        }
+      ],
+      "menuChase": [
+        {
+          "x": 11.2,
+          "z": 22
+        },
+        {
+          "x": 11.4,
+          "z": 8
+        },
+        {
+          "x": 10.6,
+          "z": -6
+        },
+        {
+          "x": 0,
+          "z": -14
+        },
+        {
+          "x": 0,
+          "z": -26
+        },
+        {
+          "x": -11.2,
+          "z": -6
+        },
+        {
+          "x": -11.4,
+          "z": 10
+        },
+        {
+          "x": -11,
+          "z": 22
+        }
+      ],
+      "boundFaces": {
+        "bound-4": {
+          "pz": {
+            "map": "/levels/textures/thursday-face-bound-4-pz.png"
+          }
+        }
+      }
     },
     {
       "id": "friday",
       "label": "周五",
       "map": {
-        "minX": -12,
-        "maxX": 12,
-        "minZ": -28,
-        "maxZ": 28
+        "minX": -18,
+        "maxX": 18,
+        "minZ": -30,
+        "maxZ": 30
       },
       "playerStart": {
         "x": 0,
-        "z": 25.5
+        "z": 26.8
       },
       "elevator": {
-        "minX": -2,
-        "maxX": 2,
-        "minZ": -28,
-        "maxZ": -26,
+        "minX": -1.5,
+        "maxX": 1.5,
+        "minZ": -29.82,
+        "maxZ": -28.290000000000003,
         "point": {
           "x": 0,
-          "z": -27
-        }
+          "z": -29.94
+        },
+        "rotY": 0
       },
       "atmosphere": {
-        "background": "#3d2e1c",
-        "fogColor": "#3d2e1c",
-        "fogNear": 16,
-        "fogFar": 46,
-        "exposure": 1,
+        "background": "#4a2818",
+        "fogColor": "#4a2818",
+        "fogNear": 60,
+        "fogFar": 90,
+        "exposure": 1.82,
         "ambient": {
-          "color": "#ffd089",
-          "intensity": 0.05
+          "color": "#ffb070",
+          "intensity": 0.38
         },
         "hemisphere": {
-          "sky": "#fff4e4",
-          "ground": "#8a7a66",
-          "intensity": 0.4
+          "sky": "#ffb070",
+          "ground": "#6a3a28",
+          "intensity": 0.38
         },
         "sun": {
           "color": "#fff2dc",
@@ -2917,24 +4126,24 @@
           ]
         },
         "lampColor": "#ffe7c4",
-        "lampIntensity": 78,
-        "overheadHeight": 2.3,
-        "lampDistance": 5.2,
+        "lampIntensity": 68,
+        "overheadHeight": 2.45,
+        "lampDistance": 4.5,
         "overheadSpacing": 8,
         "followEnabled": false,
         "followColor": "#fff2dc",
         "followIntensity": 1.2,
         "followHeight": 7.2,
         "floor": {
-          "color": "#ffffff",
-          "shininess": 8,
+          "color": "#c4b8a8",
+          "shininess": 22,
           "bumpScale": 1.2,
-          "map": null,
-          "kind": "carpet",
+          "map": "/levels/textures/friday-floor.jpg",
+          "kind": "image",
           "repeat": 8
         },
         "wall": {
-          "color": "#ffffff",
+          "color": "#d8d0c4",
           "shininess": 8,
           "map": null
         },
@@ -2942,279 +4151,388 @@
         "sky": "dusk",
         "furnitureTone": "dark"
       },
+      "pointLights": [
+        {
+          "id": "pl-start",
+          "x": -0.04296800195280272,
+          "z": 23.67693453497068,
+          "y": 3.2,
+          "intensity": 64,
+          "distance": 20,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-cross",
+          "x": 0.229689992481019,
+          "z": -0.019373223719170163,
+          "y": 3,
+          "intensity": 70,
+          "distance": 17.5,
+          "color": "#ffe7a0"
+        },
+        {
+          "id": "pl-west",
+          "x": -12.4,
+          "z": 1,
+          "y": 3.2,
+          "intensity": 58,
+          "distance": 16.4,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-east",
+          "x": 12.4,
+          "z": 1,
+          "y": 3.2,
+          "intensity": 58,
+          "distance": 11.7,
+          "color": "#fff1b8"
+        },
+        {
+          "id": "pl-hall",
+          "x": 0,
+          "z": -16.8,
+          "y": 2.95,
+          "intensity": 52,
+          "distance": 19,
+          "color": "#fff4d0"
+        },
+        {
+          "id": "pl-elev",
+          "x": 0,
+          "z": -26.4,
+          "y": 2.5,
+          "intensity": 70,
+          "distance": 5,
+          "color": "#c8ffd8"
+        }
+      ],
+      "voids": [
+        {
+          "id": "cut-nw",
+          "minX": -18,
+          "minZ": -30,
+          "maxX": -7,
+          "maxZ": -6
+        },
+        {
+          "id": "cut-ne",
+          "minX": 7,
+          "minZ": -30,
+          "maxX": 18,
+          "maxZ": -6
+        },
+        {
+          "id": "cut-sw",
+          "minX": -18,
+          "minZ": 8,
+          "maxX": -7,
+          "maxZ": 30
+        },
+        {
+          "id": "cut-se",
+          "minX": 7,
+          "minZ": 8,
+          "maxX": 18,
+          "maxZ": 30
+        }
+      ],
+      "enemySpawns": [],
       "walls": [
         {
-          "id": "maze-1",
+          "id": "ring-n",
           "kind": "wall",
-          "minX": -7,
-          "minZ": 11.6,
-          "maxX": 5,
-          "maxZ": 12.1,
+          "minX": -3.4,
+          "minZ": 5.8,
+          "maxX": 3.4,
+          "maxZ": 6.3,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "color": "#f3f1ec",
+              "map": "/levels/textures/friday-face-ring-n-pz.png"
+            }
+          }
+        },
+        {
+          "id": "ring-s",
+          "kind": "wall",
+          "minX": -3.4,
+          "minZ": -5.8,
+          "maxX": 3.4,
+          "maxZ": -5.3,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/friday-face-ring-s-pz.png"
+            }
+          }
+        },
+        {
+          "id": "store-e",
+          "kind": "wall",
+          "minX": -8.4,
+          "minZ": -3.6,
+          "maxX": -7.9,
+          "maxZ": 3.6,
           "h": 1.7
         },
         {
-          "id": "maze-2",
+          "id": "store-n",
           "kind": "wall",
-          "minX": -7,
-          "minZ": 8.1,
-          "maxX": -6.5,
-          "maxZ": 11.6,
-          "h": 1.7
-        },
-        {
-          "id": "maze-3",
-          "kind": "wall",
-          "minX": -9.5,
-          "minZ": 7.6,
-          "maxX": -3,
-          "maxZ": 8.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-4",
-          "kind": "wall",
-          "minX": 0,
-          "minZ": 7.6,
-          "maxX": 9,
-          "maxZ": 8.1,
-          "h": 1.7
-        },
-        {
-          "id": "maze-5",
-          "kind": "wall",
-          "minX": -9,
+          "minX": -18,
           "minZ": 3.6,
-          "maxX": 1,
+          "maxX": -7.9,
           "maxZ": 4.1,
           "h": 1.7
         },
         {
-          "id": "maze-6",
+          "id": "gate-e",
           "kind": "wall",
-          "minX": 4.5,
-          "minZ": 3.6,
-          "maxX": 12,
-          "maxZ": 4.1,
+          "minX": 8,
+          "minZ": 2,
+          "maxX": 14.6,
+          "maxZ": 2.5,
           "h": 1.7
         },
         {
-          "id": "meet-1",
+          "id": "pinch-a",
           "kind": "wall",
-          "minX": -12,
-          "minZ": -4.4,
-          "maxX": -8.5,
-          "maxZ": -3.9,
-          "h": 1.7
+          "minX": -1.4,
+          "minZ": -22,
+          "maxX": 1.4,
+          "maxZ": -21.6,
+          "h": 1.7,
+          "faces": {
+            "pz": {
+              "map": "/levels/textures/friday-face-pinch-a-pz.png"
+            }
+          }
         },
         {
-          "id": "meet-2",
+          "id": "wall-pj61jx",
           "kind": "wall",
-          "minX": -6.5,
-          "minZ": -4.4,
-          "maxX": -1,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "meet-3",
-          "kind": "wall",
-          "minX": 1,
-          "minZ": -4.4,
+          "minX": 8,
+          "minZ": -6,
           "maxX": 8.5,
-          "maxZ": -3.9,
-          "h": 1.7
-        },
-        {
-          "id": "hall-desk",
-          "kind": "wood",
-          "minX": -3,
-          "minZ": -15.8,
-          "maxX": 3,
-          "maxZ": -14.6,
-          "h": 1
-        },
-        {
-          "id": "pillar-1",
-          "kind": "pillar",
-          "minX": -6.9,
-          "minZ": -18.4,
-          "maxX": -6.1,
-          "maxZ": -17.6,
-          "h": 1.7
-        },
-        {
-          "id": "pillar-2",
-          "kind": "pillar",
-          "minX": 6.1,
-          "minZ": -18.4,
-          "maxX": 6.9,
-          "maxZ": -17.6,
-          "h": 1.7
-        },
-        {
-          "id": "pillar-3",
-          "kind": "pillar",
-          "minX": -6.9,
-          "minZ": -24.4,
-          "maxX": -6.1,
-          "maxZ": -23.6,
-          "h": 1.7
-        },
-        {
-          "id": "pillar-4",
-          "kind": "pillar",
-          "minX": 6.1,
-          "minZ": -24.4,
-          "maxX": 6.9,
-          "maxZ": -23.6,
+          "maxZ": 2.5,
           "h": 1.7
         }
       ],
       "desks": [
         {
           "id": "d1",
-          "minX": -11,
-          "minZ": 20.8,
-          "maxX": -6.5,
-          "maxZ": 22.4,
-          "top": "oak",
-          "kit": "simple",
-          "face": "pz"
+          "minX": -5.629885783847191,
+          "minZ": 22.963692511829485,
+          "maxX": -0.8298857838471962,
+          "maxZ": 24.563692511829487,
+          "top": "bench",
+          "kit": "packed",
+          "face": "pz",
+          "rotY": 0.7646834057644147
         },
         {
           "id": "d2",
-          "minX": -4,
-          "minZ": 20.8,
-          "maxX": 0.5,
-          "maxZ": 22.4,
-          "top": "dark",
-          "kit": "dual",
-          "face": "pz"
+          "minX": 0.7366781656852899,
+          "minZ": 22.77496152970879,
+          "maxX": 5.5366781656852915,
+          "maxZ": 24.37496152970879,
+          "top": "bench",
+          "kit": "packed",
+          "face": "nz",
+          "rotY": 2.414600244367276
         },
         {
           "id": "d3",
-          "minX": 3,
-          "minZ": 20.8,
-          "maxX": 7.5,
-          "maxZ": 22.4,
-          "top": "white",
-          "kit": "clutter",
+          "minX": -2.3232981719374686,
+          "minZ": 2.0286138291286386,
+          "maxX": 2.476701828062532,
+          "maxZ": 3.8286138291286385,
+          "top": "bench",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d4",
-          "minX": -9,
-          "minZ": 16.2,
-          "maxX": -4.5,
-          "maxZ": 17.8,
+          "minX": -2.454760608713268,
+          "minZ": -4.057205662863237,
+          "maxX": 2.345239391286732,
+          "maxZ": -2.2572056628632367,
           "top": "bench",
           "kit": "packed",
-          "face": "pz"
+          "face": "pz",
+          "rotY": 0.3041911424162146
         },
         {
           "id": "d5",
-          "minX": -2,
-          "minZ": 16.2,
-          "maxX": 2.5,
-          "maxZ": 17.8,
-          "top": "oak",
-          "kit": "simple",
+          "minX": 9,
+          "minZ": -2.8,
+          "maxX": 14.2,
+          "maxZ": -1,
+          "top": "bench",
+          "kit": "packed",
           "face": "pz"
         },
         {
           "id": "d6",
-          "minX": 5,
-          "minZ": 16.2,
-          "maxX": 9.5,
-          "maxZ": 17.8,
-          "top": "dark",
-          "kit": "dual",
-          "face": "pz"
-        },
-        {
-          "id": "d7",
-          "minX": -7,
-          "minZ": -9.6,
-          "maxX": -2,
-          "maxZ": -7.6,
-          "top": "white",
-          "kit": "clutter",
-          "face": "pz"
-        },
-        {
-          "id": "d8",
-          "minX": 2,
-          "minZ": -9.6,
-          "maxX": 7,
-          "maxZ": -7.6,
+          "minX": -16.4,
+          "minZ": -2.4,
+          "maxX": -11.2,
+          "maxZ": -0.6,
           "top": "bench",
           "kit": "packed",
-          "face": "pz"
+          "face": "nx",
+          "rotY": 1.239324860641826
+        },
+        {
+          "id": "desk-y06s2k",
+          "minX": -5.5,
+          "minZ": -10,
+          "maxX": -1,
+          "maxZ": -9,
+          "top": "bench",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 0.9639088849072724,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-8cdwh8",
+          "minX": -4.829420091219932,
+          "minZ": -17.569582728997386,
+          "maxX": 1.1705799087800663,
+          "maxZ": -16.069582728997386,
+          "top": "bench",
+          "kit": "packed",
+          "face": "nz",
+          "rotY": 2.445687252535445,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-f8il14",
+          "minX": 1,
+          "minZ": -11,
+          "maxX": 6,
+          "maxZ": -9.5,
+          "top": "bench",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 1.3121399626896,
+          "tone": "dark"
+        },
+        {
+          "id": "desk-bwunyy",
+          "minX": 2.7227802378151047,
+          "minZ": -17.46946831179997,
+          "maxX": 6.722780237815105,
+          "maxZ": -15.969468311799972,
+          "top": "bench",
+          "kit": "packed",
+          "face": "nx",
+          "rotY": 2.1304636057776487,
+          "tone": "dark"
         }
       ],
       "props": [
         {
           "id": "plant-1",
           "kind": "plant",
-          "x": -10.8,
-          "z": 25.5,
-          "plantKit": "grove"
+          "x": -6.254562379898064,
+          "z": 28.34314439028704,
+          "plantKit": "cluster",
+          "tone": "light"
         },
         {
           "id": "plant-2",
           "kind": "plant",
-          "x": 10.8,
-          "z": 25.5,
-          "plantKit": "cluster"
+          "x": 6.217706015581882,
+          "z": 28.356149067174652,
+          "plantKit": "trio"
         },
         {
           "id": "plant-3",
           "kind": "plant",
-          "x": -10.6,
-          "z": -25.5,
+          "x": -5.4,
+          "z": -27.6,
           "plantKit": "trio"
         },
         {
           "id": "plant-4",
           "kind": "plant",
-          "x": 10.6,
-          "z": -25.5,
+          "x": 5.4,
+          "z": -27.6,
           "plantKit": "pair"
-        },
-        {
-          "id": "plant-5",
-          "kind": "plant",
-          "x": -10.8,
-          "z": -6.5,
-          "plantKit": "pot"
         },
         {
           "id": "cooler-1",
           "kind": "cooler",
-          "x": 10.6,
-          "z": 13.5
+          "x": 16.2,
+          "z": 4.6
         },
         {
-          "id": "cooler-2",
-          "kind": "cooler",
-          "x": -10.6,
-          "z": -12.2
+          "id": "wet-1",
+          "kind": "wet",
+          "x": 0,
+          "z": 10.4,
+          "hazard": {
+            "radius": 1.35
+          }
         },
         {
-          "id": "win-w-0",
-          "kind": "window",
-          "x": -11.98,
-          "z": -20,
-          "y": 1.15,
-          "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
+          "id": "wet-2",
+          "kind": "wet",
+          "x": 12.4,
+          "z": 4.2
+        },
+        {
+          "id": "wet-3",
+          "kind": "wet",
+          "x": 0.2,
+          "z": -14.8
+        },
+        {
+          "id": "pit-1",
+          "kind": "pit",
+          "x": -13.13415450559526,
+          "z": 1.599987246290567
+        },
+        {
+          "id": "pit-2",
+          "kind": "pit",
+          "x": -13.6,
+          "z": -2.2
+        },
+        {
+          "id": "launch-1",
+          "kind": "launch",
+          "x": 10.8,
+          "z": 1.98,
+          "rotY": 3.141592653589793
+        },
+        {
+          "id": "launch-2",
+          "kind": "launch",
+          "x": -8.42,
+          "z": 0.2,
+          "rotY": -1.5707963267948966
+        },
+        {
+          "id": "alarm-1",
+          "kind": "alarm",
+          "x": 0,
+          "z": 0
+        },
+        {
+          "id": "alarm-2",
+          "kind": "alarm",
+          "x": 0.2,
+          "z": -9.6
         },
         {
           "id": "win-e-0",
           "kind": "window",
-          "x": 11.98,
-          "z": -20,
+          "x": 17.98,
+          "z": 1,
           "y": 1.15,
           "rotY": -1.5707963267948966,
           "w": 2.4,
@@ -3223,191 +4541,790 @@
         {
           "id": "win-w-1",
           "kind": "window",
-          "x": -11.98,
-          "z": -8,
+          "x": -17.98,
+          "z": 1,
           "y": 1.15,
           "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-e-1",
-          "kind": "window",
-          "x": 11.98,
-          "z": -8,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
         {
           "id": "win-w-2",
           "kind": "window",
-          "x": -11.98,
-          "z": 4,
+          "x": -6.98,
+          "z": -24.72,
           "y": 1.15,
           "rotY": 1.5707963267948966,
-          "w": 2.4,
-          "h": 1.05
-        },
-        {
-          "id": "win-e-2",
-          "kind": "window",
-          "x": 11.98,
-          "z": 4,
-          "y": 1.15,
-          "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
         {
           "id": "win-w-3",
           "kind": "window",
-          "x": -11.98,
-          "z": 16,
+          "x": -6.98,
+          "z": -11.28,
           "y": 1.15,
           "rotY": 1.5707963267948966,
           "w": 2.4,
           "h": 1.05
         },
         {
-          "id": "win-e-3",
+          "id": "win-w-5",
           "kind": "window",
-          "x": 11.98,
-          "z": 16,
+          "x": -6.98,
+          "z": 25.16,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-6",
+          "kind": "window",
+          "x": 6.98,
+          "z": -24.72,
           "y": 1.15,
           "rotY": -1.5707963267948966,
           "w": 2.4,
           "h": 1.05
-        }
-      ],
-      "pointLights": [
-        {
-          "id": "pl-start",
-          "x": 0,
-          "z": 24.8,
-          "y": 2.3,
-          "intensity": 80,
-          "distance": 5.6,
-          "color": "#fff1b8"
         },
         {
-          "id": "pl-elev",
-          "x": 0,
-          "z": -24.2,
-          "y": 2.5,
-          "intensity": 80,
-          "distance": 5.8,
-          "color": "#c8ffd8"
+          "id": "win-e-7",
+          "kind": "window",
+          "x": 6.98,
+          "z": -11.28,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
         },
         {
-          "id": "pl-meet-l",
+          "id": "win-e-8",
+          "kind": "window",
+          "x": 6.98,
+          "z": 12.84,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-e-9",
+          "kind": "window",
+          "x": 6.98,
+          "z": 25.16,
+          "y": 1.15,
+          "rotY": -1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "alarm-0d82kg",
+          "kind": "alarm",
+          "x": 0,
+          "z": 23.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "alarm-26gi5j",
+          "kind": "alarm",
+          "x": -8.5,
+          "z": 5.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark",
+          "color": "#ffd60a"
+        },
+        {
+          "id": "bin-pekxlk",
+          "kind": "bin",
+          "x": -5.5,
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-230wfp",
+          "kind": "bin",
           "x": -4.5,
-          "z": -8.6,
-          "y": 2.3,
-          "intensity": 76,
-          "distance": 5.4,
-          "color": "#ffe0a8"
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
         },
         {
-          "id": "pl-d6",
-          "x": 7.2,
-          "z": 17,
-          "y": 2.15,
-          "intensity": 66,
-          "distance": 4.7,
-          "color": "#fff1b8"
+          "id": "bin-0u4hol",
+          "kind": "bin",
+          "x": -2,
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
         },
         {
-          "id": "pl-d4",
-          "x": -6.6,
-          "z": 17,
-          "y": 2.25,
-          "intensity": 60,
-          "distance": 4.5,
-          "color": "#ffd889"
+          "id": "bin-ys9dx9",
+          "kind": "bin",
+          "x": -0.5,
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
         },
         {
-          "id": "pl-meet-r",
+          "id": "bin-88n582",
+          "kind": "bin",
+          "x": 0.5,
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-jbwjo6",
+          "kind": "bin",
+          "x": 2,
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-9ct73k",
+          "kind": "bin",
+          "x": 3,
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-3zj719",
+          "kind": "bin",
           "x": 4.5,
-          "z": -8.6,
-          "y": 2.2,
-          "intensity": 62,
-          "distance": 4.8,
-          "color": "#fff1b8"
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-3x50vi",
+          "kind": "bin",
+          "x": 5.5,
+          "z": 20.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-yg5vsz",
+          "kind": "bin",
+          "x": 5.5,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-10u7yj",
+          "kind": "bin",
+          "x": 4.5,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-30az0b",
+          "kind": "bin",
+          "x": 3,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-ip5rzu",
+          "kind": "bin",
+          "x": 2,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-2yhzf1",
+          "kind": "bin",
+          "x": 0.5,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-c8pym9",
+          "kind": "bin",
+          "x": -0.5,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-r11wcf",
+          "kind": "bin",
+          "x": -2,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-wbr7w1",
+          "kind": "bin",
+          "x": -3.5,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-2mfaza",
+          "kind": "bin",
+          "x": -4.5,
+          "z": 18.5,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "bin-v5ri90",
+          "kind": "bin",
+          "x": -5.5,
+          "z": 19,
+          "rotY": 1.5661630791920331,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-5bepk8",
+          "kind": "crate",
+          "x": -5.5,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-buc5l1",
+          "kind": "crate",
+          "x": -4,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-w0soye",
+          "kind": "crate",
+          "x": -2.5,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-h9xsg9",
+          "kind": "crate",
+          "x": -1,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-msifqh",
+          "kind": "crate",
+          "x": 0.5,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-nvwpv7",
+          "kind": "crate",
+          "x": 2,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-xykh8t",
+          "kind": "crate",
+          "x": 3.5,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "crate-8d1k5p",
+          "kind": "crate",
+          "x": 5,
+          "z": 16.5,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "win-m481ta",
+          "kind": "window",
+          "x": -6.96,
+          "z": 22,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-gzdoaq",
+          "kind": "window",
+          "x": -6.96,
+          "z": 18.5,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "win-lotcb9",
+          "kind": "window",
+          "x": -6.96,
+          "z": 15,
+          "y": 1.15,
+          "rotY": 1.5707963267948966,
+          "w": 2.4,
+          "h": 1.05
+        },
+        {
+          "id": "pit-l259m2",
+          "kind": "pit",
+          "x": -5.5,
+          "z": 8,
+          "rotY": 0,
+          "tone": "light"
+        },
+        {
+          "id": "pit-5jk1cy",
+          "kind": "pit",
+          "x": 5.5,
+          "z": 8,
+          "rotY": 0,
+          "tone": "light"
+        },
+        {
+          "id": "sofa-6p8115",
+          "kind": "sofa",
+          "x": -6,
+          "z": 26.5,
+          "rotY": 1.2174925183050211,
+          "tone": "light"
+        },
+        {
+          "id": "sofa-025xkn",
+          "kind": "sofa",
+          "x": 5.4215663719394245,
+          "z": 27.46806966948275,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "alarm-zh0tvw",
+          "kind": "alarm",
+          "x": -5,
+          "z": -6.5,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "alarm-777f52",
+          "kind": "alarm",
+          "x": 5,
+          "z": -6.5,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "alarm-g4he5z",
+          "kind": "alarm",
+          "x": -4,
+          "z": -22.5,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "alarm-ja5vyw",
+          "kind": "alarm",
+          "x": 4,
+          "z": -22.5,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "pit-d7565c",
+          "kind": "pit",
+          "x": -5.5,
+          "z": 0.5,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "pit-3gqj98",
+          "kind": "pit",
+          "x": 5.5,
+          "z": 0.5,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "pit-wljr3p",
+          "kind": "pit",
+          "x": 2.5,
+          "z": -20.5,
+          "rotY": -0.21689231354606656,
+          "tone": "light"
+        },
+        {
+          "id": "pit-fvu6y3",
+          "kind": "pit",
+          "x": -3,
+          "z": -16.5,
+          "rotY": 1.2848288904537248,
+          "tone": "light"
+        },
+        {
+          "id": "pit-8ao8mh",
+          "kind": "pit",
+          "x": 2,
+          "z": -28,
+          "rotY": -1.051279258285504,
+          "tone": "light"
+        },
+        {
+          "id": "wet-b45piz",
+          "kind": "wet",
+          "x": -2,
+          "z": -28,
+          "rotY": -1.051279258285504,
+          "tone": "light",
+          "hazard": {
+            "radius": 2
+          }
+        },
+        {
+          "id": "crate-j9mrvy",
+          "kind": "crate",
+          "x": 3,
+          "z": -27,
+          "rotY": -1.051279258285504,
+          "tone": "light"
+        },
+        {
+          "id": "crate-u3ori1",
+          "kind": "crate",
+          "x": 3,
+          "z": -28,
+          "rotY": -1.051279258285504,
+          "tone": "light"
+        },
+        {
+          "id": "tv-8pejm0",
+          "kind": "tv",
+          "x": -15.173350140501439,
+          "z": -5.92,
+          "y": 1.38,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-6lzxdz",
+          "kind": "tv",
+          "x": -10.670963830018792,
+          "z": -5.92,
+          "y": 1.38,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-d85o86",
+          "kind": "tv",
+          "x": 9.689131110819167,
+          "z": -5.92,
+          "y": 1.38,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-mnd8bf",
+          "kind": "tv",
+          "x": 16.101075399476414,
+          "z": -5.92,
+          "y": 1.38,
+          "rotY": 0,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-fdfop2",
+          "kind": "tv",
+          "x": -6.92,
+          "z": 10.5,
+          "y": 1.38,
+          "rotY": 1.5707963267948966,
+          "tone": "dark"
+        },
+        {
+          "id": "tv-uvh5pt",
+          "kind": "tv",
+          "x": 6.92,
+          "z": 10,
+          "y": 1.38,
+          "rotY": -1.5707963267948966,
+          "tone": "dark"
         }
       ],
       "chairSpawns": [
         {
           "id": "ch1",
-          "x": -5.2,
-          "z": 19.5,
+          "x": -3,
+          "z": 21,
           "style": "task"
         },
         {
           "id": "ch2",
-          "x": 1.5,
-          "z": 19.5,
-          "style": "mesh"
+          "x": 3.4,
+          "z": 21,
+          "style": "stool",
+          "tone": "light"
         },
         {
           "id": "ch3",
-          "x": 8,
-          "z": 19.3,
+          "x": -0.4646739550279529,
+          "z": -0.6804659676795893,
           "style": "guest"
         },
         {
           "id": "ch4",
-          "x": -3,
-          "z": 15,
+          "x": 11.4,
+          "z": 0.2,
           "style": "stool"
         },
         {
           "id": "ch5",
-          "x": 4,
-          "z": 15.2,
+          "x": -12.353277059297708,
+          "z": -0.12133179276217876,
           "style": "exec"
         },
         {
           "id": "ch6",
-          "x": -10,
-          "z": 14.5,
-          "style": "task"
-        },
-        {
-          "id": "ch7",
-          "x": -4.5,
-          "z": -6.5,
-          "style": "mesh"
-        },
-        {
-          "id": "ch8",
-          "x": 4.5,
-          "z": -6.5,
-          "style": "guest"
-        },
-        {
-          "id": "ch9",
           "x": 0,
-          "z": -10.8,
-          "style": "stool"
-        },
-        {
-          "id": "ch10",
-          "x": 5,
-          "z": -16.5,
-          "style": "exec"
-        },
-        {
-          "id": "ch11",
-          "x": -5,
-          "z": -19,
+          "z": -19.6,
           "style": "task"
+        },
+        {
+          "id": "chair-ckbz7v",
+          "x": -1.5,
+          "z": 24.5,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-tjtuwe",
+          "x": 3.5,
+          "z": 25.5,
+          "style": "mesh",
+          "rotY": 2.414600244367276,
+          "tone": "light"
+        },
+        {
+          "id": "chair-l6vf8x",
+          "x": 1.5,
+          "z": 3,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-us8jwi",
+          "x": -1,
+          "z": 3.5,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-hgl598",
+          "x": 1.5,
+          "z": -2,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-zkgpxw",
+          "x": -1.5,
+          "z": -10,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-vc6ro0",
+          "x": -1,
+          "z": -11,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-naga1v",
+          "x": -1.5,
+          "z": -15.5,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-6ppohi",
+          "x": 3.5,
+          "z": -17,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-oww6kb",
+          "x": 6.5,
+          "z": -19.5,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-3u79gp",
+          "x": 5,
+          "z": -11,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-b2evlr",
+          "x": 4.5,
+          "z": -9,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-pihcc8",
+          "x": 15,
+          "z": -2,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-rv7m2f",
+          "x": 13.5,
+          "z": -1,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-dh1hko",
+          "x": -11.5,
+          "z": -2.5,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-qxxma2",
+          "x": -4,
+          "z": 20,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-y6yiwx",
+          "x": -4.5,
+          "z": 21,
+          "style": "task",
+          "rotY": 2.414600244367276,
+          "tone": "dark"
+        },
+        {
+          "id": "chair-leo0ty",
+          "x": 4.5,
+          "z": 22,
+          "style": "stool",
+          "rotY": 2.414600244367276,
+          "tone": "light"
+        },
+        {
+          "id": "chair-nk8o9t",
+          "x": 6,
+          "z": 23.5,
+          "style": "stool",
+          "rotY": 2.414600244367276,
+          "tone": "light"
         }
       ],
-      "enemySpawns": [],
-      "heavyAnchors": [],
-      "interceptorSpawns": []
+      "heavyAnchors": [
+        {
+          "id": "hv-1",
+          "x": 0,
+          "z": -20.8
+        },
+        {
+          "id": "hv-2",
+          "x": 0,
+          "z": 4.2
+        }
+      ],
+      "interceptorSpawns": [
+        {
+          "id": "ic-1",
+          "x": 0.2,
+          "z": -25.8
+        },
+        {
+          "id": "ic-2",
+          "x": 12.6,
+          "z": -4.4
+        }
+      ],
+      "menuChase": [
+        {
+          "x": 0,
+          "z": 24
+        },
+        {
+          "x": 0.2,
+          "z": 10
+        },
+        {
+          "x": -12.8,
+          "z": 2
+        },
+        {
+          "x": 0,
+          "z": -12
+        },
+        {
+          "x": 0,
+          "z": -26
+        },
+        {
+          "x": 12.8,
+          "z": 2
+        },
+        {
+          "x": 0.2,
+          "z": 6
+        }
+      ],
+      "boundFaces": {
+        "bound-3": {
+          "pz": {
+            "map": "/levels/textures/friday-face-bound-3-pz.png"
+          }
+        },
+        "bound-4": {
+          "pz": {
+            "map": "/levels/textures/friday-face-bound-4-pz.png"
+          }
+        }
+      }
     }
   ]
 }

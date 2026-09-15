@@ -104,12 +104,26 @@
       "overtime": {
         "enabled": true,
         "color": 16769152,
-        "opacity": 0.88,
-        "additive": true,
-        "duration": 0.95,
-        "size": 0.32,
-        "rise": 1.1,
-        "y": 1.72
+        "opacity": 1,
+        "duration": 1.15,
+        "size": 0.3,
+        "rise": 0.9,
+        "y": 2.08,
+        "outline": true,
+        "outlineColor": 3802128
+      },
+      "channel": {
+        "enabled": true,
+        "stamp": "word",
+        "color": 1201651,
+        "opacity": 1,
+        "width": 0.28,
+        "height": 0.28,
+        "thick": 0.04,
+        "y": 2.05,
+        "spin": 1.8,
+        "bob": 0.04,
+        "bobSpeed": 10
       },
       "stun": {
         "enabled": true,
@@ -181,12 +195,26 @@
       "overtime": {
         "enabled": true,
         "color": 16769152,
-        "opacity": 0.88,
-        "additive": true,
-        "duration": 0.95,
-        "size": 0.32,
-        "rise": 1.1,
-        "y": 1.72
+        "opacity": 1,
+        "duration": 1.15,
+        "size": 0.3,
+        "rise": 0.9,
+        "y": 2.08,
+        "outline": true,
+        "outlineColor": 3802128
+      },
+      "channel": {
+        "enabled": true,
+        "stamp": "ppt",
+        "color": 16738370,
+        "opacity": 0.55,
+        "width": 0.15,
+        "height": 0.15,
+        "thick": 0.04,
+        "y": 2.05,
+        "spin": 1.45,
+        "bob": 0.04,
+        "bobSpeed": 10
       },
       "stun": {
         "enabled": true,
@@ -257,13 +285,27 @@
       },
       "overtime": {
         "enabled": true,
-        "color": 16769152,
-        "opacity": 0.88,
-        "additive": true,
-        "duration": 0.95,
+        "color": 8448767,
+        "opacity": 1,
+        "duration": 1.15,
         "size": 0.32,
-        "rise": 1.1,
-        "y": 1.72
+        "rise": 0.9,
+        "y": 2.08,
+        "outline": true,
+        "outlineColor": 3802128
+      },
+      "channel": {
+        "enabled": true,
+        "stamp": "figma",
+        "color": 0,
+        "opacity": 0.71,
+        "width": 0.26,
+        "height": 0.26,
+        "thick": 0.04,
+        "y": 2.38,
+        "spin": 1.8,
+        "bob": 0.04,
+        "bobSpeed": 10
       },
       "stun": {
         "enabled": true,
@@ -334,13 +376,27 @@
       },
       "overtime": {
         "enabled": true,
-        "color": 16769152,
-        "opacity": 0.88,
-        "additive": true,
-        "duration": 0.95,
-        "size": 0.32,
-        "rise": 1.1,
-        "y": 1.72
+        "color": 14788863,
+        "opacity": 1,
+        "duration": 1.15,
+        "size": 0.3,
+        "rise": 0.9,
+        "y": 2.08,
+        "outline": true,
+        "outlineColor": 3802128
+      },
+      "channel": {
+        "enabled": true,
+        "stamp": "excel",
+        "color": 236357,
+        "opacity": 1,
+        "width": 0.28,
+        "height": 0.28,
+        "thick": 0.04,
+        "y": 2.05,
+        "spin": 1.8,
+        "bob": 0.04,
+        "bobSpeed": 10
       },
       "stun": {
         "enabled": true,
@@ -1280,6 +1336,84 @@
           "splashLife": 3.2
         }
       }
+    }
+  },
+  "hazards": {
+    "wet": {
+      "color": 8308968,
+      "opacity": 0.5,
+      "radius": 0.85,
+      "duration": 1.2,
+      "factor": 0.55
+    },
+    "pit": {
+      "color": 13149450,
+      "opacity": 0.45,
+      "radius": 0.58,
+      "duration": 1.8
+    },
+    "crate": {
+      "color": 7027999,
+      "opacity": 0.55,
+      "radius": 0.58,
+      "duration": 1.8
+    },
+    "launch": {
+      "color": 16747200,
+      "opacity": 0.55,
+      "radius": 0.85,
+      "duration": 1.15,
+      "impulse": 620,
+      "lift": 36
+    },
+    "alarm": {
+      "color": 5916239,
+      "opacity": 0.12,
+      "radius": 0.9,
+      "duration": 1.05,
+      "impulse": 520,
+      "lift": 140
+    }
+  },
+  "enemySkills": {
+    "cut-in": {
+      "cooldown": 8.5,
+      "windup": 0.3,
+      "duration": 0.45,
+      "radius": 8,
+      "speed": 7.2,
+      "color": 16731984,
+      "opacity": 0.5,
+      "squash": 1,
+      "lock": 2.1,
+      "chainStyle": "rings",
+      "chainWidth": 0.045,
+      "chainSag": 0.42
+    },
+    "desk-slam": {
+      "cooldown": 10,
+      "windup": 0.35,
+      "duration": 1.5,
+      "radius": 2.7,
+      "factor": 0.45,
+      "color": 16756864,
+      "opacity": 0.5,
+      "squash": 1,
+      "knockImpulse": 570,
+      "knockLift": 40,
+      "paper": 14
+    },
+    "rally": {
+      "cooldown": 12,
+      "windup": 0.3,
+      "duration": 2,
+      "radius": 5.5,
+      "factor": 0.5,
+      "color": 16761037,
+      "opacity": 0.22,
+      "squash": 1,
+      "waves": 4,
+      "waveGap": 0.14
     }
   }
 }

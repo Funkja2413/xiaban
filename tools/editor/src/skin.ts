@@ -1,6 +1,37 @@
 import * as THREE from 'three';
 
 /** 与战场一致：glTF / Survivors kit 图集 flipY=false */
+/** 把一张已有贴图复制成独立 PNG 字节，用来从只读官方/包内皮叉出角色自己的皮 */
+export async function pngBytesFromUrl(url: string): Promise<ArrayBuffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`读贴图失败 ${res.status}`);
+  const type = res.headers.get('content-type') ?? '';
+  const buf = await res.arrayBuffer();
+  if (type.includes('png') || url.toLowerCase().endsWith('.png')) return buf;
+  const blob = new Blob([buf]);
+  const imgUrl = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('无法解码贴图'));
+      el.src = imgUrl;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('无法画贴图');
+    ctx.drawImage(img, 0, 0);
+    const png = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('无法导出 PNG'))), 'image/png');
+    });
+    return png.arrayBuffer();
+  } finally {
+    URL.revokeObjectURL(imgUrl);
+  }
+}
+
 export async function loadSkinMap(url: string, flipY = false): Promise<THREE.Texture> {
   const tex = await new THREE.TextureLoader().loadAsync(url);
   tex.colorSpace = THREE.SRGBColorSpace;

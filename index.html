@@ -165,14 +165,10 @@
     }
 
     .play-ui { display: none; }
-    #stage[data-mode="play"] .play-ui,
-    #stage[data-mode="result"] .play-ui { display: block; }
+    #stage[data-mode="play"] .play-ui { display: block; }
     #stage[data-mode="play"] #dashBtn,
-    #stage[data-mode="play"] #skillBtn,
-    #stage[data-mode="result"] #dashBtn,
-    #stage[data-mode="result"] #skillBtn { display: flex; }
-    #stage[data-mode="play"] #topbar,
-    #stage[data-mode="result"] #topbar { display: flex; }
+    #stage[data-mode="play"] #skillBtn { display: flex; }
+    #stage[data-mode="play"] #topbar { display: flex; }
 
     #stats { display: none; }
     #stage[data-mode="play"] #stats.debugOn,
@@ -180,37 +176,720 @@
 
     #overlay {
       position: absolute; inset: 0; z-index: 90;
-      display: none; flex-direction: column; align-items: center; justify-content: center;
-      background: rgba(15, 17, 22, 0.82); color: #fff; gap: 14px;
-      backdrop-filter: blur(4px); text-align: center;
+      display: none; align-items: center; justify-content: center;
+      color: #fff; text-align: center;
+      pointer-events: none;
     }
-    #stage[data-mode="result"] #overlay { display: flex; }
-    #overlay .otitle { font-size: 32px; font-weight: 900; letter-spacing: 2px; }
-    #overlay .osub { font-size: 15px; color: #bbb; line-height: 1.7; padding: 0 30px; }
+    #stage[data-mode="result"] #overlay { display: flex; pointer-events: auto; }
+    .resultVeil {
+      position: absolute; inset: 0;
+      background: rgba(12, 8, 10, 0.78);
+      backdrop-filter: blur(5px);
+    }
+    .resultArt {
+      display: none;
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: center top;
+      pointer-events: none;
+    }
+    .resultSheet {
+      position: relative; z-index: 1;
+      width: min(320px, 86%);
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    /* 印章：默认 CSS 框。要换图就在 .resultStamp 里放 <img>，文字会自动藏。 */
+    .resultStamp {
+      width: 168px; height: 168px;
+      display: grid; place-items: center;
+    }
+    .resultStampMark {
+      box-sizing: border-box; width: 148px; min-height: 92px;
+      display: grid; place-items: center;
+      padding: 12px 10px;
+      border: 5px solid #e23b3b; border-radius: 10px;
+      color: #e23b3b;
+      font-size: 28px; font-weight: 900; letter-spacing: 3px; line-height: 1.2;
+      transform: rotate(-8deg);
+      box-shadow: 0 0 0 3px rgba(226, 59, 59, 0.18) inset;
+    }
+    #overlay[data-kind="won"] .resultStampMark {
+      border-color: #3dca7a; color: #3dca7a;
+      box-shadow: 0 0 0 3px rgba(61, 202, 122, 0.18) inset;
+    }
+    .resultStamp img {
+      width: 100%; height: 100%; object-fit: contain;
+      transform: rotate(-8deg);
+    }
+    .resultStamp:has(img) .resultStampMark { display: none; }
+    #overlay .otitle { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    #overlay .resultTaunt {
+      margin: 0; max-width: 92%;
+      font-size: 16px; font-weight: 700; line-height: 1.55;
+      color: #ffd28a;
+    }
+    .resultTip { display: none; margin: 0; }
+    #overlay .osub { font-size: 14px; color: #bbb; line-height: 1.7; padding: 0 8px; }
+    .resultActions { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+    .resultImgBtn img { display: none; }
     #overlay button, .shellBtn {
       margin-top: 4px; padding: 12px 42px; border-radius: 26px; border: none;
       background: #3b82f6; color: #fff; font-size: 17px; font-weight: 700;
     }
+    #overlay .resultActions button { width: min(240px, 100%); margin-top: 0; }
     #overlay .ghost, .shellBtn.ghost {
       background: rgba(255,255,255,0.12);
       border: 1px solid rgba(255,255,255,0.28);
     }
 
-    #loading, #levels, #settings {
+    /* 结算页：Figma 750×1334 全幅插画，按胜负+男女换图。 */
+    #overlay[data-kind="lost"],
+    #overlay[data-kind="won"] {
+      align-items: stretch; justify-content: stretch;
+      container-type: size;
+      overflow: hidden;
+      background: #0a0c18;
+    }
+    #overlay[data-kind="lost"] #resultNext,
+    #overlay[data-kind="won"] #resultRetry { display: none; }
+    #overlay[data-kind="lost"] .resultArt,
+    #overlay[data-kind="won"] .resultArt {
+      display: block;
+      inset: auto;
+      top: 50%; left: 50%;
+      width: 104%; height: 104%;
+      transform: translate(-50%, -50%);
+    }
+    #overlay[data-kind="lost"] .resultVeil,
+    #overlay[data-kind="won"] .resultVeil {
+      display: block;
+      background: #0a0c18;
+      backdrop-filter: none;
+    }
+    #overlay[data-kind="lost"].is-play .resultVeil,
+    #overlay[data-kind="won"].is-play .resultVeil { animation: none; opacity: 1; }
+    #overlay[data-kind="lost"] .resultStamp,
+    #overlay[data-kind="lost"] .otitle,
+    #overlay[data-kind="lost"] .osub,
+    #overlay[data-kind="won"] .resultStamp,
+    #overlay[data-kind="won"] .otitle,
+    #overlay[data-kind="won"] .osub { display: none; }
+    #overlay[data-kind="lost"] .resultSheet,
+    #overlay[data-kind="won"] .resultSheet {
+      width: 100%; height: 100%;
+      display: block; gap: 0;
+    }
+    #overlay[data-kind="lost"] .resultTaunt,
+    #overlay[data-kind="lost"] .resultTip,
+    #overlay[data-kind="won"] .resultTaunt,
+    #overlay[data-kind="won"] .resultTip {
+      position: absolute;
+      left: calc(100% * 70 / 750);
+      right: calc(100% * 70 / 750);
+      max-width: none;
+      margin: 0;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+      font-weight: 700; letter-spacing: 0.4px; line-height: 1.25;
+      color: #f6eee4;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+    }
+    #overlay[data-kind="lost"] .resultTaunt,
+    #overlay[data-kind="won"] .resultTaunt {
+      top: calc(100% * 338 / 1334);
+      height: calc(100% * 32 / 1334);
+      font-size: clamp(13px, 3.6cqi, 16px);
+    }
+    #overlay[data-kind="lost"] .resultTip,
+    #overlay[data-kind="won"] .resultTip {
+      top: calc(100% * 372 / 1334);
+      height: calc(100% * 44 / 1334);
+      font-size: clamp(12px, 3.3cqi, 15px);
+      color: rgba(246, 238, 228, 0.5);
+    }
+    #overlay[data-kind="lost"] .resultActions,
+    #overlay[data-kind="won"] .resultActions {
+      position: absolute;
+      left: 0; right: 0;
+      top: calc(100% * 1184 / 1334);
+      height: calc(100% * 77 / 1334);
+      display: block;
+    }
+    #overlay[data-kind="lost"] .resultImgBtn,
+    #overlay[data-kind="won"] .resultImgBtn {
+      position: absolute;
+      padding: 0; margin: 0; border: none; border-radius: 0;
+      background: transparent; line-height: 0;
+    }
+    #overlay[data-kind="lost"] .resultImgBtn span,
+    #overlay[data-kind="won"] .resultImgBtn span { display: none; }
+    #overlay[data-kind="lost"] .resultImgBtn img,
+    #overlay[data-kind="won"] .resultImgBtn img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #overlay[data-kind="lost"] #resultHome,
+    #overlay[data-kind="won"] #resultHome {
+      left: calc(100% * 158 / 750);
+      top: calc(100% * 5 / 77);
+      width: calc(100% * 203 / 750);
+    }
+    #overlay[data-kind="lost"] #resultRetry {
+      left: calc(100% * 405 / 750);
+      top: calc(100% * 5 / 77);
+      width: calc(100% * 213 / 750);
+    }
+    #overlay[data-kind="won"] #resultNext {
+      left: calc(100% * 410 / 750);
+      top: 0;
+      width: calc(100% * 207 / 750);
+      height: calc(100% * 73 / 77);
+      overflow: hidden;
+    }
+    #overlay[data-kind="won"] #resultNext img {
+      position: absolute;
+      width: 107.31%;
+      height: 120.55%;
+      max-width: none;
+      left: -4.38%;
+      top: -6.85%;
+      object-fit: cover;
+    }
+    #overlay[data-kind="lost"] .resultImgBtn:active,
+    #overlay[data-kind="won"] .resultImgBtn:active { filter: brightness(0.94); transform: scale(0.98); }
+    #overlay[data-kind="lost"] #resultHome:active,
+    #overlay[data-kind="won"] #resultHome:active { transform-origin: center; }
+    #overlay[data-kind="lost"] #resultRetry:active,
+    #overlay[data-kind="won"] #resultNext:active { transform-origin: center; }
+
+    #overlay .resultVeil,
+    #overlay .resultArt,
+    #overlay .resultStamp,
+    #overlay .otitle,
+    #overlay .resultTaunt,
+    #overlay .resultTip,
+    #overlay .osub,
+    #overlay .resultActions {
+      opacity: 0;
+    }
+    #overlay.is-play .resultVeil,
+    #overlay.is-play .resultArt {
+      animation: resultVeilIn 0.28s ease-out both;
+    }
+    #overlay.is-play .resultStamp {
+      animation: resultStampSlam 0.5s cubic-bezier(0.12, 1.28, 0.28, 1) 0.08s both;
+    }
+    #overlay.is-play .otitle {
+      animation: resultRise 0.38s ease-out 0.34s both;
+    }
+    #overlay.is-play .resultTaunt {
+      animation: resultTwist 0.42s ease-out 0.52s both;
+    }
+    #overlay.is-play .resultTip {
+      animation: resultRise 0.36s ease-out 0.62s both;
+    }
+    #overlay[data-kind="lost"].is-play .resultTaunt,
+    #overlay[data-kind="lost"].is-play .resultTip,
+    #overlay[data-kind="won"].is-play .resultTaunt,
+    #overlay[data-kind="won"].is-play .resultTip {
+      animation: resultVeilIn 0.32s ease-out 0.26s both;
+    }
+    #overlay.is-play .osub {
+      animation: resultRise 0.36s ease-out 0.68s both;
+    }
+    #overlay.is-play .resultActions {
+      animation: resultRise 0.36s ease-out 0.84s both;
+    }
+    @keyframes resultVeilIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes resultStampSlam {
+      0% { opacity: 0; transform: translate(-18px, -72px) scale(2.15) rotate(-28deg); }
+      72% { opacity: 1; transform: translate(4px, 6px) scale(0.96) rotate(-6deg); }
+      100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+    }
+    @keyframes resultRise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes resultTwist {
+      from { opacity: 0; transform: translate(-16px, 10px) rotate(-8deg); }
+      to { opacity: 1; transform: rotate(-2deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #overlay.is-play .resultVeil,
+      #overlay.is-play .resultArt,
+      #overlay.is-play .resultStamp,
+      #overlay.is-play .otitle,
+      #overlay.is-play .resultTaunt,
+      #overlay.is-play .resultTip,
+      #overlay.is-play .osub,
+      #overlay.is-play .resultActions {
+        animation: none;
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    #loading {
       position: absolute; inset: 0; z-index: 80;
       display: none; flex-direction: column; align-items: center; justify-content: center;
       background: rgba(16, 14, 22, 0.86); color: #eee; gap: 14px; padding: 24px 22px;
     }
+    /* 主页按 Figma 750×1334「首页效果标定」叠在 3D 关卡上，不要铺白底。 */
     #home {
       position: absolute; inset: 0; z-index: 80;
-      display: none; flex-direction: column; align-items: center; justify-content: flex-end;
-      background: linear-gradient(180deg, rgba(10, 9, 14, 0.28) 0%, rgba(10, 9, 14, 0.12) 38%, rgba(10, 9, 14, 0.82) 100%);
-      color: #eee; gap: 14px; padding: 28px 22px calc(env(safe-area-inset-bottom, 0px) + 36px);
+      display: none;
+      background: transparent;
+      color: #eee;
+      pointer-events: none;
     }
+    #home > * { pointer-events: auto; }
+    .homeMask {
+      position: absolute; left: 0; right: 0;
+      pointer-events: none; z-index: 0;
+    }
+    #homeMaskTop {
+      top: 0; height: calc(100% * 573 / 1334);
+      background: linear-gradient(180deg, rgba(6, 0, 2, 0.79) 0%, rgba(6, 0, 2, 0) 100%);
+    }
+    #homeMaskBottom {
+      top: calc(100% * 683 / 1334); height: calc(100% * 651 / 1334);
+      background: linear-gradient(180deg, rgba(34, 14, 42, 0) 0%, #220e2a 100%);
+    }
+    #homeLogo, .homeBtn { z-index: 1; }
     #stage[data-mode="loading"] #loading { display: flex; }
-    #stage[data-mode="home"] #home { display: flex; }
-    #stage[data-mode="levels"] #levels { display: flex; }
-    #stage[data-mode="settings"] #settings { display: flex; }
+    #stage[data-mode="home"] #home { display: block; }
+    #stage[data-mode="levels"] #levels { display: block; }
+    /* 关卡页：Figma 750×1334；标题叠在列表上，上滑只淡出，不改列表高度（避免回弹） */
+    #levels {
+      position: absolute; inset: 0; z-index: 80;
+      display: none;
+      background: #000;
+      color: #fcd7cb;
+      overflow: hidden;
+      container-type: size;
+    }
+    #levels .levelsBack {
+      position: absolute;
+      left: calc(100cqw * 40 / 750);
+      top: calc(100cqh * 46 / 1334);
+      width: calc(100cqw * 58 / 750);
+      z-index: 3;
+      padding: 0; margin: 0; border: none; border-radius: 0;
+      background: transparent; line-height: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #levels .levelsBack img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #levels .levelsBack:active { filter: brightness(0.92); transform: scale(0.96); }
+    .levelsHead {
+      position: absolute;
+      left: 50%;
+      top: calc(100cqh * 157 / 1334);
+      width: calc(100cqw * 498 / 750);
+      transform: translateX(-50%);
+      z-index: 2;
+      text-align: center;
+      pointer-events: none;
+    }
+    #levels.is-scrolled .levelsHead {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .levelsTitle {
+      display: block; width: 100%; height: auto;
+      margin: 0 auto;
+      pointer-events: none;
+    }
+    .levelsSub {
+      margin: calc(100cqh * 18 / 1334) 0 0;
+      padding: 0 calc(100cqw * 8 / 750);
+      font-size: clamp(12px, 2.67cqi, 20px);
+      font-weight: 600;
+      line-height: 1.35;
+      color: #fcd7cb;
+      letter-spacing: 0.2px;
+    }
+    #levelsScroll {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      top: calc(100cqh * 100 / 1334);
+      overflow-x: hidden; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 100cqh * 48 / 1334);
+      box-sizing: border-box;
+    }
+    #levelsScroll::-webkit-scrollbar { display: none; }
+    /* 占位对齐 Figma：首关标题约在 398/1334，避免标题压住周一卡片 */
+    .levelsHeadSpacer {
+      height: calc(100cqh * 298 / 1334);
+      flex-shrink: 0;
+      pointer-events: none;
+    }
+    #levelList {
+      width: calc(100cqw * 584 / 750);
+      margin: 0 auto;
+      display: flex; flex-direction: column;
+      gap: calc(100cqh * 48 / 1334);
+      padding-bottom: 0;
+    }
+    .levelCard {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: calc(100cqh * 12 / 1334) 12px;
+      width: 100%;
+      margin: 0; padding: 0; border: none; border-radius: 0;
+      background: transparent;
+      color: #fcd7cb;
+      text-align: left;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .levelCard:disabled { opacity: 1; cursor: default; }
+    .levelCard:not(:disabled):active { filter: brightness(0.96); }
+    .levelDay {
+      font-size: clamp(13px, 2.67cqi, 20px);
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      color: #fcd7cb;
+      line-height: 1.2;
+    }
+    .levelTag {
+      font-size: clamp(13px, 2.67cqi, 20px);
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+      justify-self: end;
+    }
+    .levelTag[data-state="beaten"] { color: #e47d9d; }
+    .levelTag[data-state="open"] { color: #2bf9a7; }
+    .levelTag[data-state="locked"] { color: #ff436f; }
+    .levelThumb {
+      grid-column: 1 / -1;
+      width: 100%;
+      line-height: 0;
+      border-radius: 0;
+      overflow: visible;
+      background: transparent;
+    }
+    .levelThumb img {
+      display: block; width: 100%; height: auto;
+      pointer-events: none;
+    }
+    .levelCard.locked .levelDay {
+      color: #7a7a82;
+    }
+    .levelCard.locked .levelTag {
+      color: #9a4a5c;
+    }
+    .levelCard.locked .levelThumb img {
+      filter: grayscale(1);
+      opacity: 0.72;
+    }
+    #stage[data-mode="roster"] #roster { display: block; }
+    /* 同事名册：Figma 750×1334；标题显隐与关卡页同一套逻辑 */
+    #roster {
+      position: absolute; inset: 0; z-index: 80;
+      display: none;
+      background: #000;
+      color: #fcd7cb;
+      overflow: hidden;
+      container-type: size;
+    }
+    #roster .rosterBack {
+      position: absolute;
+      left: calc(100cqw * 40 / 750);
+      top: calc(100cqh * 46 / 1334);
+      width: calc(100cqw * 58 / 750);
+      z-index: 3;
+      padding: 0; margin: 0; border: none; border-radius: 0;
+      background: transparent; line-height: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #roster .rosterBack img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #roster .rosterBack:active { filter: brightness(0.92); transform: scale(0.96); }
+    .rosterHead {
+      position: absolute;
+      left: 50%;
+      top: calc(100cqh * 161 / 1334);
+      width: calc(100cqw * 424 / 750);
+      transform: translateX(-50%);
+      z-index: 2;
+      text-align: center;
+      pointer-events: none;
+    }
+    #roster.is-scrolled .rosterHead {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .rosterTitle {
+      display: block; width: 100%; height: auto;
+      margin: 0 auto;
+      pointer-events: none;
+    }
+    .rosterSub {
+      margin: calc(100cqh * 22 / 1334) 0 0;
+      padding: 0 calc(100cqw * 24 / 750);
+      font-size: clamp(12px, 2.67cqi, 20px);
+      font-weight: 600;
+      line-height: 1.35;
+      color: #fcd7cb;
+      letter-spacing: 0.2px;
+    }
+    #rosterScroll {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      top: calc(100cqh * 100 / 1334);
+      overflow-x: hidden; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 100cqh * 48 / 1334);
+      box-sizing: border-box;
+    }
+    #rosterScroll::-webkit-scrollbar { display: none; }
+    /* 占位：给标题+副标题留空，避免压住首行卡片 */
+    .rosterHeadSpacer {
+      height: calc(100cqh * 320 / 1334);
+      flex-shrink: 0;
+      pointer-events: none;
+    }
+    #rosterHall {
+      width: calc(100cqw * 654 / 750);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: calc(100cqh * 22 / 1334) calc(100cqw * 16 / 750);
+      align-content: start;
+      padding: 0;
+    }
+    .rosterCard {
+      margin: 0; padding: 8px 6px 10px; border: none; border-radius: 16px;
+      background: rgba(255,255,255,0.06);
+      color: #fcd7cb; text-align: center;
+    }
+    .rosterThumb {
+      width: 100%; aspect-ratio: 1;
+      border-radius: 12px; overflow: hidden;
+      background: rgba(0,0,0,0.28);
+    }
+    .rosterThumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .rosterCard.locked .rosterThumb img { filter: grayscale(1); opacity: 0.34; }
+    .rosterName {
+      margin-top: 8px; font-size: clamp(11px, 2.2cqi, 13px); font-weight: 700; letter-spacing: 0.3px;
+      color: #fcd7cb;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .rosterCard.locked .rosterName { color: #7a7a82; }
+    #stage[data-mode="settings"] #settings { display: block; }
+    /* 设置页：Figma 750×1334「设置页面」 */
+    #settings {
+      position: absolute; inset: 0; z-index: 80;
+      display: none;
+      background: #000;
+      color: #fcd7cb;
+      overflow: hidden;
+      container-type: size;
+    }
+    #settings .settingsBack {
+      position: absolute;
+      left: calc(100% * 40 / 750);
+      top: calc(100% * 46 / 1334);
+      width: calc(100% * 58 / 750);
+      padding: 0; margin: 0; border: none; border-radius: 0;
+      background: transparent; line-height: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #settings .settingsBack img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #settings .settingsBack:active { filter: brightness(0.92); transform: scale(0.96); }
+    #settings .settingsTitle {
+      position: absolute;
+      left: calc(100% * 272 / 750);
+      top: calc(100% * 195 / 1334);
+      width: calc(100% * 188 / 750);
+      margin: 0; line-height: 0;
+    }
+    #settings .settingsTitle img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #settings .settingsOpt {
+      position: absolute;
+      left: calc(100% * 208 / 750);
+      width: calc(100% * 317 / 750);
+      height: calc(100% * 65 / 1334);
+      display: block;
+      margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      cursor: pointer;
+    }
+    #settings .settingsOpt[data-opt="music"] { top: calc(100% * 449 / 1334); }
+    #settings .settingsOpt[data-opt="sfx"] { top: calc(100% * 545 / 1334); }
+    #settings .settingsOptLabel {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: clamp(22px, 4.27cqi, 32px);
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #fcd7cb;
+      line-height: 1;
+    }
+    #settings .settingsCheck {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      margin: 0; opacity: 0;
+      cursor: pointer;
+      z-index: 2;
+    }
+    #settings .settingsCheckArt {
+      position: absolute;
+      right: 0; top: 0;
+      width: calc(100% * 65 / 317);
+      height: 100%;
+      line-height: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+    #settings .settingsCheckArt img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    #settings .settingsCheckArt .on { display: none; }
+    #settings .settingsCheck:checked + .settingsCheckArt .on { display: block; }
+    #settings .settingsCheck:checked + .settingsCheckArt .off { display: none; }
+    #settings .settingsCredits {
+      position: absolute;
+      left: calc(100% * 182 / 750);
+      top: calc(100% * 1199 / 1334);
+      width: calc(100% * 385 / 750);
+      height: calc(100% * 135 / 1334);
+      margin: 0; line-height: 0;
+      pointer-events: none;
+    }
+    #settings .settingsCredits img {
+      display: block; width: 100%; height: 100%;
+      object-fit: contain; object-position: center top;
+    }
+    #settings .settingsReset {
+      position: absolute;
+      left: 50%;
+      top: calc(100% * 1120 / 1334);
+      transform: translateX(-50%);
+      padding: 6px 10px; margin: 0; border: none; border-radius: 0;
+      background: transparent;
+      color: rgba(252, 215, 203, 0.42);
+      font-size: clamp(11px, 2.4cqi, 13px);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #settings .settingsReset:active { color: rgba(252, 215, 203, 0.7); }
+    #settings .settingsDebug {
+      position: absolute;
+      width: 1px; height: 1px;
+      opacity: 0; pointer-events: none;
+    }
+    /* 角色选择：Figma 750×1334「请问你是？」；3D 棚在画布，壳只叠 UI */
+    #avatar {
+      position: absolute; inset: 0; z-index: 80;
+      display: none;
+      background: transparent;
+      color: #fcd7cb;
+      overflow: hidden;
+      container-type: size;
+      pointer-events: none;
+    }
+    #avatar > * { pointer-events: auto; }
+    #stage[data-mode="avatar"] #avatar { display: block; }
+    #avatar .avatarBack {
+      position: absolute;
+      left: calc(100cqw * 40 / 750);
+      top: calc(100cqh * 46 / 1334);
+      width: calc(100cqw * 58 / 750);
+      z-index: 3;
+      padding: 0; margin: 0; border: none; border-radius: 0;
+      background: transparent; line-height: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #avatar .avatarBack img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #avatar .avatarBack:active { filter: brightness(0.92); transform: scale(0.96); }
+    .avatarTitle {
+      position: absolute;
+      left: 50%;
+      top: calc(100cqh * 167 / 1334);
+      width: calc(100cqw * 420 / 750);
+      transform: translateX(-50%);
+      z-index: 2;
+      margin: 0; line-height: 0;
+      pointer-events: none;
+    }
+    .avatarTitle img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #avatarHits {
+      position: absolute;
+      left: 0; right: 0;
+      top: calc(100cqh * 280 / 1334);
+      bottom: calc(100cqh * 170 / 1334);
+      display: flex; z-index: 1;
+    }
+    .avatarHit {
+      flex: 1; border: none; outline: none; background: transparent; color: inherit;
+      box-shadow: none; -webkit-tap-highlight-color: transparent;
+      position: relative;
+      padding: 0; margin: 0;
+    }
+    .avatarHit:focus, .avatarHit:focus-visible { outline: none; box-shadow: none; }
+    /* 名牌：水平居中锚点；具体 left/top 由 shell.layoutAvatarNames 按 3D 脚底投影写入 */
+    #avatar .avatarNameArt {
+      position: absolute;
+      z-index: 2;
+      display: block; height: auto;
+      pointer-events: none;
+      opacity: 0.55;
+      transition: opacity 0.12s, filter 0.12s, transform 0.12s;
+      transform: translateX(-50%);
+      transform-origin: center top;
+      left: 34.6%;
+      top: 56.8%;
+      width: calc(100cqw * 91 / 750);
+    }
+    #avatar .avatarNameArt[data-slot="player-f"] {
+      left: 65.4%;
+      width: calc(100cqw * 82 / 750);
+    }
+    #avatar .avatarNameArt.selected {
+      opacity: 1;
+      transform: translateX(-50%) scale(1.06);
+      filter: drop-shadow(0 0 10px rgba(255, 210, 140, 0.35));
+    }
+    #avatarGo {
+      position: absolute; z-index: 3;
+      left: 50%;
+      top: calc(100cqh * 1181 / 1334);
+      width: calc(100cqw * 378 / 750);
+      transform: translateX(-50%);
+      padding: 0; margin: 0; border: none; border-radius: 0;
+      background: transparent; line-height: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #avatarGo img {
+      display: block; width: 100%; height: auto; pointer-events: none;
+    }
+    #avatarGo:active:not(:disabled) { filter: brightness(0.94); transform: translateX(-50%) scale(0.97); }
+    #avatarGo:disabled { opacity: 0.38; }
     #loading { background: #121018; justify-content: center; }
 
     .artSlot {
@@ -251,32 +930,41 @@
       100% { transform: translateX(320%); }
     }
     #homeLogo {
-      width: min(280px, 78%); height: 96px; margin-bottom: auto; margin-top: 12vh;
+      position: absolute; left: 0; top: 0;
+      width: 100%; height: calc(100% * 525 / 1334);
+      background: none; border: none; overflow: visible;
     }
+    #homeLogo img {
+      object-position: top center;
+    }
+    .homeBtn {
+      position: absolute; left: 50%;
+      width: calc(100% * 385 / 750);
+      transform: translateX(-50%);
+      padding: 0; margin: 0; border: none; border-radius: 0;
+      background: transparent; line-height: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .homeBtn img {
+      display: block; width: 100%; height: auto;
+      pointer-events: none;
+    }
+    .homeBtn:active { transform: translateX(-50%) scale(0.98); filter: brightness(0.94); }
+    #btnStart { top: calc(100% * 930 / 1334); }
+    #btnLevels { top: calc(100% * 1015 / 1334); }
+    #btnRoster { top: calc(100% * 1099 / 1334); }
+    #home #btnSettings { top: calc(100% * 1182 / 1334); }
 
     .shellTitle { font-size: 28px; font-weight: 800; letter-spacing: 2px; }
     .shellSub, #loading .sub { font-size: 13px; color: #c5c0b8; text-shadow: 0 1px 4px rgba(0,0,0,0.55); }
     #loading:has(#loadingLogo:not(.empty)) .title { display: none; }
-    #home:has(#homeLogo:not(.empty)) .shellSub { margin-top: -8px; }
     .shellStack { display: flex; flex-direction: column; gap: 12px; width: min(280px, 80%); }
     .shellBtn { width: 100%; }
     .shellBack { align-self: flex-start; background: transparent; border: none; color: #bbb; font-size: 15px; padding: 8px 0; }
-    #levelList { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 70%; }
-    .levelCard {
-      text-align: left; width: 100%; padding: 12px 14px; border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06);
-      color: #eee; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
-    }
-    .levelCard.locked { opacity: 0.42; }
-    .levelDay { font-size: 18px; font-weight: 800; }
-    .levelTag { font-size: 11px; color: #ffd873; align-self: center; }
-    .levelBlurb { grid-column: 1 / -1; font-size: 12px; color: #9aa; }
-    .optRow { display: flex; justify-content: space-between; align-items: center; width: min(300px, 86%); font-size: 15px; }
-    .optRow input { width: 18px; height: 18px; }
 
     #toast {
       position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
-      color: #ffb4a8; font-size: 20px; font-weight: 800; z-index: 15;
+      color: #ffb4a8; font-size: 20px; font-weight: 800; z-index: 100;
       pointer-events: none; opacity: 0; text-shadow: 0 2px 6px rgba(0,0,0,0.5);
       transition: opacity 0.15s; white-space: nowrap;
     }
@@ -286,15 +974,37 @@
       font-size: 15px; font-weight: 700;
       display: none; pointer-events: none; white-space: nowrap;
     }
+    /* 开局 3 秒准备：顶部正中倒计时 */
+    #readyCount {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 0px) + 56px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 45;
+      display: none;
+      min-width: 1.2em;
+      text-align: center;
+      font-size: clamp(52px, 16vw, 84px);
+      font-weight: 900;
+      line-height: 1;
+      color: #fff;
+      letter-spacing: 2px;
+      pointer-events: none;
+      text-shadow:
+        0 3px 0 rgba(0,0,0,0.35),
+        0 8px 28px rgba(0,0,0,0.55),
+        0 0 32px rgba(255, 210, 100, 0.35);
+    }
+    #readyCount.show { display: block; }
+    #readyCount.go {
+      font-size: clamp(36px, 11vw, 56px);
+      color: #ffe08a;
+    }
     #topbar, #resetBtn, #dashBtn, #skillBtn { display: none; }
-    #stage[data-mode="play"] #topbar,
-    #stage[data-mode="result"] #topbar { display: flex; }
-    #stage[data-mode="play"] #resetBtn,
-    #stage[data-mode="result"] #resetBtn { display: block; }
+    #stage[data-mode="play"] #topbar { display: flex; }
+    #stage[data-mode="play"] #resetBtn { display: block; }
     #stage[data-mode="play"] #dashBtn,
-    #stage[data-mode="play"] #skillBtn,
-    #stage[data-mode="result"] #dashBtn,
-    #stage[data-mode="result"] #skillBtn { display: flex; }
+    #stage[data-mode="play"] #skillBtn { display: flex; }
   </style>
 </head>
 <body>
@@ -313,15 +1023,36 @@
     <div id="badgeInfo"></div>
     <div id="elevTimer"></div>
   </div>
+  <div id="readyCount" aria-hidden="true"></div>
   <div id="stats"></div>
   <div id="toast"></div>
 
   <div id="overlay">
-    <div class="otitle"></div>
-    <div class="osub"></div>
-    <button id="resultNext" type="button">下一关</button>
-    <button id="resultRetry" type="button" class="ghost">再试一次</button>
-    <button id="resultHome" type="button" class="ghost">回主页</button>
+    <div class="resultVeil"></div>
+    <img class="resultArt" alt="" src="%BASE_URL%ui/result-lose.png" width="750" height="1334" />
+    <div class="resultSheet">
+      <div class="resultStamp">
+        <div class="resultStampMark">下班失败</div>
+      </div>
+      <div class="otitle"></div>
+      <p class="resultTaunt"></p>
+      <p class="resultTip"></p>
+      <div class="osub"></div>
+      <div class="resultActions">
+        <button id="resultNext" type="button" class="ghost resultImgBtn" aria-label="下一关">
+          <img alt="" src="%BASE_URL%ui/result-win-btn-next.png" width="626" height="248" />
+          <span>下一关</span>
+        </button>
+        <button id="resultHome" type="button" class="ghost resultImgBtn" aria-label="回主页">
+          <img alt="" src="%BASE_URL%ui/result-lose-btn-home.png" width="420" height="148" />
+          <span>回主页</span>
+        </button>
+        <button id="resultRetry" type="button" class="ghost resultImgBtn" aria-label="再试一次">
+          <img alt="" src="%BASE_URL%ui/result-lose-btn-retry.png" width="439" height="142" />
+          <span>再试一次</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <div id="stickMove" class="stick"><div class="base"></div><div class="knob"></div></div>
@@ -340,28 +1071,89 @@
   </div>
 
   <div id="home">
-    <div id="homeLogo" class="artSlot empty" data-label="标题 Logo"><img alt="我要下班！" src="%BASE_URL%ui/home-title.png" /></div>
-    <div class="shellSub">把同事引开，挤进电梯</div>
-    <div class="shellStack">
-      <button type="button" class="shellBtn" id="btnStart">开始游戏</button>
-      <button type="button" class="shellBtn ghost" id="btnLevels">关卡</button>
-      <button type="button" class="shellBtn ghost" id="btnSettings">设置</button>
-    </div>
+    <div id="homeMaskTop" class="homeMask" aria-hidden="true"></div>
+    <div id="homeMaskBottom" class="homeMask" aria-hidden="true"></div>
+    <div id="homeLogo" class="artSlot empty" data-label="标题 Logo"><img alt="你能下班嘛！" src="%BASE_URL%ui/home-title.png" /></div>
+    <button type="button" class="homeBtn" id="btnStart" aria-label="开始游戏"><img alt="" src="%BASE_URL%ui/home-btn-start.png" width="479" height="88" /></button>
+    <button type="button" class="homeBtn" id="btnLevels" aria-label="关卡"><img alt="" src="%BASE_URL%ui/home-btn-levels.png" width="479" height="86" /></button>
+    <button type="button" class="homeBtn" id="btnRoster" aria-label="同事名册"><img alt="" src="%BASE_URL%ui/home-btn-roster.png" width="784" height="137" /></button>
+    <button type="button" class="homeBtn" id="btnSettings" aria-label="设置"><img alt="" src="%BASE_URL%ui/home-btn-settings.png" width="482" height="88" /></button>
   </div>
 
   <div id="levels">
-    <button type="button" class="shellBack" id="btnLevelsBack">← 主页</button>
-    <div class="shellTitle">本周班次</div>
-    <div class="shellSub">通关后解锁下一天</div>
-    <div id="levelList"></div>
+    <button type="button" class="levelsBack" id="btnLevelsBack" aria-label="回主页">
+      <img alt="" src="%BASE_URL%ui/settings-back.png" width="90" height="72" />
+    </button>
+    <div class="levelsHead">
+      <img class="levelsTitle" alt="今天周几啦？" src="%BASE_URL%ui/levels-title.png" width="1037" height="276" />
+      <p class="levelsSub">周一很恶心，周二更呕心，周三周四最yue心，周五不呕心</p>
+    </div>
+    <div id="levelsScroll">
+      <div class="levelsHeadSpacer" aria-hidden="true"></div>
+      <div id="levelList"></div>
+    </div>
+  </div>
+
+  <div id="roster">
+    <button type="button" class="rosterBack" id="btnRosterBack" aria-label="回主页">
+      <img alt="" src="%BASE_URL%ui/settings-back.png" width="90" height="72" />
+    </button>
+    <div class="rosterHead">
+      <img class="rosterTitle" alt="同事花名册" src="%BASE_URL%ui/roster-title.png" width="1087" height="266" />
+      <p class="rosterSub" id="rosterSub">已认识 0 / 20 个奇葩同事，通关解锁下一天的奇葩</p>
+    </div>
+    <div id="rosterScroll">
+      <div class="rosterHeadSpacer" aria-hidden="true"></div>
+      <div id="rosterHall"></div>
+    </div>
+  </div>
+
+  <div id="avatar">
+    <button type="button" class="avatarBack" id="btnAvatarBack" aria-label="返回">
+      <img alt="" src="%BASE_URL%ui/settings-back.png" width="90" height="72" />
+    </button>
+    <div class="avatarTitle" aria-hidden="true">
+      <img alt="请问你是？" src="%BASE_URL%ui/avatar-title.png" width="972" height="259" />
+    </div>
+    <div id="avatarHits">
+      <button type="button" class="avatarHit" data-slot="player" aria-label="小牛"></button>
+      <button type="button" class="avatarHit" data-slot="player-f" aria-label="马姐"></button>
+    </div>
+    <img class="avatarNameArt" data-slot="player" alt="小牛" src="%BASE_URL%ui/avatar-name-player.png" width="253" height="137" />
+    <img class="avatarNameArt" data-slot="player-f" alt="马姐" src="%BASE_URL%ui/avatar-name-player-f.png" width="259" height="134" />
+    <button type="button" class="avatarGo" id="avatarGo" disabled aria-label="进入">
+      <img alt="" src="%BASE_URL%ui/avatar-go.png" width="983" height="177" />
+    </button>
   </div>
 
   <div id="settings">
-    <button type="button" class="shellBack" id="btnSettingsBack">← 主页</button>
-    <div class="shellTitle">设置</div>
-    <label class="optRow"><span>音效（即将加入）</span><input id="optSfx" type="checkbox" checked /></label>
-    <label class="optRow"><span>显示调试信息</span><input id="optDebug" type="checkbox" /></label>
-    <button type="button" class="shellBtn ghost" id="optReset">重置闯关进度</button>
+    <button type="button" class="settingsBack" id="btnSettingsBack" aria-label="回主页">
+      <img alt="" src="%BASE_URL%ui/settings-back.png" width="90" height="72" />
+    </button>
+    <div class="settingsTitle" aria-hidden="true">
+      <img alt="设置" src="%BASE_URL%ui/settings-title.png" width="339" height="180" />
+    </div>
+    <label class="settingsOpt" data-opt="music">
+      <span class="settingsOptLabel">音乐</span>
+      <input id="optMusic" class="settingsCheck" type="checkbox" checked />
+      <span class="settingsCheckArt" aria-hidden="true">
+        <img class="off" alt="" src="%BASE_URL%ui/settings-check-off.png" width="183" height="181" />
+        <img class="on" alt="" src="%BASE_URL%ui/settings-check-on.png" width="183" height="182" />
+      </span>
+    </label>
+    <label class="settingsOpt" data-opt="sfx">
+      <span class="settingsOptLabel">音效</span>
+      <input id="optSfx" class="settingsCheck" type="checkbox" checked />
+      <span class="settingsCheckArt" aria-hidden="true">
+        <img class="off" alt="" src="%BASE_URL%ui/settings-check-off.png" width="183" height="181" />
+        <img class="on" alt="" src="%BASE_URL%ui/settings-check-on.png" width="183" height="182" />
+      </span>
+    </label>
+    <input id="optDebug" class="settingsDebug" type="checkbox" tabindex="-1" aria-hidden="true" />
+    <button type="button" class="settingsReset" id="optReset">重置闯关进度</button>
+    <div class="settingsCredits" aria-hidden="true">
+      <img alt="" src="%BASE_URL%ui/settings-credits.png" width="788" height="276" />
+    </div>
   </div>
   </div>
 

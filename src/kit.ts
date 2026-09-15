@@ -1,6 +1,6 @@
 /** Kenney Survivors kit：编辑器和战场共用。glTF 图集 flipY=false。 */
 
-import { RepeatWrapping } from 'three';
+import { AnimationClip, RepeatWrapping, type KeyframeTrack, type Object3D } from 'three';
 
 export const KIT_URL = '/models/kit/character_kit.glb';
 
@@ -30,8 +30,14 @@ export type KitHairId = (typeof KIT_HAIRS)[number]['id'];
 export const KIT_SKINS = [
   { id: 'survivor-male-b', label: 'survivorMaleB', file: '/models/kit/textures/survivorMaleB.png' },
   { id: 'survivor-female-a', label: 'survivorFemaleA', file: '/models/kit/textures/survivorFemaleA.png' },
-  { id: 'zombie-a', label: 'zombieA', file: '/models/kit/textures/zombieA.png' },
-  { id: 'zombie-c', label: 'zombieC', file: '/models/kit/textures/zombieC.png' },
+  { id: 'lady-01', label: '灰衫裙', file: '/models/kit/textures/lady_01_grey_shirt_skirt.png' },
+  { id: 'lady-02', label: '藏青西装裤', file: '/models/kit/textures/lady_02_navy_blazer_pants.png' },
+  { id: 'kenney-female-a', label: '紫马甲裙', file: '/models/kit/textures/lady_03_purple_vest_skirt.png' },
+  { id: 'lady-04', label: '蓝衫裤', file: '/models/kit/textures/lady_04_blue_shirt_pants.png' },
+  { id: 'lady-05', label: '藏青西装裙', file: '/models/kit/textures/lady_05_navy_blazer_skirt.png' },
+  { id: 'lady-06', label: '开衫裤', file: '/models/kit/textures/lady_06_cardigan_pants.png' },
+  { id: 'lady-07', label: '青绿裙', file: '/models/kit/textures/lady_07_teal_dress.png' },
+  { id: 'lady-08', label: '炭黑西装', file: '/models/kit/textures/lady_08_charcoal_suit.png' },
 ] as const;
 
 /** glTF 图集：y=0 在 PNG 顶，与 skin 预览画布一致 */
@@ -331,12 +337,45 @@ export function findKitBody(root: any) {
   return body;
 }
 
+export function remapAnimBoneName(name: string): string {
+  return name.replace(/^mixamorig/, '').replace(/^Armature\|/, '');
+}
+
+function parseTrackBoneProp(trackName: string): { bone: string; prop: string } | null {
+  const indexed = trackName.match(/\.bones\[([^\]]+)\]\.(.+)$/);
+  if (indexed) return { bone: indexed[1], prop: indexed[2] };
+  const dot = trackName.lastIndexOf('.');
+  if (dot <= 0) return null;
+  return { bone: trackName.slice(0, dot), prop: trackName.slice(dot + 1) };
+}
+
 /** Kenney FBX 接到 kit：只借变形骨 quaternion（丢掉厘米位移/缩放和 IK 辅助骨） */
 export function isBodyDeformQuatTrack(trackName: string, boneExists: (name: string) => boolean) {
-  const [bone, prop] = trackName.split('.');
-  if (!bone || !boneExists(bone) || prop !== 'quaternion') return false;
-  if (/Ctrl|IK|Roll|Heel/.test(bone)) return false;
+  const parsed = parseTrackBoneProp(trackName);
+  if (!parsed) return false;
+  const { bone, prop } = parsed;
+  if (!boneExists(bone) || prop !== 'quaternion') return false;
+  if (/Ctrl|IK|Roll|Heel|_end$/.test(bone)) return false;
   return /^(Hips|Spine|Chest|UpperChest|Neck|Head|LeftShoulder|RightShoulder|LeftArm|RightArm|LeftForeArm|RightForeArm|LeftHand|RightHand|LeftUpLeg|RightUpLeg|LeftLeg|RightLeg|LeftFoot|RightFoot|LeftToes|RightToes)/.test(
     bone
   );
+}
+
+/** 只抽 kit 上存在的变形骨旋转。 */
+export function retargetBodyQuats(clip: AnimationClip, root: Object3D): AnimationClip {
+  const names = new Set<string>();
+  root.traverse((o) => names.add(o.name));
+  const tracks: KeyframeTrack[] = [];
+  for (const t of clip.tracks) {
+    const parsed = parseTrackBoneProp(t.name);
+    if (!parsed) continue;
+    const mapped = remapAnimBoneName(parsed.bone);
+    const renamed = `${mapped}.${parsed.prop}`;
+    if (!isBodyDeformQuatTrack(renamed, (n) => names.has(n))) continue;
+    const copy = t.clone();
+    copy.name = renamed;
+    tracks.push(copy);
+  }
+  if (!tracks.length) return clip;
+  return new AnimationClip(clip.name, clip.duration, tracks);
 }

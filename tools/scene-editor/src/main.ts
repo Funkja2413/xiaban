@@ -1,5 +1,6 @@
 import { ScenePreview, type Tool } from './preview';
 import { downloadJson, saveLevelCatalog, saveLevelTexture } from './io';
+import { loadFxCatalog, mergeHazardFx } from '../../../src/fx/catalog';
 import {
   MAX_AMBIENT,
   MAX_HEMISPHERE,
@@ -10,14 +11,19 @@ import {
   PROP_SPECS,
   WEEKDAYS,
   clampLightParams,
+  DEFAULT_CUSTOM_COLOR,
   cloneLevel,
   ensureWeekdays,
   faceYaw,
+  isHazardKind,
+  isWallMount,
+  isWallSnap,
   loadLevelCatalog,
   seedLevel,
   applySky,
   propSpec,
   toneFromWallHex,
+  voidShapeOf,
   wallFaceLabel,
   wallToneHex,
   type Atmosphere,
@@ -27,10 +33,13 @@ import {
   type DeskTop,
   type FloorKind,
   type FurnitureTone,
+  type HazardKind,
+  type HazardTune,
   type LevelCatalog,
   type LevelDef,
   type PlantKit,
   type SkyKind,
+  type VoidShape,
   type WeekdayId,
 } from '../../../src/levels';
 
@@ -66,23 +75,105 @@ function bindDrop(zone: HTMLElement, input: HTMLInputElement, onFile: (f: File) 
   });
 }
 
-const TOOLS: { id: Tool; label: string }[] = [
-  { id: 'select', label: '选择 / 移动' },
-  { id: 'wall', label: '墙' },
-  { id: 'desk', label: '工位桌' },
-  { id: 'wood', label: '木台' },
-  { id: 'pillar', label: '柱' },
-  ...PROP_SPECS.filter((s) => s.id !== 'ceilingLight').map((s) => ({ id: s.id as Tool, label: s.label })),
-  { id: 'elevator', label: '电梯区' },
-  { id: 'player', label: '玩家出生' },
-  { id: 'chair', label: '椅子' },
-  { id: 'pointLight', label: '点光' },
+const TOOL_GROUPS: { title: string; hint: string; tools: { id: Tool; label: string }[] }[] = [
+  {
+    title: '场景',
+    hint: '点墙放置侧窗、电视、弹簧门和电梯；斜墙和三角/圆切口也能挂。',
+    tools: [
+      { id: 'select', label: '选择 / 移动' },
+      { id: 'wall', label: '墙' },
+      { id: 'void', label: '黑色遮罩' },
+      { id: 'window', label: '侧窗' },
+      { id: 'tv', label: '挂壁电视' },
+      { id: 'launch', label: '弹簧门' },
+      { id: 'elevator', label: '电梯区' },
+      { id: 'player', label: '玩家出生' },
+      { id: 'heavy', label: '主管锚点' },
+      { id: 'interceptor', label: '拦截点' },
+      { id: 'pointLight', label: '点光' },
+    ],
+  },
+  {
+    title: '硬道具',
+    hint: '挡路，推不动。',
+    tools: [
+      { id: 'desk', label: '工位桌' },
+      { id: 'wood', label: '木台' },
+      { id: 'pillar', label: '柱' },
+      ...PROP_SPECS.filter((s) => s.move === 'block').map((s) => ({ id: s.id as Tool, label: s.label })),
+    ],
+  },
+  {
+    title: '可互动',
+    hint: '踩到或碰到触发。选中后右侧调减速、眩晕、弹开等。',
+    tools: PROP_SPECS.filter((s) => s.move === 'hazard' && s.id !== 'launch').map((s) => ({ id: s.id as Tool, label: s.label })),
+  },
+  {
+    title: '可碰飞',
+    hint: '游戏里能撞走，还能撞人。',
+    tools: [
+      ...PROP_SPECS.filter((s) => s.move === 'push').map((s) => ({ id: s.id as Tool, label: s.label })),
+      { id: 'chair', label: '椅子' },
+    ],
+  },
 ];
+
+const HAZARD_UI: Record<HazardKind, { hint: string; fields: { row: string; key: keyof HazardTune; label: string; min: number; max: number; step: number }[] }> = {
+  wet: {
+    hint: '踩上去减速。半径是水渍大小，倍率越小越慢。',
+    fields: [
+      { row: 'hzRadiusRow', key: 'radius', label: '水渍半径', min: 0.4, max: 2, step: 0.05 },
+      { row: 'hzDurationRow', key: 'duration', label: '减速持续', min: 0.3, max: 3, step: 0.05 },
+      { row: 'hzFactorRow', key: 'factor', label: '速度倍率', min: 0.2, max: 0.9, step: 0.02 },
+    ],
+  },
+  pit: {
+    hint: '地上一张报纸。踩上去会眩晕。半径是触发范围。',
+    fields: [
+      { row: 'hzRadiusRow', key: 'radius', label: '触发半径', min: 0.3, max: 1.4, step: 0.05 },
+      { row: 'hzDurationRow', key: 'duration', label: '眩晕秒', min: 0.6, max: 3, step: 0.05 },
+    ],
+  },
+  crate: {
+    hint: '棕色文件箱。碰到会眩晕，也会挡住路。',
+    fields: [
+      { row: 'hzRadiusRow', key: 'radius', label: '触发半径', min: 0.3, max: 1.4, step: 0.05 },
+      { row: 'hzDurationRow', key: 'duration', label: '眩晕秒', min: 0.6, max: 3, step: 0.05 },
+    ],
+  },
+  launch: {
+    hint: '必须贴墙。点哪面墙就挖门洞，靠近正面会被拍开摔倒。',
+    fields: [
+      { row: 'hzRadiusRow', key: 'radius', label: '感应距离', min: 0.35, max: 1.8, step: 0.05 },
+      { row: 'hzImpulseRow', key: 'impulse', label: '弹回冲量', min: 200, max: 900, step: 10 },
+      { row: 'hzLiftRow', key: 'lift', label: '抬起', min: 8, max: 80, step: 2 },
+      { row: 'hzDurationRow', key: 'duration', label: '摔倒秒', min: 0.6, max: 2.2, step: 0.05 },
+    ],
+  },
+  alarm: {
+    hint: '游戏里几乎看不见。谁踩上去都会被弹飞，触发时地面会闪一圈白边。',
+    fields: [
+      { row: 'hzRadiusRow', key: 'radius', label: '地板半径', min: 0.35, max: 1.8, step: 0.05 },
+      { row: 'hzImpulseRow', key: 'impulse', label: '弹飞冲量', min: 200, max: 900, step: 10 },
+      { row: 'hzLiftRow', key: 'lift', label: '弹飞高度', min: 40, max: 220, step: 2 },
+      { row: 'hzDurationRow', key: 'duration', label: '失控秒', min: 0.5, max: 2.2, step: 0.05 },
+    ],
+  },
+};
 
 function moveLine(kind: string): string {
   if (kind === 'chair') return MOVE_HINT.push;
   if (kind === 'desk' || kind === 'wall' || kind === 'wood' || kind === 'pillar') return MOVE_HINT.block;
-  if (kind === 'player' || kind === 'elevator' || kind === 'pointLight') return MOVE_HINT.meta;
+  if (kind === 'launch') return '必须贴墙。点哪面墙就挖出门洞，朝向跟着墙。靠近会被拍开摔倒。';
+  if (kind === 'elevator') return '点哪面墙就贴哪面，朝向跟着墙。斜墙和三角、圆切口也能挂。';
+  if (kind === 'pit') return '地上一张报纸。踩上去会眩晕。';
+  if (kind === 'crate') return '棕色文件箱。碰到会眩晕，也会挡住路。';
+  if (isWallMount(kind)) return '贴墙装饰，可从下面走过。点哪面墙就贴哪面，朝向跟着墙走。斜墙和三角、圆切口也能挂。';
+  if (kind === 'player' || kind === 'pointLight' || kind === 'heavy' || kind === 'interceptor' || kind === 'void') {
+    return kind === 'void'
+      ? '从楼板挖掉。游戏里不铺遮罩色，能看见背景。矩形、圆形、三角都会改外轮廓并沿切口长出墙。'
+      : MOVE_HINT.meta;
+  }
   const spec = propSpec(kind);
   return spec ? MOVE_HINT[spec.move] : '';
 }
@@ -165,6 +256,7 @@ function writeAtmo(def: LevelDef): { geom: boolean } {
 async function boot() {
   const preview = new ScenePreview();
   await preview.init($('viewport'));
+  await loadFxCatalog();
 
   let cat: LevelCatalog = await loadLevelCatalog();
   ensureWeekdays(cat);
@@ -211,15 +303,21 @@ async function boot() {
     });
   };
 
-  const toolsEl = $('tools');
-  toolsEl.innerHTML = TOOLS.map((t) => `<button type="button" data-tool="${t.id}">${t.label}</button>`).join('');
+  const toolsEl = $('toolGroups');
+  toolsEl.innerHTML = TOOL_GROUPS.map(
+    (g) =>
+      `<div class="tool-sec"><h3>${g.title}</h3><p class="hint">${g.hint}</p><div class="tools">${g.tools
+        .map((t) => `<button type="button" data-tool="${t.id}">${t.label}</button>`)
+        .join('')}</div></div>`
+  ).join('');
   const syncTool = () => {
     toolsEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.tool === preview.tool));
   };
-  toolsEl.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+    toolsEl.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
     b.addEventListener('click', () => {
       preview.tool = b.dataset.tool as Tool;
       syncTool();
+      syncMaskEdit();
     });
   });
   syncTool();
@@ -268,13 +366,52 @@ async function boot() {
     $('plantKits').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.kit === (plant.plantKit ?? 'pot')));
   };
 
+  const hzRows = ['hzRadiusRow', 'hzDurationRow', 'hzFactorRow', 'hzImpulseRow', 'hzLiftRow'] as const;
+  const hzInputs: Record<keyof HazardTune, string> = {
+    radius: 'hzRadius',
+    duration: 'hzDuration',
+    factor: 'hzFactor',
+    impulse: 'hzImpulse',
+    lift: 'hzLift',
+  };
+  const syncHazardEdit = () => {
+    const s = preview.selected;
+    const box = $('hazardEdit');
+    const kind = s && isHazardKind(s.kind) ? s.kind : undefined;
+    const prop = kind ? preview.findProp(s!.id) : undefined;
+    box.hidden = !prop;
+    if (!kind || !prop) return;
+    const ui = HAZARD_UI[kind];
+    $('hazardHint').textContent = ui.hint;
+    const fx = mergeHazardFx(kind, prop.hazard);
+    for (const row of hzRows) $(row).hidden = true;
+    for (const f of ui.fields) {
+      const row = $(f.row);
+      row.hidden = false;
+      const lab = row.querySelector('.hz-lab');
+      if (lab) lab.textContent = f.label;
+      const inp = $(hzInputs[f.key]) as HTMLInputElement;
+      inp.min = String(f.min);
+      inp.max = String(f.max);
+      inp.step = String(f.step);
+      const v = fx[f.key] ?? f.min;
+      inp.value = String(v);
+      setLabel(hzInputs[f.key], v);
+    }
+  };
+
   const syncToneEdit = () => {
     const box = $('toneEdit');
     const on = preview.canTone();
     box.hidden = !on;
     if (!on) return;
+    const custom = !!preview.itemColor();
     const tone = preview.itemTone();
-    $('itemTones').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.tone === tone));
+    $('itemTones').querySelectorAll('button').forEach((b) => {
+      const t = (b as HTMLButtonElement).dataset.tone;
+      b.classList.toggle('active', custom ? t === 'custom' : t === tone);
+    });
+    ($('itemColor') as HTMLInputElement).value = preview.itemColorSwatch();
   };
 
   const syncWallEdit = () => {
@@ -287,11 +424,28 @@ async function boot() {
     const hex = preview.wallItemColor();
     ($('wallItemColor') as HTMLInputElement).value = hex.length === 7 ? hex : '#d8d0c4';
     const tone = own ? toneFromWallHex(own) : undefined;
-    $('wallFaceHint').textContent = `这一面 ${wallFaceLabel(s.face!)}。取色只改你点到的面，其它墙不动。`;
+    const faceMap = preview.paintedFaceMap();
+    $('wallFaceHint').textContent = `这一面 ${wallFaceLabel(s.face!)}。贴图按原比例齐高或齐宽，不拉伸。`;
+    $('faceTexInfo').textContent = faceMap ? `这一面 ${faceMap}` : '这一面没有贴图';
     $('wallItemTones').querySelectorAll('button').forEach((b) => {
       const t = (b as HTMLButtonElement).dataset.tone;
       b.classList.toggle('active', own ? t === tone : t === 'inherit');
     });
+  };
+
+  const syncMaskEdit = () => {
+    const s = preview.selected;
+    const box = $('maskEdit');
+    const v = s?.kind === 'void' ? preview.findVoid(s.id) : undefined;
+    const on = preview.tool === 'void' || !!v;
+    box.hidden = !on;
+    if (!on) return;
+    const shape = v ? voidShapeOf(v) : preview.lastVoidShape;
+    $('maskShapes').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.shape === shape));
+    $('maskSizeRow').hidden = !v;
+    if (!v) return;
+    ($('maskW') as HTMLInputElement).value = String(Number((v.maxX - v.minX).toFixed(2)));
+    ($('maskH') as HTMLInputElement).value = String(Number((v.maxZ - v.minZ).toFixed(2)));
   };
 
   const syncYaw = () => {
@@ -321,8 +475,16 @@ async function boot() {
             ? `工位桌 · ${s.id}（右侧换桌面、物品和朝向）`
             : s.kind === 'plant'
               ? `绿植 · ${s.id}（右侧换组合，同款每盆也会不一样）`
+              : isWallSnap(s.kind)
+              ? `${s.kind === 'elevator' ? '电梯区' : propSpec(s.kind)?.label ?? s.kind} · ${s.id}（拖到别的墙会重新贴面）`
               : (s.kind === 'wall' || s.kind === 'pillar') && s.face
-              ? `${s.kind === 'pillar' ? '柱' : '墙'} · ${s.id} · 面 ${wallFaceLabel(s.face)}（右侧只给这一面取色）`
+              ? `${s.kind === 'pillar' ? '柱' : '墙'} · ${s.id} · 面 ${wallFaceLabel(s.face)}（右侧给这一面取色或贴图）`
+              : s.kind === 'heavy'
+              ? `主管锚点 · ${s.id}`
+              : s.kind === 'interceptor'
+                ? `拦截点 · ${s.id}`
+                : s.kind === 'void'
+                ? `挖空 · ${s.id}（拖中间移动，拖边/角改长宽${preview.findVoid(s.id) && voidShapeOf(preview.findVoid(s.id)!) !== 'rect' ? '，右侧可转朝向' : ''}）`
               : `${propSpec(s.kind)?.label ?? s.kind} · ${s.id}`
       : `未选中。点物体，或用「点光」点在要亮的地方（最多 ${MAX_POINT_LIGHTS} 盏）。`;
     $('moveHint').textContent = s ? moveLine(s.kind) : '';
@@ -330,9 +492,11 @@ async function boot() {
     syncDeskEdit();
     syncChairEdit();
     syncPlantEdit();
+    syncHazardEdit();
     syncToneEdit();
     syncWallEdit();
     syncYaw();
+    syncMaskEdit();
     syncBudget();
   };
   preview.onChange = (rebuild) => {
@@ -390,6 +554,23 @@ async function boot() {
 
   $('btnDelete').addEventListener('click', () => preview.deleteSelected());
 
+  const commitMaskSize = () => {
+    const w = Number(($('maskW') as HTMLInputElement).value);
+    const d = Number(($('maskH') as HTMLInputElement).value);
+    if (!Number.isFinite(w) || !Number.isFinite(d)) return;
+    preview.applyMaskSize(w, d);
+    syncMaskEdit();
+  };
+  $('maskW').addEventListener('change', commitMaskSize);
+  $('maskH').addEventListener('change', commitMaskSize);
+  $('maskShapes').querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+    b.addEventListener('click', () => {
+      preview.applyVoidShape(b.dataset.shape as VoidShape);
+      syncMaskEdit();
+      syncYaw();
+    });
+  });
+
   const applyDeskLook = (patch: { top?: DeskTop; kit?: DeskKit; face?: DeskFace }) => {
     const s = preview.selected;
     if (!s || s.kind !== 'desk') return;
@@ -434,11 +615,26 @@ async function boot() {
       syncPlantEdit();
     });
   });
+  const writeHazard = (key: keyof HazardTune, raw: number) => {
+    preview.applyHazard({ [key]: raw });
+    syncHazardEdit();
+  };
+  ($('hzRadius') as HTMLInputElement).addEventListener('input', () => writeHazard('radius', Number(($('hzRadius') as HTMLInputElement).value)));
+  ($('hzDuration') as HTMLInputElement).addEventListener('input', () => writeHazard('duration', Number(($('hzDuration') as HTMLInputElement).value)));
+  ($('hzFactor') as HTMLInputElement).addEventListener('input', () => writeHazard('factor', Number(($('hzFactor') as HTMLInputElement).value)));
+  ($('hzImpulse') as HTMLInputElement).addEventListener('input', () => writeHazard('impulse', Number(($('hzImpulse') as HTMLInputElement).value)));
+  ($('hzLift') as HTMLInputElement).addEventListener('input', () => writeHazard('lift', Number(($('hzLift') as HTMLInputElement).value)));
   $('itemTones').querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
     b.addEventListener('click', () => {
-      preview.applyTone(b.dataset.tone as FurnitureTone);
+      const t = b.dataset.tone;
+      if (t === 'custom') preview.applyColor(preview.itemColor() ?? preview.lastColor ?? DEFAULT_CUSTOM_COLOR);
+      else preview.applyTone(t as FurnitureTone);
       syncToneEdit();
     });
+  });
+  $('itemColor').addEventListener('input', () => {
+    preview.applyColor(($('itemColor') as HTMLInputElement).value);
+    syncToneEdit();
   });
   $('wallItemTones').querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
     b.addEventListener('click', () => {
@@ -572,8 +768,31 @@ async function boot() {
     scheduleRebuild();
     toast(`已引用 ${res.file}，记得保存本关`);
   };
+  const uploadFace = async (file: File) => {
+    if (!preview.canWallColor() || !preview.selected?.face) {
+      toast('先用选择工具点到要贴的那一面');
+      return;
+    }
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+    const face = preview.selected.face;
+    const name = `${current.id}-face-${preview.selected.id}-${face}.${ext}`;
+    const res = await saveLevelTexture(name, await file.arrayBuffer());
+    if (!res.ok || !res.file) {
+      toast(`上传失败：${res.error}`);
+      return;
+    }
+    preview.applyWallMap(res.file);
+    syncWallEdit();
+    toast(`已贴到这一面 ${res.file}，记得保存本关`);
+  };
   bindDrop($('floorDrop'), $('floorFile') as HTMLInputElement, (f) => void upload('floor', f));
   bindDrop($('wallDrop'), $('wallFile') as HTMLInputElement, (f) => void upload('wall', f));
+  bindDrop($('faceDrop'), $('faceFile') as HTMLInputElement, (f) => void uploadFace(f));
+  $('btnClearFaceMap').addEventListener('click', () => {
+    if (!preview.canWallColor()) return;
+    preview.applyWallMap(null);
+    syncWallEdit();
+  });
   $('floorKinds').querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
     b.addEventListener('click', () => {
       const kind = b.dataset.kind as FloorKind;

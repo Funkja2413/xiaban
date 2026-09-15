@@ -21,12 +21,13 @@ import {
   type HaloStyle,
   type Lv,
 } from '../../../src/fx/catalog';
-import { loadCatalog } from '../../../src/catalog';
-import { WEEKDAYS } from '../../../src/levels';
+import { bustCatalogAssets, catalogLookStamp, ENEMY_SKILL_META, loadCatalog, lookForSlotOnDay, type ColleagueCatalog, type EnemySkillId } from '../../../src/catalog';
+import { loadLevelCatalog, WEEKDAYS, type LevelCatalog, type WeekdayId } from '../../../src/levels';
+import { dayKitHint, dayKitMeta, dayPlayKit, type DayPlayKit } from '../../../src/fx/days';
 import { loadHumanoidKit } from '../../../src/game/humanoid';
 import { initPhysics } from '../../../src/sim/physics';
 import { FxPreview, type PlayKind } from './preview';
-import { TRACKS, ACTORS, actorSections, dashReactFields, fieldSections, type Field, type TrackDef, type TrackId } from './schema';
+import { TRACKS, ACTORS, actorSections, dashReactFields, enemySkillSections, fieldSections, tracksForDay, type Field, type TrackDef, type TrackId } from './schema';
 import type { ActorId } from '../../../src/fx/catalog';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -46,9 +47,32 @@ let selectedActor: ActorId | null = null;
 let level: Lv = 1;
 let panelTab: 'overall' | 'react' = 'overall';
 let preview: FxPreview;
+let currentDay: WeekdayId = 'monday';
+let colleagueCat: ColleagueCatalog;
+let levelCat: LevelCatalog;
+let lookStamp = '';
+let rosterBusy = false;
+let bakedDay: WeekdayId | null = null;
+let wantLooks: WeekdayId | null = null;
+
+function kitOf(day = currentDay): DayPlayKit {
+  return dayPlayKit(day, colleagueCat, levelCat);
+}
+
+function visibleTracks() {
+  return tracksForDay(kitOf());
+}
 
 function trackOf(id: TrackId): TrackDef {
   return TRACKS.find((t) => t.id === id) ?? TRACKS[0]!;
+}
+
+function ensureSelection() {
+  const tracks = visibleTracks();
+  if (selectedActor) return;
+  if (tracks.some((t) => t.id === selected)) return;
+  selected = tracks[0]?.id ?? 'common';
+  if (!trackOf(selected).hasLevel) level = 1;
 }
 
 function playKindOf(id: TrackId): PlayKind {
@@ -56,6 +80,7 @@ function playKindOf(id: TrackId): PlayKind {
   if (id === 'decoy') return 'decoy';
   if (id === 'keyboard') return 'keyboard';
   if (id === 'coffee') return 'coffee';
+  if (id === 'hazards' || id === 'enemySkills') return 'common';
   return 'dash';
 }
 
@@ -64,8 +89,10 @@ function syncPreview() {
   preview.track = selected;
   preview.skillLv = t.hasLevel ? level : 1;
   preview.actorEdit = selectedActor !== null;
+  preview.actorSkill = actorSkillOf(selectedActor);
   if (selectedActor) preview.actorId = selectedActor;
   preview.refreshOvertime();
+  preview.applyActorLayout();
 }
 
 function playCurrent() {
@@ -77,10 +104,59 @@ function playCurrent() {
   preview.start(playKindOf(selected));
 }
 
+function actorsForDay() {
+  return ACTORS.map((a) => {
+    const look = lookForSlotOnDay(colleagueCat, currentDay, a.id);
+    if (a.id === 'player') return a;
+    const skill = look?.enemySkill ?? null;
+    return {
+      ...a,
+      name: look?.label || a.name,
+      tag: skill ? ENEMY_SKILL_META[skill].name : '无技能',
+    };
+  });
+}
+
+function actorSkillOf(id: ActorId | null): EnemySkillId | null {
+  if (!id || id === 'player') return null;
+  return lookForSlotOnDay(colleagueCat, currentDay, id)?.enemySkill ?? null;
+}
+
+function renderDays() {
+  const box = $('dayList');
+  box.innerHTML = WEEKDAYS.map((s) => {
+    const kit = kitOf(s.id);
+    const on = currentDay === s.id ? 'on' : '';
+    const tag = kit.inherited
+      ? '<span class="tag wait">沿用周一</span>'
+      : '<span class="tag ok">本关</span>';
+    return `<button type="button" class="item ${on}" data-id="${s.id}"><div><div>${s.label}</div><div class="meta">${dayKitMeta(kit)}</div></div>${tag}</button>`;
+  }).join('');
+  box.querySelectorAll<HTMLButtonElement>('.item').forEach((el) => {
+    el.addEventListener('click', () => switchDay(el.dataset.id as WeekdayId));
+  });
+  $('dayKitHint').textContent = dayKitHint(kitOf());
+}
+
+function switchDay(id: WeekdayId) {
+  if (!id || id === currentDay) return;
+  currentDay = id;
+  ensureSelection();
+  renderDays();
+  renderList();
+  renderCast();
+  renderLevel();
+  renderFields();
+  syncPreview();
+  const label = WEEKDAYS.find((d) => d.id === currentDay)?.label ?? currentDay;
+  toast(`正在编 ${label}`);
+  void applyDayLooks();
+}
+
 function renderCast() {
   const box = $('castList');
   box.innerHTML = '';
-  for (const a of ACTORS) {
+  for (const a of actorsForDay()) {
     const btn = document.createElement('button');
     btn.className = `item${selectedActor === a.id ? ' on' : ''}`;
     btn.innerHTML = `<span>${a.name}</span><span class="tag">${a.tag}</span>`;
@@ -104,8 +180,10 @@ function renderList() {
     common: '场景',
     dash: '冲刺属性',
     skill: '主动技能',
+    hazard: '陷阱',
+    enemy: '同事主动',
   };
-  for (const e of TRACKS) {
+  for (const e of visibleTracks()) {
     if (e.group !== lastGroup) {
       lastGroup = e.group;
       const h = document.createElement('div');
@@ -261,7 +339,7 @@ function renderReactTab(line: DashKey, lv: Lv, box: HTMLElement) {
   box.appendChild(hint);
   const pack = fx().lines[line][lv];
   for (const id of CROWD_ACTOR_IDS) {
-    const def = ACTORS.find((a) => a.id === id);
+    const def = actorsForDay().find((a) => a.id === id);
     const card = document.createElement('div');
     card.className = 'reactCard';
     const h = document.createElement('h3');
@@ -279,10 +357,36 @@ function renderFields() {
   box.innerHTML = '';
   if (selectedActor) {
     renderDashTabs(false);
-    const def = ACTORS.find((a) => a.id === selectedActor)!;
-    $('fxTitle').textContent = def.name;
-    $('fxBlurb').textContent = def.blurb;
+    const def = actorsForDay().find((a) => a.id === selectedActor) ?? ACTORS.find((a) => a.id === selectedActor)!;
+    const skill = actorSkillOf(selectedActor);
+    $('fxTitle').textContent = skill ? `${def.name} · ${ENEMY_SKILL_META[skill].name}` : def.name;
+    $('fxBlurb').textContent = skill
+      ? `先调这一关挂上的主动技能，下面才是倒地/眩晕/减速。点「播放当前」看他对着玩家放技能：前摇下蹲，再打在玩家身上。`
+      : def.blurb;
     if (selectedActor === 'player') renderHaloStyles(box);
+    if (skill) {
+      const head = document.createElement('h3');
+      head.className = 'sec';
+      head.textContent = `主动技能 · ${ENEMY_SKILL_META[skill].name}`;
+      box.appendChild(head);
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = `${ENEMY_SKILL_META[skill].hint}。身体仍是待机/跑步，特效在身外。`;
+      box.appendChild(hint);
+      for (const sec of enemySkillSections(skill)) {
+        const h = document.createElement('h3');
+        h.className = 'sec';
+        h.textContent = sec.title;
+        box.appendChild(h);
+        for (const f of sec.fields) renderField(f, box);
+      }
+    }
+    if (skill && selectedActor !== 'player') {
+      const pass = document.createElement('h3');
+      pass.className = 'sec';
+      pass.textContent = '被动状态';
+      box.appendChild(pass);
+    }
     for (const sec of actorSections(selectedActor)) {
       const h = document.createElement('h3');
       h.className = 'sec';
@@ -302,7 +406,7 @@ function renderFields() {
     renderReactTab(def.id as DashKey, lv, box);
     return;
   }
-  for (const sec of fieldSections(def, lv)) {
+  for (const sec of fieldSections(def, lv, kitOf())) {
     const h = document.createElement('h3');
     h.className = 'sec';
     h.textContent = sec.title;
@@ -421,12 +525,15 @@ async function boot() {
   await loadFxCatalog('/fx/catalog.json');
   if (!alive()) return;
   setLoading('读取角色清单…');
-  const catalog = await loadCatalog();
+  colleagueCat = await loadCatalog();
   if (!alive()) return;
-  const day = WEEKDAYS.find((d) => d.id === catalog.active);
-  $('castDay').textContent = `当前关：${day?.label ?? catalog.active}`;
+  setLoading('读取关卡清单…');
+  levelCat = await loadLevelCatalog();
+  if (!alive()) return;
+  currentDay = WEEKDAYS.some((d) => d.id === colleagueCat.active) ? colleagueCat.active : 'monday';
+  ensureSelection();
   setLoading('加载战场角色…', 'kit / 皮肤 / idle·run 与游戏同一套，不进对外包体');
-  const kit = await loadHumanoidKit();
+  const kit = await loadHumanoidKit('player', currentDay);
   if (!alive()) return;
   setLoading('初始化物理…');
   const world = await initPhysics();
@@ -439,6 +546,7 @@ async function boot() {
   preview.setStatus((s) => {
     $('status').textContent = s;
   });
+  renderDays();
   renderCast();
   bindPose();
 
@@ -488,8 +596,9 @@ async function boot() {
       return;
     }
     const i = Number(e.code.replace('Digit', ''));
-    if (i < 1 || i > TRACKS.length) return;
-    const t = TRACKS[i - 1];
+    const tracks = visibleTracks();
+    if (i < 1 || i > tracks.length) return;
+    const t = tracks[i - 1];
     if (!t) return;
     selectedActor = null;
     selected = t.id;
@@ -501,8 +610,87 @@ async function boot() {
     playCurrent();
   });
 
+  lookStamp = catalogLookStamp(colleagueCat);
+  bakedDay = currentDay;
+  watchRoster();
   $('loading').style.display = 'none';
   renderer.setAnimationLoop((t: number) => preview.tick(t));
+}
+
+async function applyDayLooks() {
+  if (!preview) return;
+  if (rosterBusy) {
+    wantLooks = currentDay;
+    return;
+  }
+  if (bakedDay === currentDay) return;
+  rosterBusy = true;
+  const label = WEEKDAYS.find((d) => d.id === currentDay)?.label ?? currentDay;
+  setLoading(`换上${label}角色…`, '皮肤和挂件按这一关重烤');
+  $('loading').style.display = '';
+  try {
+    const day = currentDay;
+    const kit = await loadHumanoidKit('player', day);
+    if (currentDay !== day) {
+      bakedDay = null;
+      return;
+    }
+    preview.adoptKit(kit);
+    bakedDay = day;
+    syncPreview();
+  } catch (err) {
+    console.warn('[fx-editor] day looks failed', err);
+    toast('换角色失败');
+  } finally {
+    rosterBusy = false;
+    $('loading').style.display = 'none';
+    if (wantLooks && wantLooks !== bakedDay) {
+      wantLooks = null;
+      void applyDayLooks();
+    } else {
+      wantLooks = null;
+    }
+  }
+}
+
+async function reloadRoster(force = false) {
+  if (!preview || rosterBusy) return;
+  const cat = await loadCatalog();
+  const stamp = catalogLookStamp(cat);
+  if (!force && stamp === lookStamp) return;
+  rosterBusy = true;
+  try {
+    lookStamp = stamp;
+    colleagueCat = cat;
+    bustCatalogAssets();
+    const kit = await loadHumanoidKit('player', currentDay);
+    preview.adoptKit(kit);
+    bakedDay = currentDay;
+    renderDays();
+    renderCast();
+    renderFields();
+    syncPreview();
+    toast('角色形象已同步');
+  } catch (err) {
+    console.warn('[fx-editor] roster reload failed', err);
+  } finally {
+    rosterBusy = false;
+  }
+}
+
+function watchRoster() {
+  import.meta.hot?.on('roster-catalog', () => {
+    void reloadRoster(true);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) void reloadRoster(false);
+  });
+  window.addEventListener('focus', () => {
+    void reloadRoster(false);
+  });
+  window.setInterval(() => {
+    if (!document.hidden) void reloadRoster(false);
+  }, 2500);
 }
 
 boot().catch((err) => {

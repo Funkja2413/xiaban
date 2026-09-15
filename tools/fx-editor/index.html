@@ -77,6 +77,11 @@
       font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
       border: 1px solid var(--line); color: var(--muted); flex-shrink: 0;
     }
+    .item .tag.ok { color: var(--ok); border-color: #3d6b55; }
+    .item .tag.wait { color: var(--warn); border-color: #6b5a30; }
+    .item .meta { color: var(--muted); font-size: 11px; }
+    #dayList { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+    #dayList .item { align-items: flex-start; }
     .slider {
       display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: 6px;
       color: var(--muted); margin-bottom: 5px;
@@ -140,12 +145,15 @@
     </header>
     <div id="layout">
       <aside class="pane" id="left">
+        <h2>关卡槽</h2>
+        <p class="hint">选关后左侧只留这一天的冲刺、技能、陷阱和同事主动。周二–周五还没单独规划构筑时先沿用周一。</p>
+        <div class="list" id="dayList"></div>
+        <p class="hint" id="dayKitHint"></p>
         <h2>构筑</h2>
         <p class="hint">冲刺和技能的群体反馈。各角色被撞后的状态在冲刺右侧「角色反应」。</p>
         <div class="list" id="fxList"></div>
         <h2>战场角色</h2>
-        <p class="hint">点角色编被动：玩家光环，同事编加班头顶和倒地/眩晕/减速样子。判定加时不用贴近，选中后头顶会循环飘。</p>
-        <p class="hint" id="castDay"></p>
+        <p class="hint">点角色编：有主动技能的先出技能配置，下面才是加班飘字和倒地/眩晕/减速。选中带技能的同事后场景收成他对着玩家；点播放看技能打在玩家身上。判定加时会循环飘 +N分钟。</p>
         <div class="list" id="castList"></div>
         <h2>预览状态</h2>
         <div class="row">

@@ -1,10 +1,24 @@
 import { isKitHairId, isKitSkirtId, KIT_URL, type KitHairId, type KitSkirtId } from './kit';
 import { WEEKDAYS, weekdaySlot, type WeekdayId } from './levels';
-import { ROSTER, rosterSlot } from './roster';
+import { isPlayerSlotId, ROSTER, rosterSlot, type PlayerSlotId } from './roster';
 
 /** 同事形象清单。id 必须是 src/roster.ts 里的槽位。游戏只读；写入走编辑器。 */
 
 export type Gender = 'male' | 'female';
+
+export const ENEMY_SKILL_IDS = ['cut-in', 'desk-slam', 'rally'] as const;
+export type EnemySkillId = (typeof ENEMY_SKILL_IDS)[number];
+
+export const ENEMY_SKILL_META: Record<EnemySkillId, { name: string; hint: string }> = {
+  'cut-in': { name: '截杀', hint: '拦截者' },
+  'desk-slam': { name: '拍桌', hint: '主管' },
+  rally: { name: '喊人', hint: '进圈站住减速' },
+};
+
+export function migrateEnemySkill(s?: string | null): EnemySkillId | null {
+  if (s === 'cut-in' || s === 'desk-slam' || s === 'rally') return s;
+  return null;
+}
 
 export interface HairTransform {
   position: [number, number, number];
@@ -18,10 +32,52 @@ export interface HairDef {
   preRotation: [number, number, number];
 }
 
-export type PropDef = HairDef;
+export interface PropDef {
+  id: string;
+  file: string;
+  preRotation: [number, number, number];
+  /**
+   * 编辑器预设把模型最长边压到该尺寸（米）。
+   * 点预设时写进网格；读档和游戏必须同样压，否则会按源文件单位（往往是 Blender 米）显示过大。
+   */
+  fit?: number;
+}
 
-/** 头顶（帽子，与发型并存）或右手 */
-export type AttachAnchor = 'head' | 'hand';
+/** 与编辑器 PROP_PRESETS 一致。catalog 未写 fit 时也按 id 回退，避免旧档读爆。 */
+export const PROP_PRESET_FIT: Record<string, number> = {
+  'prop-cup': 0.1,
+  'prop-laptop': 0.22,
+  'prop-mic': 0.26,
+  'prop-lens': 0.2,
+  'prop-radio': 0.12,
+  'prop-award': 0.16,
+  'prop-paper': 0.16,
+  'prop-trophy': 0.14,
+  'prop-papers': 0.2,
+  'prop-pack': 0.32,
+  'prop-toilet': 0.36,
+  'prop-horn': 0.2,
+  'prop-heart': 0.14,
+  'prop-clock': 0.1,
+  'prop-pot': 0.18,
+  'prop-pizza': 0.22,
+  'prop-detonator': 0.1,
+  'prop-bell': 0.12,
+  'prop-keys': 0.18,
+  'prop-stop': 0.22,
+  'prop-bible': 0.16,
+  'prop-swatter': 0.34,
+  'prop-oil': 0.14,
+};
+
+export function propFitOf(id: string, stored?: number): number | undefined {
+  if (stored && stored > 0) return stored;
+  const fallback = PROP_PRESET_FIT[id];
+  return fallback && fallback > 0 ? fallback : undefined;
+}
+
+/** 头顶（帽子，与发型并存）、右手、后背（胸椎） */
+export type AttachAnchor = 'head' | 'hand' | 'back';
 
 export interface PropUse {
   id: string;
@@ -45,6 +101,8 @@ export interface VariantDef {
   props: PropUse[];
   /** kit fat/thin：-1 瘦 … 0 … +1 胖 */
   bodyMorph?: number;
+  /** 相对 1.72m 标准身高的整体缩放。缺省：主管 1.38，其余 1 */
+  bodyScale?: number;
   /** 包内蒙皮头发；null / 缺省 = 图集短发 */
   kitHair?: KitHairId | null;
   /** 头发贴图（独立 UV，默认 hair_albedo） */
@@ -55,6 +113,8 @@ export interface VariantDef {
   kitSkirtMap?: string | null;
   /** 角色规划缩略图，编辑器保存时写入 */
   thumb?: string | null;
+  /** 周三起个别同事的主动。玩家槽不要挂。 */
+  enemySkill?: EnemySkillId | null;
 }
 
 export interface ColleagueDay {
@@ -80,7 +140,7 @@ export interface ColleagueCatalog {
   variants: VariantDef[];
 }
 
-export const BUDGET = { skins: 8, props: 6 };
+export const BUDGET = { skins: 16, props: 6 };
 
 /** 旧 catalog id → 规划槽位 */
 const SLOT_ALIASES: Record<string, string> = {
@@ -117,6 +177,33 @@ export const BATTLE_SLOT_IDS = ['colleague-a-m', 'colleague-a-f', 'heavy', 'inte
 export function lookForSlot(cat: ColleagueCatalog, id: string): VariantDef | undefined {
   const slotId = SLOT_ALIASES[id] ?? id;
   return cat.variants.find((v) => (SLOT_ALIASES[v.id] ?? v.id) === slotId);
+}
+
+/** 指定工作日的形象，不改 cat.variants 指针 */
+export function lookForSlotOnDay(cat: ColleagueCatalog, day: WeekdayId, id: string): VariantDef | undefined {
+  const variants = cat.days.find((d) => d.id === day)?.variants ?? cat.variants;
+  return lookForSlot({ ...cat, variants }, id);
+}
+
+/**
+ * 男女主角形象不跟当前关走。主页可能是上周打过的关，
+ * 那天的 player 槽经常还是 Kenney 占位皮，选角棚就会长成同事。
+ */
+export function lookForProtagonist(cat: ColleagueCatalog, id: PlayerSlotId): VariantDef | undefined {
+  const skinId = slotSkinId(id);
+  for (const day of cat.days) {
+    const hit = (day.variants ?? []).find((v) => v.id === id && v.skin === skinId);
+    if (hit) return hit;
+  }
+  return lookForSlotOnDay(cat, 'monday', id) ?? lookForSlot(cat, id);
+}
+
+/** 解析主角槽时，把 catalog.variants 临时换成主角那套 */
+export function catalogForPlayerSlot(cat: ColleagueCatalog, id: string): ColleagueCatalog {
+  if (!isPlayerSlotId(id)) return cat;
+  const look = lookForProtagonist(cat, id);
+  if (!look) return cat;
+  return { ...cat, variants: [look, ...cat.variants.filter((v) => v.id !== id)] };
 }
 
 export function hairForSlot(
@@ -158,6 +245,25 @@ export function bodyMorphForSlot(cat: ColleagueCatalog, id: string) {
   return Math.max(-1, Math.min(1, Number.isFinite(v) ? v : 0));
 }
 
+export const BODY_SCALE_MIN = 0.5;
+export const BODY_SCALE_MAX = 2;
+/** 未写 bodyScale 时主管仍用战场原来的大块头 */
+export const HEAVY_BODY_SCALE = 1.38;
+
+export function defaultBodyScale(id: string) {
+  return rosterSlot(id)?.enemy === 'C' ? HEAVY_BODY_SCALE : 1;
+}
+
+export function clampBodyScale(v: number) {
+  return Math.max(BODY_SCALE_MIN, Math.min(BODY_SCALE_MAX, v));
+}
+
+export function bodyScaleForSlot(cat: ColleagueCatalog, id: string) {
+  const raw = lookForSlot(cat, id)?.bodyScale;
+  const v = raw != null && Number.isFinite(raw) && raw > 0 ? raw : defaultBodyScale(id);
+  return clampBodyScale(v);
+}
+
 export function kitHairForSlot(cat: ColleagueCatalog, id: string): KitHairId | null {
   const h = lookForSlot(cat, id)?.kitHair;
   return isKitHairId(h) ? h : null;
@@ -194,11 +300,13 @@ export function ensureRosterLooks(cat: ColleagueCatalog): boolean {
       hairTransform: { ...IDENTITY_TRANSFORM },
       props: [],
       bodyMorph: 0,
+      bodyScale: defaultBodyScale(slot.id),
       kitHair: null,
       kitHairMap: null,
       kitSkirt: null,
       kitSkirtMap: null,
       thumb: null,
+      enemySkill: null,
     });
     added = true;
   }
@@ -206,9 +314,43 @@ export function ensureRosterLooks(cat: ColleagueCatalog): boolean {
 }
 
 /** GitHub Pages 用相对根路径；开发服务器 BASE_URL 为 `/` */
+let assetBust = '';
+
+export function bustCatalogAssets(token = String(Date.now())) {
+  assetBust = token;
+}
+
 export function assetUrl(p: string) {
   const rel = p.replace(/^\//, '');
-  return `${import.meta.env.BASE_URL}${rel}`;
+  const url = `${import.meta.env.BASE_URL}${rel}`;
+  if (!assetBust) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}v=${assetBust}`;
+}
+
+/** 形象相关字段；变了就该重烤 kit。 */
+export function catalogLookStamp(cat: ColleagueCatalog): string {
+  const variant = (v: VariantDef) => [
+    v.id,
+    v.skin,
+    v.hair,
+    v.hairTransform,
+    v.props,
+    v.bodyMorph,
+    v.bodyScale,
+    v.kitHair,
+    v.kitHairMap,
+    v.kitSkirt,
+    v.kitSkirtMap,
+    v.enemySkill,
+  ];
+  return JSON.stringify({
+    active: cat.active,
+    skins: cat.skins.map((s) => [s.id, s.file]),
+    props: cat.props.map((p) => [p.id, p.file, p.fit]),
+    hairs: cat.hairs.map((h) => [h.id, h.file]),
+    variants: cat.variants.map(variant),
+    days: cat.days.map((d) => ({ id: d.id, variants: d.variants.map(variant) })),
+  });
 }
 
 export function emptyDay(id: WeekdayId): ColleagueDay {
@@ -240,18 +382,21 @@ function stripOverlayHair(v: VariantDef) {
   v.hairTransform ??= { ...IDENTITY_TRANSFORM };
   v.props ??= [];
   v.bodyMorph ??= 0;
+  v.bodyScale ??= defaultBodyScale(v.id);
   v.kitHair ??= null;
   v.kitHairMap ??= null;
   v.kitSkirt ??= null;
   v.kitSkirtMap ??= null;
   v.thumb ??= null;
+  v.enemySkill = migrateEnemySkill(v.enemySkill);
 }
 
-/** 旧 catalog 只有一份 variants：复制到周一～周五。 */
-export function ensureLookDays(cat: ColleagueCatalog): void {
+/** 旧 catalog 只有一份 variants：复制到周一～周五。缺槽会补上。 */
+export function ensureLookDays(cat: ColleagueCatalog): boolean {
   if (!weekdaySlot(cat.active)) cat.active = 'monday';
   cat.days ??= [];
   const seed = Array.isArray(cat.variants) && cat.variants.length ? cat.variants : [];
+  let added = false;
   for (const slot of WEEKDAYS) {
     let day = cat.days.find((d) => d.id === slot.id);
     if (!day) {
@@ -261,15 +406,17 @@ export function ensureLookDays(cat: ColleagueCatalog): void {
         variants: structuredClone(seed),
       };
       cat.days.push(day);
+      added = true;
     } else {
       day.label = slot.label;
       day.variants ??= [];
     }
     for (const v of day.variants) stripOverlayHair(v);
     const wrap: ColleagueCatalog = { ...cat, variants: day.variants };
-    ensureRosterLooks(wrap);
+    if (ensureRosterLooks(wrap)) added = true;
     day.variants = wrap.variants;
   }
+  return added;
 }
 
 export function selectCatalogDay(cat: ColleagueCatalog, id?: string | null): WeekdayId {
@@ -321,6 +468,7 @@ export async function loadCatalog(): Promise<ColleagueCatalog> {
     const alias = (v: VariantDef) => {
       v.props ??= [];
       v.bodyMorph ??= 0;
+      v.bodyScale ??= defaultBodyScale(v.id);
       v.kitHair ??= null;
       v.kitHairMap ??= null;
       v.kitSkirt ??= null;

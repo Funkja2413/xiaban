@@ -37,6 +37,11 @@
     h1 { font-size: 13px; font-weight: 700; margin: 0; letter-spacing: 0.04em; }
     h2 { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
       letter-spacing: 0.08em; margin: 14px 0 8px; }
+    .tool-sec h3 {
+      font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.08em; margin: 12px 0 4px;
+    }
+    .tool-sec .hint { margin: 0 0 6px; }
     .hint { color: var(--muted); font-size: 11.5px; margin: 0 0 8px; }
     a { color: var(--accent); text-decoration: none; }
     #app { display: grid; grid-template-rows: 42px 1fr; height: 100%; }
@@ -75,9 +80,10 @@
     }
     .item .tag.ok { color: var(--ok); border-color: #3d6b55; }
     .slider {
-      display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: 6px;
+      display: grid; grid-template-columns: 88px 1fr 44px; align-items: center; gap: 6px;
       color: var(--muted); margin-bottom: 5px;
     }
+    .slider[hidden] { display: none; }
     .slider input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
     .slider .v { font-variant-numeric: tabular-nums; text-align: right; font-size: 11px; }
     .drop {
@@ -135,8 +141,8 @@
         <div class="list" id="dayList"></div>
 
         <h2>摆放工具</h2>
-        <p class="hint">左键拖出墙/桌/电梯。点放置家具、椅子、点光。选中后右侧圆盘转朝向，四键正交吸附。右键旋转视角，Shift+拖平移。</p>
-        <div class="tools" id="tools"></div>
+        <p class="hint">左键拖出墙/桌/挖空。点放置家具、椅子、点光。侧窗、挂壁电视、弹簧门和电梯点在墙边会按墙面朝向贴上，斜墙和三角/圆切口也能挂；弹簧门还会从墙上挖出门洞。选中后右侧圆盘转朝向（贴墙件除外）。右键旋转视角，Shift+拖平移。</p>
+        <div id="toolGroups"></div>
         <p class="hint" id="lightBudget">点光 0/6</p>
         <div class="row" style="margin-top:8px">
           <button type="button" id="btnDelete">删除选中</button>
@@ -216,7 +222,7 @@
         </div>
         <label class="slider">默认强度 <input type="range" id="lampI" min="8" max="80" step="1"><span class="v" data-for="lampI"></span></label>
         <label class="slider">默认高度 <input type="range" id="ohY" min="1.4" max="3.2" step="0.05"><span class="v" data-for="ohY"></span></label>
-        <label class="slider">默认半径 <input type="range" id="lampDist" min="2" max="10" step="0.1"><span class="v" data-for="lampDist"></span></label>
+        <label class="slider">默认半径 <input type="range" id="lampDist" min="2" max="20" step="0.1"><span class="v" data-for="lampDist"></span></label>
 
         <div class="pair">
           <label class="field">墙底色<input type="color" id="wallColor"></label>
@@ -224,7 +230,7 @@
         </div>
         <label class="slider">墙高光 <input type="range" id="wallShine" min="0" max="80" step="1"><span class="v" data-for="wallShine"></span></label>
         <label class="slider">地高光 <input type="range" id="floorShine" min="0" max="80" step="1"><span class="v" data-for="floorShine"></span></label>
-        <p class="hint">墙底色只给还没单独上色的面。要改某一面：用选择工具点那一面，右侧取色。</p>
+        <p class="hint">墙底色只给还没单独上色的面。要改某一面：用选择工具点那一面，右侧取色或贴图（原比例，不拉伸）。</p>
         <div class="hint" style="margin:8px 0 4px">家具默认色（深灰地板配亮色）</div>
         <div class="tools" id="furnTones">
           <button type="button" data-tone="light">亮色</button>
@@ -233,6 +239,7 @@
         <p class="hint">没单独指定颜色的桌、椅、柜都跟这套。只换材质颜色，不加点光。</p>
 
         <h2>地图范围</h2>
+        <p class="hint">这四个数是外接矩形。要改楼层外形：俯视图下用「黑色遮罩」拖一块切掉楼板。矩形、圆形、三角都会改外墙。游戏里不显示遮罩颜色。周一保持矩形即可。</p>
         <div class="pair">
           <label class="field">minX <input type="number" id="minX" step="1"></label>
           <label class="field">maxX <input type="number" id="maxX" step="1"></label>
@@ -244,7 +251,7 @@
         <p class="hint" id="selInfo">未选中。点物体，或用「点光」点在要亮的地方（最多 6 盏）。</p>
         <p class="move-tag" id="moveHint"></p>
         <div id="yawEdit" hidden>
-          <p class="hint">朝向。圆盘任意转，四键对齐正交。工位桌转的是人坐的方向，桌面仍贴拖出的矩形。</p>
+          <p class="hint">朝向。圆盘任意转，四键对齐正交。工位桌是整张桌子一起转，桌面和桌上物品都跟着走。</p>
           <div class="yaw-wrap">
             <div id="yawDial" class="yaw-dial">
               <span class="tick" style="transform:rotate(0deg)"></span>
@@ -280,7 +287,7 @@
             <button type="button" data-kit="clutter">杂物</button>
             <button type="button" data-kit="packed">堆满</button>
           </div>
-          <div class="hint" style="margin:8px 0 4px">坐哪一侧（也可上面圆盘任意转）</div>
+          <div class="hint" style="margin:8px 0 4px">整桌朝向（也可上面圆盘任意转）</div>
           <div class="tools" id="deskFaces">
             <button type="button" data-face="pz">坐 +Z</button>
             <button type="button" data-face="nz">坐 -Z</button>
@@ -309,27 +316,57 @@
           </div>
         </div>
         <div id="toneEdit" hidden>
-          <p class="hint">这件的成套色。亮色=白/米，暗色=木/炭灰。桌上键鼠也会跟着变。</p>
+          <p class="hint">这件的成套色。亮色=白/米，暗色=木/炭灰。自定义只改这一件，沙发、柜体、椅面都会换成你选的颜色。</p>
           <div class="tools" id="itemTones">
             <button type="button" data-tone="light">亮色</button>
             <button type="button" data-tone="dark">暗色</button>
+            <button type="button" data-tone="custom">自定义</button>
           </div>
+          <label class="field" id="itemColorField" style="margin-top:8px">自定义颜色<input type="color" id="itemColor"></label>
+        </div>
+        <div id="hazardEdit" hidden>
+          <p class="hint" id="hazardHint">这一件陷阱的判定。没改过的项跟特效目录默认值。</p>
+          <label class="slider" id="hzRadiusRow"><span class="hz-lab">半径</span> <input type="range" id="hzRadius" min="0.3" max="2" step="0.05"><span class="v" data-for="hzRadius"></span></label>
+          <label class="slider" id="hzDurationRow"><span class="hz-lab">持续</span> <input type="range" id="hzDuration" min="0.3" max="5" step="0.05"><span class="v" data-for="hzDuration"></span></label>
+          <label class="slider" id="hzFactorRow"><span class="hz-lab">速度倍率</span> <input type="range" id="hzFactor" min="0.2" max="0.9" step="0.02"><span class="v" data-for="hzFactor"></span></label>
+          <label class="slider" id="hzImpulseRow"><span class="hz-lab">弹开冲量</span> <input type="range" id="hzImpulse" min="200" max="900" step="10"><span class="v" data-for="hzImpulse"></span></label>
+          <label class="slider" id="hzLiftRow"><span class="hz-lab">弹开高度</span> <input type="range" id="hzLift" min="8" max="160" step="2"><span class="v" data-for="hzLift"></span></label>
         </div>
         <div id="wallEdit" hidden>
-          <p class="hint" id="wallFaceHint">点到的这一面。取色只改这一面，其它墙不动。</p>
+          <p class="hint" id="wallFaceHint">点到的这一面。贴图按原比例：更宽齐宽，更高齐高，不拉伸。</p>
           <div class="tools" id="wallItemTones">
             <button type="button" data-tone="inherit">跟随底色</button>
             <button type="button" data-tone="light">亮色</button>
             <button type="button" data-tone="dark">暗色</button>
           </div>
           <label class="field" style="margin-top:8px">这一面的颜色<input type="color" id="wallItemColor"></label>
+          <div class="drop" id="faceDrop" style="margin-top:8px">拖入这一面的 PNG / JPG
+            <input id="faceFile" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+          </div>
+          <p class="hint" id="faceTexInfo">这一面没有贴图</p>
+          <div class="row">
+            <button type="button" id="btnClearFaceMap">清这一面图</button>
+          </div>
+        </div>
+        <div id="maskEdit" hidden>
+          <p class="hint">从楼板挖掉。游戏里不铺黑块，能看见背景/雾。矩形、圆形、三角都会改外轮廓并沿切口长出墙。圆形和三角可用圆盘转向。</p>
+          <div class="hint" style="margin-bottom:4px">形状</div>
+          <div class="tools" id="maskShapes">
+            <button type="button" data-shape="rect">矩形</button>
+            <button type="button" data-shape="circle">圆形</button>
+            <button type="button" data-shape="tri">三角</button>
+          </div>
+          <div class="pair" id="maskSizeRow" style="margin-top:8px">
+            <label class="field">宽 (X) <input type="number" id="maskW" step="0.5" min="0.5"></label>
+            <label class="field">深 (Z) <input type="number" id="maskH" step="0.5" min="0.5"></label>
+          </div>
         </div>
         <div id="lightEdit" hidden>
-          <p class="hint">灯越低、半径越小，地上的斑越硬。强度上限 80，半径上限 10。</p>
+          <p class="hint">灯越低、半径越小，地上的斑越硬。强度上限 80，半径上限 20。</p>
           <label class="field">颜色<input type="color" id="plColor"></label>
           <label class="slider">高度 <input type="range" id="plY" min="1.4" max="3.2" step="0.05"><span class="v" data-for="plY"></span></label>
           <label class="slider">强度 <input type="range" id="plI" min="8" max="80" step="1"><span class="v" data-for="plI"></span></label>
-          <label class="slider">照亮半径 <input type="range" id="plDist" min="2" max="10" step="0.1"><span class="v" data-for="plDist"></span></label>
+          <label class="slider">照亮半径 <input type="range" id="plDist" min="2" max="20" step="0.1"><span class="v" data-for="plDist"></span></label>
         </div>
 
         <h2>写入游戏</h2>
