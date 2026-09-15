@@ -351,10 +351,10 @@ export type ThrowGlowStyle = (typeof THROW_GLOW_STYLE_IDS)[number];
 
 export const THROW_GLOW_STYLE_META: { id: ThrowGlowStyle; name: string; blurb: string }[] = [
   { id: 'off', name: '无', blurb: '不要光晕' },
-  { id: 'soft', name: '柔光', blurb: '淡淡外壳' },
-  { id: 'ring', name: '光环', blurb: '腰间一圈' },
-  { id: 'core', name: '内核', blurb: '亮心+淡晕' },
-  { id: 'flare', name: '十字闪', blurb: '交叉光片' },
+  { id: 'soft', name: '柔光', blurb: '软边光斑' },
+  { id: 'ring', name: '光环', blurb: '脚下柔环' },
+  { id: 'core', name: '内核', blurb: '亮心软晕' },
+  { id: 'flare', name: '十字闪', blurb: '软边光带' },
 ];
 
 export function normalizeThrowGlowStyle(id: unknown, legacyGlow?: boolean): ThrowGlowStyle {
@@ -1030,19 +1030,19 @@ export const DEFAULT_FX: FxCatalog = {
           knockImpulse: 300,
           scale: 1,
           color: 0xffffff,
-          glowStyle: 'soft',
+          glowStyle: 'soft' as ThrowGlowStyle,
           glowColor: 0xffd257,
-          glowOpacity: 0.3,
-          glowSize: 1.45,
-        },
+          glowOpacity: 0.55,
+          glowSize: 1.55,
+        } satisfies KeyboardLevel,
       },
       {
         keyboard: {
           width: 1.05,
           scale: 1.25,
           glowStyle: 'ring',
-          glowOpacity: 0.4,
-          glowSize: 1.2,
+          glowOpacity: 0.6,
+          glowSize: 1.25,
         },
       },
       {
@@ -1050,8 +1050,8 @@ export const DEFAULT_FX: FxCatalog = {
           knockImpulse: 300,
           scale: 1.55,
           glowStyle: 'core',
-          glowOpacity: 0.38,
-          glowSize: 1.35,
+          glowOpacity: 0.58,
+          glowSize: 1.4,
         },
       }
     ),
