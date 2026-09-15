@@ -42,14 +42,22 @@ export class Hud {
   private renderDeadline() {
     const total = 18 * 60 + this.overtimeMin;
     if (this.overtimeMin >= 360) {
-      this.deadlineEl.textContent = '24:00 今晚走不了了…';
+      this.deadlineEl.innerHTML =
+        '<span class="dl-time">24:00</span><span class="dl-label">今晚走不了了…</span>';
+      this.deadlineEl.classList.remove('warn');
       this.deadlineEl.classList.add('hit');
       return;
     }
     const h = Math.floor(total / 60) % 24;
     const m = total % 60;
-    this.deadlineEl.textContent = `预计下班 ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    this.deadlineEl.classList.toggle('hit', this.overtimeMin >= 240);
+    const clock = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    this.deadlineEl.innerHTML =
+      `<span class="dl-label">预计下班</span><span class="dl-time">${clock}</span>`;
+    // 橙黄告警：≥20:00（加班 120 分）；极限红：≥22:00（加班 240 分，与 clock_warn 对齐）
+    const critical = this.overtimeMin >= 240;
+    const warn = !critical && this.overtimeMin >= 120;
+    this.deadlineEl.classList.toggle('warn', warn);
+    this.deadlineEl.classList.toggle('hit', critical);
   }
 
   toast(text: string) {

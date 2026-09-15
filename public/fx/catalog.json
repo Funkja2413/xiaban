@@ -207,9 +207,9 @@
         "enabled": true,
         "stamp": "ppt",
         "color": 16738370,
-        "opacity": 0.55,
-        "width": 0.15,
-        "height": 0.15,
+        "opacity": 0.99,
+        "width": 0.28,
+        "height": 0.28,
         "thick": 0.04,
         "y": 2.05,
         "spin": 1.45,
@@ -1055,7 +1055,9 @@
           "stun": 1.05,
           "heavyStun": 0.55,
           "cdRefund": 0,
-          "phaseTime": 0
+          "phaseTime": 0,
+          "ghostTime": 0,
+          "hopDist": 0
         },
         "react": {
           "colleague-a-m": {
@@ -1123,7 +1125,9 @@
           "stun": 0.9,
           "heavyStun": 0.5,
           "cdRefund": 0.35,
-          "phaseTime": 0
+          "phaseTime": 0,
+          "ghostTime": 0.4,
+          "hopDist": 0
         },
         "react": {
           "colleague-a-m": {
@@ -1191,7 +1195,9 @@
           "stun": 0.9,
           "heavyStun": 0.5,
           "cdRefund": 0.35,
-          "phaseTime": 1.5
+          "phaseTime": 1.5,
+          "ghostTime": 0.4,
+          "hopDist": 1.1
         },
         "react": {
           "colleague-a-m": {
@@ -1229,6 +1235,627 @@
             "factor": 0.42,
             "radius": 1.9,
             "bounce": false
+          }
+        }
+      }
+    },
+    "rebound": {
+      "1": {
+        "hit": {
+          "time": 0.2,
+          "speed": 13,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 380,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 16751181,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "rebound": {
+          "maxBounces": 1,
+          "probe": 0.62,
+          "heavyOk": false,
+          "shockRadius": 0,
+          "shockImpulse": 0
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
+          }
+        }
+      },
+      "2": {
+        "hit": {
+          "time": 0.2,
+          "speed": 13,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 480,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 16751181,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "rebound": {
+          "maxBounces": 1,
+          "probe": 0.7,
+          "heavyOk": false,
+          "shockRadius": 1.2,
+          "shockImpulse": 280
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
+          }
+        }
+      },
+      "3": {
+        "hit": {
+          "time": 0.2,
+          "speed": 13,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 560,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 16751181,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "rebound": {
+          "maxBounces": 2,
+          "probe": 0.75,
+          "heavyOk": true,
+          "shockRadius": 1.5,
+          "shockImpulse": 360
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "shove",
+            "impulse": 420,
+            "stun": 0.25,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "shove",
+            "impulse": 720,
+            "stun": 0.35,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          }
+        }
+      }
+    },
+    "reclock": {
+      "1": {
+        "hit": {
+          "time": 0.14,
+          "speed": 14,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 360,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 5757380,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "reclock": {
+          "window": 0.35,
+          "segmentScale": 0.85,
+          "hitRefund": 0,
+          "autoThird": false
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
+          }
+        }
+      },
+      "2": {
+        "hit": {
+          "time": 0.15,
+          "speed": 14.5,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 360,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 5757380,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "reclock": {
+          "window": 0.45,
+          "segmentScale": 0.9,
+          "hitRefund": 0.25,
+          "autoThird": false
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
+          }
+        }
+      },
+      "3": {
+        "hit": {
+          "time": 0.16,
+          "speed": 15,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 420,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 5757380,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "reclock": {
+          "window": 0.5,
+          "segmentScale": 0.95,
+          "hitRefund": 0.25,
+          "autoThird": true
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "knock",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
+          }
+        }
+      }
+    },
+    "blame": {
+      "1": {
+        "hit": {
+          "time": 0.18,
+          "speed": 13,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 320,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 13934615,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "blame": {
+          "duration": 1.2,
+          "radius": 3.2,
+          "count": 2,
+          "groundRadius": 0
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
+          }
+        }
+      },
+      "2": {
+        "hit": {
+          "time": 0.18,
+          "speed": 13,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 380,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 13934615,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "blame": {
+          "duration": 1.8,
+          "radius": 3.8,
+          "count": 3,
+          "groundRadius": 0
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
+          }
+        }
+      },
+      "3": {
+        "hit": {
+          "time": 0.18,
+          "speed": 13,
+          "cooldown": 1.4,
+          "radius": 1,
+          "impulse": 420,
+          "maxHits": 0,
+          "oncePerDash": false
+        },
+        "trail": {
+          "color": 13934615,
+          "interval": 0.035,
+          "life": 0.22,
+          "opacity": 0.4,
+          "radius": 0.26,
+          "height": 0.5,
+          "ghost": true,
+          "additive": true,
+          "stretch": 1.85,
+          "fadePow": 1.35,
+          "copies": 2
+        },
+        "blame": {
+          "duration": 2.2,
+          "radius": 4.2,
+          "count": 4,
+          "groundRadius": 2.4
+        },
+        "react": {
+          "colleague-a-m": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "colleague-a-f": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "interceptor": {
+            "kind": "shove",
+            "impulse": 320,
+            "stun": 0.2,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": false
+          },
+          "heavy": {
+            "kind": "none",
+            "impulse": 0,
+            "stun": 0,
+            "duration": 0,
+            "factor": 0.42,
+            "radius": 1.9,
+            "bounce": true
           }
         }
       }
@@ -1267,9 +1894,15 @@
           "cooldown": 5.5,
           "speed": 14,
           "range": 8,
-          "width": 0.75,
+          "width": 0.45,
           "hitImpulse": 340,
-          "knockImpulse": 300
+          "knockImpulse": 300,
+          "scale": 0.65,
+          "color": 16777215,
+          "glowColor": 16765527,
+          "glowOpacity": 0.13,
+          "glowSize": 1.1,
+          "glowStyle": "off"
         }
       },
       "2": {
@@ -1279,7 +1912,13 @@
           "range": 8,
           "width": 1.05,
           "hitImpulse": 340,
-          "knockImpulse": 300
+          "knockImpulse": 300,
+          "scale": 1,
+          "color": 16777215,
+          "glowColor": 16765527,
+          "glowOpacity": 0.45,
+          "glowSize": 1.35,
+          "glowStyle": "soft"
         }
       },
       "3": {
@@ -1289,7 +1928,13 @@
           "range": 8,
           "width": 1.05,
           "hitImpulse": 340,
-          "knockImpulse": 300
+          "knockImpulse": 300,
+          "scale": 1,
+          "color": 16777215,
+          "glowColor": 16765527,
+          "glowOpacity": 0.45,
+          "glowSize": 1.35,
+          "glowStyle": "soft"
         }
       }
     },

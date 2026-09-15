@@ -12,6 +12,9 @@ import {
   type HumanoidFigure,
   type HumanoidKit,
 } from '../../../src/game/humanoid';
+import { coffeeTintOnDay, skillNameOnDay } from '../../../src/fx/days';
+import type { WeekdayId } from '../../../src/levels';
+import { applyThrowLook, makeThrowProjectile, throwLookOf, throwSkinOnDay } from '../../../src/game/skillProjectiles';
 import { ChannelMarks, DashTrail, ImpactMist, OvertimePop, PaperBurst, SlowPulse, StatusMarks, spawnHitFx } from '../../../src/game/look';
 import { SkillChains, SkillShout, SHOUT_Y, figureChest, figureHand, figureHandL, figureNeck, setFigureGlow } from '../../../src/game/skillVfx';
 import { RagdollFactory, type RagdollHandle } from '../../../src/game/ragdoll';
@@ -82,6 +85,7 @@ export class FxPreview {
   readonly camera: THREE.PerspectiveCamera;
   readonly orbit: OrbitControls;
   skillLv = 1;
+  day: WeekdayId = 'monday';
   track: 'common' | DashKey | SkillKey | 'hazards' | 'enemySkills' = 'none';
   actorId: ActorId = 'player';
   /** 正在编角色被动时，不画冲刺判定辅助圈 */
@@ -107,7 +111,7 @@ export class FxPreview {
   private radiusRing: THREE.Mesh;
   private dummies: Dummy[] = [];
   private decoy: THREE.Group | null = null;
-  private keyboard: THREE.Mesh | null = null;
+  private keyboard: THREE.Object3D | null = null;
   private crate: THREE.Mesh | null = null;
   private play: PlayKind | null = null;
   private t = 0;
@@ -321,7 +325,7 @@ export class FxPreview {
       this.onStatus?.(`播放 ${ENEMY_SKILL_META[this.actorSkill].name} · 同事打在玩家身上`);
       return;
     }
-    this.onStatus?.(`播放 ${labelOf(kind)}`);
+    this.onStatus?.(`播放 ${labelOf(kind, this.day)}`);
   }
 
   tick(now: number) {
@@ -779,7 +783,7 @@ export class FxPreview {
       }
     }
     if (this.t > life + (this.decoyBlasted ? HOLD_AFTER_DASH : 0.12)) {
-      this.finishPlay('分身结束 · 已复位');
+      this.finishPlay(`${skillNameOnDay(this.day, 'decoy')} · 已复位`);
     }
   }
 
@@ -793,12 +797,15 @@ export class FxPreview {
     } else {
       this.kb.z += kb.speed * dt;
       if (this.kb.z > 2.4) {
-        this.finishPlay('键盘结束 · 已复位');
+        this.finishPlay(`${skillNameOnDay(this.day, 'keyboard')} · 已复位`);
         return;
       }
     }
     this.keyboard.position.set(this.kb.x, 1, this.kb.z);
-    this.keyboard.rotation.y += dt * 18;
+    const skin = throwSkinOnDay(this.day);
+    const spin = skin === 'boomerang' ? 28 : skin === 'mouse' ? 14 : 18;
+    this.keyboard.rotation.y += dt * spin;
+    if (skin === 'boomerang') this.keyboard.rotation.z = Math.sin(this.kb.traveled * 2.2) * 0.35;
     const width = kb.width;
     for (const [i, d] of this.dummies.entries()) {
       if (this.kb.hit.has(i) || d.hit) continue;
@@ -817,12 +824,16 @@ export class FxPreview {
   }
 
   private placeKeyboard() {
-    this.keyboard = new THREE.Mesh(
-      new THREE.BoxGeometry(0.74, 0.07, 0.3),
-      new THREE.MeshLambertMaterial({ color: 0xe8e8ec })
-    );
+    const look = throwLookOf(skillFx('keyboard', this.skillLv).keyboard);
+    this.keyboard = makeThrowProjectile(throwSkinOnDay(this.day), look);
     this.keyboard.position.set(0, 1, 2.2);
     this.scene.add(this.keyboard);
+  }
+
+  /** 拖滑条时立刻改飞出物样子，不用重播。 */
+  refreshThrowLook() {
+    if (!this.keyboard) return;
+    applyThrowLook(this.keyboard, throwLookOf(skillFx('keyboard', this.skillLv).keyboard));
   }
 
   private placeCrate() {
@@ -837,7 +848,8 @@ export class FxPreview {
   private pourCoffee() {
     const c = skillFx('coffee', this.skillLv).coffee;
     if (!c) return;
-    const look = { color: c.color, opacity: c.opacity };
+    const tint = coffeeTintOnDay(this.day);
+    const look = { color: tint ?? c.color, opacity: c.opacity };
     const n = Math.max(1, c.count | 0);
     for (let k = 0; k < n; k++) {
       const dist = c.range + k * c.spacing + (Math.random() - 0.5) * 0.16;
@@ -852,7 +864,7 @@ export class FxPreview {
 
   private stepCoffee() {
     const life = skillFx('coffee', this.skillLv).coffee?.life ?? 2.4;
-    if (this.t > life + 0.6) this.finishPlay('咖啡渍 · 已复位');
+    if (this.t > life + 0.6) this.finishPlay(`${skillNameOnDay(this.day, 'coffee')} · 已复位`);
   }
 
   private syncRadius() {
@@ -1082,13 +1094,13 @@ function makeStandee() {
   return g;
 }
 
-function labelOf(kind: PlayKind) {
-  const map: Record<PlayKind, string> = {
+function labelOf(kind: PlayKind, day: WeekdayId = 'monday') {
+  if (kind === 'keyboard') return skillNameOnDay(day, 'keyboard');
+  if (kind === 'coffee') return skillNameOnDay(day, 'coffee');
+  if (kind === 'decoy') return skillNameOnDay(day, 'decoy');
+  const map: Record<Exclude<PlayKind, 'keyboard' | 'coffee' | 'decoy'>, string> = {
     dash: '冲撞',
     common: '撞物',
-    decoy: '摸鱼分身',
-    keyboard: '回旋键盘',
-    coffee: '咖啡',
     actor: '角色被动',
   };
   return map[kind];

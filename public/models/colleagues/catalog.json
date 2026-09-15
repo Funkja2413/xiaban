@@ -54,7 +54,7 @@
       "preRotation": [
         3.14,
         -1.66,
-        0
+        -0.64
       ],
       "fit": 0.18
     },
@@ -531,9 +531,9 @@
               "anchor": "hand",
               "transform": {
                 "position": [
-                  -0.2485,
-                  0.2638,
-                  -0.0149
+                  -0.2225,
+                  0.219,
+                  0.0786
                 ],
                 "rotation": [
                   0,
@@ -549,13 +549,13 @@
             }
           ],
           "bodyMorph": -0.86,
+          "bodyScale": 1,
           "kitHair": null,
           "kitHairMap": "/models/kit/textures/hair_albedo.png",
           "kitSkirt": null,
           "kitSkirtMap": "/models/kit/textures/skirt_black.png",
           "thumb": "/models/colleagues/thumbs/monday-colleague-a-m.png",
-          "enemySkill": null,
-          "bodyScale": 1
+          "enemySkill": null
         },
         {
           "id": "heavy",
@@ -606,9 +606,9 @@
           "bodyMorph": 0.6,
           "bodyScale": 1.38,
           "kitHair": "hair_bob",
-          "kitHairMap": "/models/colleagues/skins/skin-heavy-hair.png",
+          "kitHairMap": "/models/colleagues/skins/skin-heavy-monday-hair.png",
           "kitSkirt": "skirt_pencil",
-          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-skirt.png",
+          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-monday-skirt.png",
           "thumb": "/models/colleagues/thumbs/monday-heavy.png",
           "enemySkill": null
         },

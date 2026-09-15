@@ -127,6 +127,8 @@ export class CharacterPreview {
   private compareOfficial = false;
   private officialId = OFFICIAL_SKINS[0].id;
   private customMap: THREE.Texture | null = null;
+  /** 底座转盘（截封面时隐藏） */
+  private stageProps: THREE.Object3D[] = [];
 
   constructor(private host: HTMLElement) {
     this.scene.background = new THREE.Color(0x2a2c33);
@@ -176,6 +178,7 @@ export class CharacterPreview {
     const grid = new THREE.GridHelper(0.72, 4, 0x6a6e78, 0x4a4e56);
     grid.position.y = 0.001;
     this.scene.add(grid);
+    this.stageProps = [pedestal, cap, grid];
 
     this.resize();
     new ResizeObserver(() => this.resize()).observe(host);
@@ -385,13 +388,15 @@ export class CharacterPreview {
     const helper = this.gizmo.getHelper();
     const helperOn = helper.visible;
     const enabled = this.gizmo.enabled;
+    const stageVis = this.stageProps.map((o) => o.visible);
     this.gizmo.enabled = false;
     helper.visible = false;
+    for (const o of this.stageProps) o.visible = false;
     this.orbit.update();
     this.renderer.render(this.scene, this.camera);
     const src = this.renderer.domElement;
-    const w = 96;
-    const h = 120;
+    const w = 320;
+    const h = 480; // 2:3 封面
     const c = document.createElement('canvas');
     c.width = w;
     c.height = h;
@@ -414,6 +419,9 @@ export class CharacterPreview {
     ctx.drawImage(src, sx, sy, cw, ch, 0, 0, w, h);
     this.gizmo.enabled = enabled;
     helper.visible = helperOn;
+    this.stageProps.forEach((o, i) => {
+      o.visible = stageVis[i] ?? true;
+    });
     return c.toDataURL('image/png');
   }
 

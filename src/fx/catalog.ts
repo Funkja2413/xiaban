@@ -5,8 +5,10 @@ import type { HazardKind, HazardTune } from '../levels';
 
 export type { EnemySkillId, HazardKind };
 
-export type LineId = 'brute' | 'slump' | 'phantom';
+export const LINE_IDS = ['brute', 'slump', 'phantom', 'rebound', 'reclock', 'blame'] as const;
+export type LineId = (typeof LINE_IDS)[number];
 export type DashKey = 'none' | LineId;
+export const DASH_KEYS = ['none', ...LINE_IDS] as const;
 export type SkillKey = 'decoy' | 'keyboard' | 'coffee';
 export type Lv = 1 | 2 | 3;
 
@@ -250,6 +252,10 @@ export interface PhantomLevel {
   heavyStun: number;
   cdRefund: number;
   phaseTime: number;
+  /** 起冲留下虚影秒数，0 = 无 */
+  ghostTime?: number;
+  /** 虚影后再点平移的距离，0 = 不可再点 */
+  hopDist?: number;
 }
 
 /** 倦怠：撞人后范围内同事减速。圈颜色在整体；持续/倍率/半径在角色反应。 */
@@ -262,6 +268,41 @@ export interface SlumpLevel {
   color: number;
   opacity: number;
   pulseLife: number;
+  /** 冲刺路径是否拖减速带 */
+  trail?: boolean;
+}
+
+/** 反弹冲：玩家撞墙/柜子（或满级撞主管）折向续冲 */
+export interface ReboundLevel {
+  /** 单次冲刺最多折向几次 */
+  maxBounces: number;
+  /** 探墙距离 */
+  probe: number;
+  /** 撞主管是否也能折（不硬直弹开） */
+  heavyOk: boolean;
+  /** 折向瞬间清贴身半径，0 = 无 */
+  shockRadius: number;
+  shockImpulse: number;
+}
+
+/** 补卡冲：一段结束后窗口内再按第二段 */
+export interface ReclockLevel {
+  window: number;
+  /** 第二段时长相对 hit.time 的倍率 */
+  segmentScale: number;
+  /** 第二段命中退冷却 */
+  hitRefund: number;
+  /** 两段都命中后是否再自动滑一步 */
+  autoThird: boolean;
+}
+
+/** 甩锅冲：命中第一个人，周围改追他 */
+export interface BlameLevel {
+  duration: number;
+  radius: number;
+  count: number;
+  /** 空挥时脚下随机甩锅半径，0 = 必须撞到人 */
+  groundRadius: number;
 }
 
 export const DASH_REACT_IDS = ['none', 'knock', 'stun', 'slow', 'shove'] as const;
@@ -292,6 +333,9 @@ export interface DashLevelFx {
   trail: TrailFx;
   phantom?: PhantomLevel;
   slump?: SlumpLevel;
+  rebound?: ReboundLevel;
+  reclock?: ReclockLevel;
+  blame?: BlameLevel;
   react?: CrowdReact;
 }
 
@@ -302,6 +346,23 @@ export interface DecoyLevel {
   blastImpulse: number;
 }
 
+export const THROW_GLOW_STYLE_IDS = ['off', 'soft', 'ring', 'core', 'flare'] as const;
+export type ThrowGlowStyle = (typeof THROW_GLOW_STYLE_IDS)[number];
+
+export const THROW_GLOW_STYLE_META: { id: ThrowGlowStyle; name: string; blurb: string }[] = [
+  { id: 'off', name: '无', blurb: '不要光晕' },
+  { id: 'soft', name: '柔光', blurb: '淡淡外壳' },
+  { id: 'ring', name: '光环', blurb: '腰间一圈' },
+  { id: 'core', name: '内核', blurb: '亮心+淡晕' },
+  { id: 'flare', name: '十字闪', blurb: '交叉光片' },
+];
+
+export function normalizeThrowGlowStyle(id: unknown, legacyGlow?: boolean): ThrowGlowStyle {
+  if (typeof id === 'string' && (THROW_GLOW_STYLE_IDS as readonly string[]).includes(id)) return id as ThrowGlowStyle;
+  if (legacyGlow === false) return 'off';
+  return 'soft';
+}
+
 export interface KeyboardLevel {
   cooldown: number;
   speed: number;
@@ -309,6 +370,13 @@ export interface KeyboardLevel {
   width: number;
   hitImpulse: number;
   knockImpulse: number;
+  /** 飞出物视觉：按技能等级各自一份（鼠标/键盘/电脑/回旋镖换皮共用这套） */
+  scale: number;
+  color: number;
+  glowStyle: ThrowGlowStyle;
+  glowColor: number;
+  glowOpacity: number;
+  glowSize: number;
 }
 
 export interface CoffeeLevel {
@@ -882,12 +950,67 @@ export const DEFAULT_FX: FxCatalog = {
         { ...NONE_HIT, impulse: 0 },
         0x8ea2ff,
         {
-          phantom: { stun: 0.9, heavyStun: 0.5, cdRefund: 0, phaseTime: 0 },
+          phantom: { stun: 0.9, heavyStun: 0.5, cdRefund: 0, phaseTime: 0, ghostTime: 0, hopDist: 0 },
           react: crowdReact(reactOf('stun', { stun: 0.9 }), reactOf('stun', { stun: 0.5 })),
         }
       ),
-      { phantom: { cdRefund: 0.35 } },
-      { phantom: { phaseTime: 1.5 } }
+      { phantom: { cdRefund: 0.35, ghostTime: 0.4 } },
+      { phantom: { phaseTime: 1.5, hopDist: 1.1 } }
+    ),
+    rebound: levels(
+      dash(
+        { ...NONE_HIT, impulse: 380, time: 0.2 },
+        0xff9a4d,
+        {
+          rebound: { maxBounces: 1, probe: 0.62, heavyOk: false, shockRadius: 0, shockImpulse: 0 },
+          react: crowdReact(reactOf('shove', { impulse: 420, stun: 0.25 }), reactOf('none', { bounce: true })),
+        }
+      ),
+      {
+        rebound: { maxBounces: 1, probe: 0.7, heavyOk: false, shockRadius: 1.2, shockImpulse: 280 },
+        hit: { impulse: 480 },
+      },
+      {
+        rebound: { maxBounces: 2, probe: 0.75, heavyOk: true, shockRadius: 1.5, shockImpulse: 360 },
+        hit: { impulse: 560 },
+        react: { heavy: reactOf('shove', { impulse: 720, stun: 0.35, bounce: false }) },
+      }
+    ),
+    reclock: levels(
+      dash(
+        { ...NONE_HIT, time: 0.14, speed: 14, impulse: 360 },
+        0x57d9c4,
+        {
+          reclock: { window: 0.35, segmentScale: 0.85, hitRefund: 0, autoThird: false },
+          react: crowdReact(reactOf('knock'), reactOf('none', { bounce: true })),
+        }
+      ),
+      {
+        reclock: { window: 0.45, segmentScale: 0.9, hitRefund: 0.25, autoThird: false },
+        hit: { time: 0.15, speed: 14.5 },
+      },
+      {
+        reclock: { window: 0.5, segmentScale: 0.95, hitRefund: 0.25, autoThird: true },
+        hit: { time: 0.16, speed: 15, impulse: 420 },
+      }
+    ),
+    blame: levels(
+      dash(
+        { ...NONE_HIT, impulse: 320 },
+        0xd4a017,
+        {
+          blame: { duration: 1.2, radius: 3.2, count: 2, groundRadius: 0 },
+          react: crowdReact(reactOf('shove', { impulse: 320, stun: 0.2 }), reactOf('none', { bounce: true })),
+        }
+      ),
+      {
+        blame: { duration: 1.8, radius: 3.8, count: 3, groundRadius: 0 },
+        hit: { impulse: 380 },
+      },
+      {
+        blame: { duration: 2.2, radius: 4.2, count: 4, groundRadius: 2.4 },
+        hit: { impulse: 420 },
+      }
     ),
   },
   skills: {
@@ -897,9 +1020,40 @@ export const DEFAULT_FX: FxCatalog = {
       { decoy: { blastRadius: 2.6, blastImpulse: 340 } }
     ),
     keyboard: levels(
-      { keyboard: { cooldown: 5.5, speed: 14, range: 8, width: 0.75, hitImpulse: 340, knockImpulse: 300 } },
-      { keyboard: { width: 1.05 } },
-      { keyboard: { knockImpulse: 300 } }
+      {
+        keyboard: {
+          cooldown: 5.5,
+          speed: 14,
+          range: 8,
+          width: 0.75,
+          hitImpulse: 340,
+          knockImpulse: 300,
+          scale: 1,
+          color: 0xffffff,
+          glowStyle: 'soft',
+          glowColor: 0xffd257,
+          glowOpacity: 0.3,
+          glowSize: 1.45,
+        },
+      },
+      {
+        keyboard: {
+          width: 1.05,
+          scale: 1.25,
+          glowStyle: 'ring',
+          glowOpacity: 0.4,
+          glowSize: 1.2,
+        },
+      },
+      {
+        keyboard: {
+          knockImpulse: 300,
+          scale: 1.55,
+          glowStyle: 'core',
+          glowOpacity: 0.38,
+          glowSize: 1.35,
+        },
+      }
     ),
     coffee: levels(
       { coffee: { cooldown: 6.5, range: 1.7, count: 1, spacing: 0.7, color: 0x4a2d18, opacity: 0.55, radius: 0.85, life: 2.4, splashRadius: 0, splashLife: 0 } },
@@ -988,18 +1142,43 @@ export function mergeFx(base: FxCatalog, over: unknown): FxCatalog {
   ensureActorStates(merged, o);
   merged.hazards = mergeDeep(clone(DEFAULT_FX.hazards), merged.hazards);
   merged.enemySkills = mergeDeep(clone(DEFAULT_FX.enemySkills), merged.enemySkills);
+  if (!merged.skills.keyboard) merged.skills.keyboard = clone(DEFAULT_FX.skills.keyboard);
+  else {
+    for (const lv of [1, 2, 3] as Lv[]) {
+      const pack = merged.skills.keyboard[lv]?.keyboard as (KeyboardLevel & { glow?: boolean }) | undefined;
+      const fb = DEFAULT_FX.skills.keyboard[lv].keyboard!;
+      if (!pack) {
+        merged.skills.keyboard[lv] = clone(DEFAULT_FX.skills.keyboard[lv]);
+        continue;
+      }
+      if (pack.scale == null) pack.scale = fb.scale;
+      if (pack.color == null) pack.color = fb.color;
+      pack.glowStyle = normalizeThrowGlowStyle(pack.glowStyle, pack.glow);
+      delete pack.glow;
+      if (pack.glowColor == null) pack.glowColor = fb.glowColor;
+      if (pack.glowOpacity == null) pack.glowOpacity = fb.glowOpacity;
+      if (pack.glowSize == null) pack.glowSize = fb.glowSize;
+    }
+  }
   return merged;
 }
 
 function ensureDashReact(merged: FxCatalog) {
-  for (const key of ['none', 'brute', 'slump', 'phantom'] as DashKey[]) {
+  for (const key of DASH_KEYS) {
+    if (!merged.lines[key]) merged.lines[key] = clone(DEFAULT_FX.lines[key]);
     const line = merged.lines[key];
     if (!line) continue;
     for (const lv of [1, 2, 3] as Lv[]) {
       const pack = line[lv];
-      if (!pack) continue;
+      if (!pack) {
+        line[lv] = clone(DEFAULT_FX.lines[key][lv]);
+        continue;
+      }
       const fallback = DEFAULT_FX.lines[key][lv];
       if (!pack.react) pack.react = clone(fallback.react ?? crowdReact(reactOf('knock'), reactOf('none')));
+      if (fallback.rebound && !pack.rebound) pack.rebound = clone(fallback.rebound);
+      if (fallback.reclock && !pack.reclock) pack.reclock = clone(fallback.reclock);
+      if (fallback.blame && !pack.blame) pack.blame = clone(fallback.blame);
       for (const id of CROWD_ACTOR_IDS) {
         const base = fallback.react?.[id] ?? (id === 'heavy' ? reactOf('none') : reactOf('knock'));
         const cur = pack.react[id];
@@ -1016,7 +1195,7 @@ function ensureDashReact(merged: FxCatalog) {
 
 /** 旧档把整体冲量抄进每个角色后，整体滑条会失效；相同值收成 0 = 跟整体。 */
 function liftSharedImpulse(merged: FxCatalog) {
-  for (const key of ['none', 'brute', 'slump', 'phantom'] as DashKey[]) {
+  for (const key of DASH_KEYS) {
     const line = merged.lines[key];
     if (!line) continue;
     for (const lv of [1, 2, 3] as Lv[]) {
@@ -1318,6 +1497,9 @@ function migrateLegacy(raw: Record<string, unknown>): Partial<FxCatalog> {
         { phantom: { cdRefund: Number(phantom.cdRefund) || 0.35 } },
         { phantom: { phaseTime: Number(phantom.phaseTime) || 1.5 } }
       ),
+      rebound: clone(DEFAULT_FX.lines.rebound),
+      reclock: clone(DEFAULT_FX.lines.reclock),
+      blame: clone(DEFAULT_FX.lines.blame),
     },
     skills: {
       decoy: levels(
@@ -1334,10 +1516,31 @@ function migrateLegacy(raw: Record<string, unknown>): Partial<FxCatalog> {
             width: Number(keyboard.width) || 0.75,
             hitImpulse: Number(keyboard.hitImpulse) || 340,
             knockImpulse: Number(keyboard.knockImpulse) || 300,
+            scale: Number(keyboard.scale) || 1,
+            color: Number(keyboard.color) || 0xffffff,
+            glowStyle: normalizeThrowGlowStyle(keyboard.glowStyle, keyboard.glow !== false),
+            glowColor: Number(keyboard.glowColor) || 0xffd257,
+            glowOpacity: Number(keyboard.glowOpacity) || 0.3,
+            glowSize: Number(keyboard.glowSize) || 1.45,
           },
         },
-        { keyboard: { width: Number(keyboard.widthLv2) || 1.05 } },
-        {}
+        {
+          keyboard: {
+            width: Number(keyboard.widthLv2) || 1.05,
+            scale: 1.25,
+            glowStyle: 'ring',
+            glowOpacity: 0.4,
+            glowSize: 1.2,
+          },
+        },
+        {
+          keyboard: {
+            scale: 1.55,
+            glowStyle: 'core',
+            glowOpacity: 0.38,
+            glowSize: 1.35,
+          },
+        }
       ),
       coffee: levels(
         {

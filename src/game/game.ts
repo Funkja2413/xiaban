@@ -204,6 +204,7 @@ export class Game {
 
     const ragFactory = new RagdollFactory(this.scene, this.world);
     this.player = new Player(this.scene, this.world, playerStart.x, playerStart.z, humans, ragFactory);
+    this.player.nav = this.flow;
     this.enemies = new Enemies(this.scene, this.world, this.flow, ragFactory, ENEMY_CAP, humans);
     const looks = await loadCatalog();
     this.enemies.skillOf = (id) => lookForSlot(looks, id)?.enemySkill ?? null;
@@ -231,7 +232,7 @@ export class Game {
     // 构筑系统：击倒掉工牌 → 攒满抽卡 → 不暂停三选一
     this.cards = new Cards();
     const loadout = dayPlayerLoadout(day);
-    this.cards.setDayKit(loadout.dashes, loadout.skills);
+    this.cards.setDayKit(day, loadout.dashes, loadout.skills);
     this.cards.onApplied = (label) => this.hud.toast(`${label} 已装备`);
     this.player.cards = this.cards;
     this.enemies.onKnockdown = (type, x, z, gender) => {
@@ -295,6 +296,7 @@ export class Game {
     this.skills = new Skills(this.scene, (x, z, r, life, look) => {
       this.slicks.spawn(x, z, r, life, look);
     });
+    this.skills.setDay(day);
     this.papers = new PaperBurst(this.scene);
     this.dashTrail = new DashTrail(this.scene);
     this.mist = new ImpactMist(this.scene);

@@ -1,7 +1,10 @@
 import * as THREE from 'three/webgpu';
 import { skillFx } from '../fx/catalog';
+import { coffeeTintOnDay } from '../fx/days';
+import type { WeekdayId } from '../levels';
 import { Enemies, EState } from './enemies';
 import type { SkillId } from './cards';
+import { makeThrowProjectile, throwLookOf, throwSkinOnDay, type ThrowSkin } from './skillProjectiles';
 import { sfx } from '../audio';
 
 interface Decoy {
@@ -13,7 +16,7 @@ interface Decoy {
 }
 
 interface Keyboard {
-  mesh: THREE.Mesh;
+  mesh: THREE.Object3D;
   x: number;
   z: number;
   dirX: number;
@@ -23,20 +26,24 @@ interface Keyboard {
   traveled: number;
   hit: Set<number>;
   lv: number;
+  skin: ThrowSkin;
 }
 
-/** 主动技能：摸鱼分身、回旋键盘、泼咖啡 */
+/** 主动技能：分身、投掷物（按关换皮）、泼咖啡 */
 export class Skills {
   cd = 0;
+  private day: WeekdayId = 'monday';
   private decoy: Decoy | null = null;
   private kb: Keyboard | null = null;
-  private kbGeo = new THREE.BoxGeometry(0.74, 0.07, 0.3);
-  private kbMat = new THREE.MeshLambertMaterial({ color: 0xe8e8ec });
 
   constructor(
     private scene: THREE.Scene,
     private pourCoffee: (x: number, z: number, r: number, life: number, look: { color: number; opacity: number }) => void
   ) {}
+
+  setDay(day: WeekdayId) {
+    this.day = day;
+  }
 
   /** 分身存活时全场仇恨目标改为它 */
   get decoyPos(): { x: number; z: number } | null {
@@ -72,8 +79,8 @@ export class Skills {
     } else if (id === 'keyboard') {
       this.cd = pack.keyboard?.cooldown ?? 5.5;
       if (this.kb) this.scene.remove(this.kb.mesh);
-      const mesh = new THREE.Mesh(this.kbGeo, this.kbMat);
-      mesh.castShadow = true;
+      const skin = throwSkinOnDay(this.day);
+      const mesh = makeThrowProjectile(skin, throwLookOf(pack.keyboard));
       this.scene.add(mesh);
       this.kb = {
         mesh,
@@ -85,13 +92,15 @@ export class Skills {
         traveled: 0,
         hit: new Set(),
         lv,
+        skin,
       };
       sfx.play('keyboard');
     } else if (id === 'coffee') {
       const c = pack.coffee;
       if (!c) return false;
       this.cd = c.cooldown;
-      const look = { color: c.color, opacity: c.opacity };
+      const tint = coffeeTintOnDay(this.day);
+      const look = { color: tint ?? c.color, opacity: c.opacity };
       const n = Math.max(1, c.count | 0);
       const sideX = -dirZ;
       const sideZ = dirX;
@@ -128,7 +137,6 @@ export class Skills {
       d.group.rotation.z = Math.sin(d.t * 7) * 0.06;
       if (d.t <= 0) {
         if (d.lv >= 3) {
-          // 到期爆炸：放倒周围同事
           const blast = skillFx('decoy', d.lv).decoy;
           if (blast && blast.blastRadius > 0.05) {
             for (let i = 0; i < enemies.cap; i++) {
@@ -173,7 +181,9 @@ export class Skills {
       }
       if (this.kb) {
         k.mesh.position.set(k.x, 1.0, k.z);
-        k.mesh.rotation.y += dt * 18;
+        const spin = k.skin === 'boomerang' ? 28 : k.skin === 'mouse' ? 14 : 18;
+        k.mesh.rotation.y += dt * spin;
+        if (k.skin === 'boomerang') k.mesh.rotation.z = Math.sin(k.traveled * 2.2) * 0.35;
         const width = kb.width;
         for (let i = 0; i < enemies.cap; i++) {
           if (k.hit.has(i)) continue;
@@ -184,7 +194,6 @@ export class Skills {
           if (dx * dx + dz * dz < width * width) {
             k.hit.add(i);
             const dd = Math.hypot(dx, dz) || 1;
-            // 去程放倒；返程 LV3 才放倒，否则击退
             const fell = k.lv >= 3 || k.phase === 0;
             enemies.hit(i, dx / dd, dz / dd, fell ? kb.knockImpulse : kb.hitImpulse, { force: fell });
           }

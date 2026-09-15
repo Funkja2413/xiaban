@@ -32,32 +32,95 @@ export interface DayPlayKit extends DayPlayerLoadout {
 }
 
 export const LINE_NAMES: Record<LineId, string> = {
-  brute: '蛮力',
-  slump: '倦怠',
-  phantom: '幻影',
+  brute: '蛮力冲',
+  slump: '倦怠冲',
+  phantom: '幻影冲',
+  rebound: '反弹冲',
+  reclock: '补卡冲',
+  blame: '甩锅冲',
 };
 
+/** 技能族默认名（无按天覆盖时） */
 export const SKILL_NAMES: Record<SkillKey, string> = {
-  decoy: '摸鱼分身',
-  keyboard: '回旋键盘',
-  coffee: '咖啡',
+  decoy: '工位马甲',
+  keyboard: '横飞鼠标',
+  coffee: '喝咖啡',
 };
 
-/** 周一完整构筑。周二–周五没写自己的 dashes/skills 时套这一套。 */
+/** 按关显示名：同一 SkillKey，皮不同 */
+const SKILL_DAY_NAMES: Record<WeekdayId, Partial<Record<SkillKey, string>>> = {
+  monday: { keyboard: '横飞鼠标', coffee: '喝咖啡' },
+  tuesday: { keyboard: '横飞鼠标', coffee: '喝咖啡', decoy: '工位马甲' },
+  wednesday: { keyboard: '回旋键盘', coffee: '泼脏水', decoy: '工位马甲' },
+  thursday: { keyboard: '飞踹电脑', coffee: '外卖汤', decoy: '我是NPC' },
+  friday: { keyboard: 'OKR回旋镖', coffee: '破罐破摔', decoy: '假人下班' },
+};
+
+export function lineName(_day: WeekdayId, id: LineId): string {
+  return LINE_NAMES[id];
+}
+
+export function skillNameOnDay(day: WeekdayId, id: SkillKey): string {
+  return SKILL_DAY_NAMES[day]?.[id] ?? SKILL_NAMES[id];
+}
+
+/** 抽卡角标：跟当天皮名走 */
+export function skillGlyphOnDay(day: WeekdayId, id: SkillKey): string {
+  if (id === 'keyboard') {
+    if (day === 'friday') return '🪃';
+    if (day === 'thursday') return '💻';
+    if (day === 'wednesday') return '⌨️';
+    return '🖱️';
+  }
+  if (id === 'coffee') {
+    if (day === 'friday') return '💥';
+    if (day === 'thursday') return '🍜';
+    if (day === 'wednesday') return '💧';
+    return '☕';
+  }
+  if (id === 'decoy') {
+    if (day === 'friday') return '🧍';
+    if (day === 'thursday') return '🎭';
+    return '🪧';
+  }
+  return '•';
+}
+
+/** 咖啡渍按关换色（泼脏水 / 外卖汤等） */
+export function coffeeTintOnDay(day: WeekdayId): number | null {
+  if (day === 'wednesday') return 0x6a7a88;
+  if (day === 'thursday') return 0xc45c28;
+  if (day === 'friday') return 0x5a4038;
+  return null;
+}
+
+/** 周一：2 技能 + 2 冲刺 */
 export const MONDAY_LOADOUT: Omit<DayPlayerLoadout, 'inherited'> = {
-  dashes: ['brute', 'slump', 'phantom'],
-  skills: ['decoy', 'keyboard', 'coffee'],
+  dashes: ['brute', 'slump'],
+  skills: ['keyboard', 'coffee'],
 };
 
 /**
  * 只写和周一不同的关。
- * 例：tuesday: { skills: ['coffee'] } 表示周二仍用周一三条冲刺，主动技能只留咖啡。
+ * 周二起 3+3；周五冲刺换成反弹 / 补卡 / 甩锅。
  */
 export const DAY_LOADOUTS: Partial<Record<WeekdayId, { dashes?: LineId[]; skills?: SkillKey[] }>> = {
-  tuesday: {},
-  wednesday: {},
-  thursday: {},
-  friday: {},
+  tuesday: {
+    dashes: ['brute', 'slump', 'phantom'],
+    skills: ['keyboard', 'coffee', 'decoy'],
+  },
+  wednesday: {
+    dashes: ['brute', 'slump', 'rebound'],
+    skills: ['keyboard', 'coffee', 'decoy'],
+  },
+  thursday: {
+    dashes: ['brute', 'slump', 'phantom'],
+    skills: ['keyboard', 'coffee', 'decoy'],
+  },
+  friday: {
+    dashes: ['rebound', 'reclock', 'blame'],
+    skills: ['keyboard', 'coffee', 'decoy'],
+  },
 };
 
 export function dayPlayerLoadout(day: WeekdayId): DayPlayerLoadout {
@@ -114,8 +177,8 @@ export function dayKitMeta(kit: DayPlayKit): string {
 }
 
 export function dayKitHint(kit: DayPlayKit): string {
-  const dashes = kit.dashes.map((id) => LINE_NAMES[id]).join(' / ') || '无';
-  const skills = kit.skills.map((id) => SKILL_NAMES[id]).join(' / ') || '无';
+  const dashes = kit.dashes.map((id) => lineName(kit.day, id)).join(' / ') || '无';
+  const skills = kit.skills.map((id) => skillNameOnDay(kit.day, id)).join(' / ') || '无';
   const traps = kit.hazards.length ? kit.hazards.map(hazardLabel).join('、') : '无';
   const enemy = kit.enemySkills.length
     ? kit.enemySkills.map((id) => ENEMY_SKILL_META[id].name).join('、')

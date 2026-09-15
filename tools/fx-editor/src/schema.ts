@@ -1,7 +1,8 @@
 import { BATTLE_SLOT_IDS, type EnemySkillId } from '../../../src/catalog';
 import type { ActorId, CrowdActorId, DashKey, DashReactKind, LineId, SkillKey, Lv } from '../../../src/fx/catalog';
-import { CHAIN_STYLE_META, CHANNEL_STAMP_META, CROWD_ACTOR_IDS, DASH_REACT_META, STUN_ELEM_META } from '../../../src/fx/catalog';
-import type { DayPlayKit } from '../../../src/fx/days';
+import { CHAIN_STYLE_META, CHANNEL_STAMP_META, CROWD_ACTOR_IDS, DASH_REACT_META, STUN_ELEM_META, type ThrowGlowStyle } from '../../../src/fx/catalog';
+import { fx } from '../../../src/fx/catalog';
+import { lineName, skillNameOnDay, type DayPlayKit } from '../../../src/fx/days';
 import type { HazardKind } from '../../../src/levels';
 import { rosterSlot } from '../../../src/roster';
 
@@ -48,51 +49,75 @@ export const TRACKS: TrackDef[] = [
   },
   {
     id: 'brute',
-    name: '蛮力',
+    name: '蛮力冲',
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: 'LV1 撞更猛 · LV2 时间/半径 · LV3 冲量再抬。主管推开/同事倒地在「角色反应」。',
+    blurb: '撞开清路。LV 抬冲量/半径；主管推开在「角色反应」。',
   },
   {
     id: 'slump',
-    name: '倦怠',
+    name: '倦怠冲',
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: 'LV1 撞人后周围减速 · LV2 圈更大更久 · LV3 主管也会被拖慢。谁减速、持续多久在「角色反应」。',
+    blurb: '撞人后困意圈。谁减速、持续多久在「角色反应」。',
   },
   {
     id: 'phantom',
-    name: '幻影',
+    name: '幻影冲',
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: 'LV1 穿人晕 · LV2 穿人回充 · LV3 冲完虚化。各角色眩晕时长在「角色反应」。',
+    blurb: '穿人晕 · 回充 · 虚化。各角色眩晕时长在「角色反应」。',
+  },
+  {
+    id: 'rebound',
+    name: '反弹冲',
+    tag: '属性',
+    group: 'dash',
+    hasLevel: true,
+    blurb: '玩家撞墙折向续冲（不是把人弹飞）。满级可碰主管折向。',
+  },
+  {
+    id: 'reclock',
+    name: '补卡冲',
+    tag: '属性',
+    group: 'dash',
+    hasLevel: true,
+    blurb: '一段结束后窗口内再按第二段，可拐弯。',
+  },
+  {
+    id: 'blame',
+    name: '甩锅冲',
+    tag: '属性',
+    group: 'dash',
+    hasLevel: true,
+    blurb: '撞到的人背锅，周围同事改追他。',
   },
   {
     id: 'decoy',
-    name: '摸鱼分身',
+    name: '工位马甲',
     tag: '技能',
     group: 'skill',
     hasLevel: true,
-    blurb: 'LV1 吸仇恨 · LV2 更久 · LV3 到期爆炸。爆炸倒地用被炸角色自己的被动。',
+    blurb: 'LV1 吸仇恨 · LV2 更久 · LV3 到期爆炸。按关换皮名。',
   },
   {
     id: 'keyboard',
-    name: '回旋键盘',
+    name: '横飞鼠标',
     tag: '技能',
     group: 'skill',
     hasLevel: true,
-    blurb: 'LV1 去程放倒 · LV2 更宽 · LV3 返程也倒。',
+    blurb: '掷出物去程放倒 · LV2 更宽 · LV3 返程也倒。按关换皮。上方切 LV1/2/3 可各自调大小、染色、光晕样式。',
   },
   {
     id: 'coffee',
-    name: '咖啡',
+    name: '喝咖啡',
     tag: '技能',
     group: 'skill',
     hasLevel: true,
-    blurb: 'LV1 朝前泼一滩 · LV2 渍更大更久 · LV3 连泼三滩再溅一大摊。',
+    blurb: '朝前泼一滩 · LV2 更大更久 · LV3 连泼再溅。按关换皮名和渍色。',
   },
   {
     id: 'hazards',
@@ -119,6 +144,14 @@ export function tracksForDay(kit: DayPlayKit): TrackDef[] {
     if (t.group === 'hazard') return kit.hazards.length > 0;
     if (t.group === 'enemy') return false;
     return true;
+  }).map((t) => {
+    if (t.group === 'dash' && t.id !== 'none') {
+      return { ...t, name: lineName(kit.day, t.id as LineId) };
+    }
+    if (t.group === 'skill') {
+      return { ...t, name: skillNameOnDay(kit.day, t.id as SkillKey) };
+    }
+    return t;
   });
 }
 
@@ -213,6 +246,7 @@ function dashSections(line: DashKey, lv: Lv): FieldSection[] {
         { path: `${p}.slump.color`, label: '圈颜色', kind: 'color' },
         { path: `${p}.slump.opacity`, label: '圈透明度', kind: 'range', min: 0.1, max: 0.9, step: 0.02 },
         { path: `${p}.slump.pulseLife`, label: '圈寿命', kind: 'range', min: 0.15, max: 1.2, step: 0.02 },
+        { path: `${p}.slump.trail`, label: '路径拖带', kind: 'bool', hint: '冲刺路径留下减速带（玩法开关）' },
       ],
     });
   }
@@ -222,6 +256,42 @@ function dashSections(line: DashKey, lv: Lv): FieldSection[] {
       fields: [
         { path: `${p}.phantom.cdRefund`, label: '穿人回充', kind: 'range', min: 0, max: 1.2, step: 0.05 },
         { path: `${p}.phantom.phaseTime`, label: '冲完虚化', kind: 'range', min: 0, max: 4, step: 0.1, hint: '0 = 不虚化' },
+        { path: `${p}.phantom.ghostTime`, label: '起冲虚影', kind: 'range', min: 0, max: 1.5, step: 0.05, hint: '0 = 无虚影' },
+        { path: `${p}.phantom.hopDist`, label: '再点平移', kind: 'range', min: 0, max: 2.5, step: 0.05, hint: '0 = 不可再点' },
+      ],
+    });
+  }
+  if (line === 'rebound') {
+    out.push({
+      title: '折向（玩家自己）',
+      fields: [
+        { path: `${p}.rebound.maxBounces`, label: '最多折几次', kind: 'int', min: 0, max: 3, step: 1 },
+        { path: `${p}.rebound.probe`, label: '探墙距离', kind: 'range', min: 0.3, max: 1.4, step: 0.02 },
+        { path: `${p}.rebound.heavyOk`, label: '碰主管也折', kind: 'bool' },
+        { path: `${p}.rebound.shockRadius`, label: '折向冲击波', kind: 'range', min: 0, max: 3, step: 0.05 },
+        { path: `${p}.rebound.shockImpulse`, label: '冲击波冲量', kind: 'range', min: 0, max: 800, step: 10 },
+      ],
+    });
+  }
+  if (line === 'reclock') {
+    out.push({
+      title: '两段补卡',
+      fields: [
+        { path: `${p}.reclock.window`, label: '二段窗口', kind: 'range', min: 0.1, max: 0.9, step: 0.01 },
+        { path: `${p}.reclock.segmentScale`, label: '二段时长倍率', kind: 'range', min: 0.4, max: 1.2, step: 0.05 },
+        { path: `${p}.reclock.hitRefund`, label: '二段命中退 CD', kind: 'range', min: 0, max: 1, step: 0.05 },
+        { path: `${p}.reclock.autoThird`, label: '两段中后自动滑', kind: 'bool' },
+      ],
+    });
+  }
+  if (line === 'blame') {
+    out.push({
+      title: '甩锅',
+      fields: [
+        { path: `${p}.blame.duration`, label: '背锅秒', kind: 'range', min: 0.4, max: 4, step: 0.05 },
+        { path: `${p}.blame.radius`, label: '改追半径', kind: 'range', min: 1, max: 8, step: 0.1 },
+        { path: `${p}.blame.count`, label: '最多改追人数', kind: 'int', min: 1, max: 8, step: 1 },
+        { path: `${p}.blame.groundRadius`, label: '空挥甩锅半径', kind: 'range', min: 0, max: 5, step: 0.1, hint: '0 = 必须撞到人' },
       ],
     });
   }
@@ -472,9 +542,29 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
     ];
   }
   const p = `skills.keyboard.${lv}`;
+  const glowStyle = (fx().skills.keyboard[lv]?.keyboard?.glowStyle ?? 'soft') as ThrowGlowStyle;
+  const lookFields: Field[] = [
+    {
+      path: `${p}.keyboard.scale`,
+      label: '大小',
+      kind: 'range',
+      min: 0.4,
+      max: 2.4,
+      step: 0.05,
+      hint: `只改 LV${lv}。相对各关默认皮（鼠标/键盘/电脑/回旋镖）再缩放。`,
+    },
+    { path: `${p}.keyboard.color`, label: '染色', kind: 'color', hint: '白 = 不染色，保留皮本身颜色。' },
+  ];
+  if (glowStyle !== 'off') {
+    lookFields.push(
+      { path: `${p}.keyboard.glowColor`, label: '光晕色', kind: 'color' },
+      { path: `${p}.keyboard.glowOpacity`, label: '光晕透明', kind: 'range', min: 0.05, max: 1, step: 0.02 },
+      { path: `${p}.keyboard.glowSize`, label: '光晕大小', kind: 'range', min: 0.8, max: 2.4, step: 0.05 }
+    );
+  }
   return [
     {
-      title: '技能',
+      title: '判定',
       fields: [
         { path: `${p}.keyboard.cooldown`, label: '冷却', kind: 'range', min: 2, max: 12, step: 0.5 },
         { path: `${p}.keyboard.speed`, label: '速度', kind: 'range', min: 6, max: 24, step: 0.5 },
@@ -483,6 +573,10 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
         { path: `${p}.keyboard.knockImpulse`, label: '放倒冲量', kind: 'range', min: 120, max: 700, step: 10 },
         { path: `${p}.keyboard.hitImpulse`, label: '击退冲量', kind: 'range', min: 120, max: 700, step: 10 },
       ],
+    },
+    {
+      title: `飞出物样子 · LV${lv}`,
+      fields: lookFields,
     },
   ];
 }

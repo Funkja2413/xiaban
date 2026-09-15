@@ -9,8 +9,14 @@ import { setFigureGlow } from './skillVfx';
 import type { Cards } from './cards';
 import { RagdollFactory, type RagdollHandle } from './ragdoll';
 import { sfx } from '../audio';
+import type { FlowField } from '../sim/flowfield';
 
 const SPEED = 4.6;
+/** 有输入却几乎走不动：判定被挤住，给短虚化脱身 */
+const JAM_SPEED = 0.55;
+const JAM_TIME = 0.28;
+/** 覆盖起身硬直(~0.5s) + 之后一小段可走动脱身 */
+const GETUP_PHASE = 1.05;
 
 export class Player {
   body: RAPIER.RigidBody;
@@ -27,6 +33,15 @@ export class Player {
   dashCd = 0;
   private dashDirX = 0;
   private dashDirZ = -1;
+  /** 反弹冲：本段剩余可折次数 */
+  private reboundLeft = 0;
+  /** 补卡冲：二段窗口 / 已用段数 / 本段是否命中 */
+  private reclockT = 0;
+  private reclockSeg = 0;
+  private reclockHitSeg = false;
+  private reclockHitAll = false;
+  /** 甩锅：本段是否已甩成功 */
+  private blamedThisDash = false;
   fireCd = 0;
   /** 撞上重量级同事后的硬直 / 布娃娃落地后的起身 */
   stunT = 0;
@@ -58,6 +73,9 @@ export class Player {
   private ragPos = { x: 0, y: 0.66, z: 0 };
   private standY = 0.66;
   private stepT = 0;
+  private jamT = 0;
+  /** 起身找空地（由 Game 注入主流场） */
+  nav: FlowField | null = null;
 
   constructor(
     scene: THREE.Scene,
@@ -114,6 +132,12 @@ export class Player {
     if (this.rag) this.finishRagdoll(true);
     this.dashT = 0;
     this.dashCd = 0;
+    this.reboundLeft = 0;
+    this.reclockT = 0;
+    this.reclockSeg = 0;
+    this.reclockHitSeg = false;
+    this.reclockHitAll = false;
+    this.blamedThisDash = false;
     this.stunT = 0;
     this.slowT = 0;
     this.slowMul = 1;
@@ -145,6 +169,10 @@ export class Player {
   stun(duration: number) {
     this.stunT = Math.max(this.stunT, duration);
     this.dashT = 0;
+    if (!this.rag) {
+      const cur = this.body.linvel();
+      this.body.setLinvel({ x: 0, y: cur.y, z: 0 }, true);
+    }
   }
 
   /**
@@ -219,7 +247,11 @@ export class Player {
   }
 
   requestDash(moveX: number, moveZ: number): boolean {
-    if (this.rag || this.dashCd > 0 || this.dashT > 0 || this.stunT > 0) return false;
+    if (this.rag || this.dashT > 0 || this.stunT > 0) return false;
+    const pack = dashFx((this.cards?.line ?? 'none') as DashKey, this.cards?.lineLv || 1);
+    const follow = this.reclockT > 0 && !!pack.reclock && this.reclockSeg >= 1 && this.reclockSeg < 2;
+    if (!follow && this.dashCd > 0) return false;
+
     const len = Math.hypot(moveX, moveZ);
     if (len > 0.15) {
       this.dashDirX = moveX / len;
@@ -228,9 +260,20 @@ export class Player {
       this.dashDirX = Math.sin(this.yaw);
       this.dashDirZ = Math.cos(this.yaw);
     }
-    const pack = dashFx((this.cards?.line ?? 'none') as DashKey, this.cards?.lineLv || 1);
-    this.dashT = pack.hit.time;
-    this.dashCd = pack.hit.cooldown;
+
+    const scale = follow ? pack.reclock!.segmentScale : 1;
+    this.dashT = pack.hit.time * scale;
+    if (!follow) {
+      this.dashCd = pack.hit.cooldown;
+      this.reclockSeg = 0;
+      this.reclockHitAll = false;
+      this.reboundLeft = pack.rebound?.maxBounces ?? 0;
+    } else {
+      this.reclockSeg = 2;
+      this.reclockT = 0;
+    }
+    this.reclockHitSeg = false;
+    this.blamedThisDash = false;
     this.passed.clear();
     this.dashed.clear();
     sfx.play('dash');
@@ -239,6 +282,7 @@ export class Player {
 
   update(dt: number, moveX: number, moveZ: number, aiming: boolean, enemies: Enemies) {
     this.dashCd = Math.max(0, this.dashCd - dt);
+    this.reclockT = Math.max(0, this.reclockT - dt);
     this.bouncedByHeavy = false;
 
     if (this.slowT > 0) {
@@ -260,11 +304,13 @@ export class Player {
 
     if (this.stunT > 0) {
       this.stunT = Math.max(0, this.stunT - dt);
+      this.jamT = 0;
     } else if (this.dashT > 0) {
       const pack = dashFx((line ?? 'none') as DashKey, lv || 1);
       const hit = pack.hit;
       const phase = !!pack.phantom;
       this.dashT -= dt;
+      if (pack.rebound && this.reboundLeft > 0) this.tryReboundWall(pack, enemies);
       this.body.setLinvel({ x: this.dashDirX * hit.speed, y: cur.y, z: this.dashDirZ * hit.speed }, true);
       const p = this.pos;
 
@@ -291,11 +337,31 @@ export class Player {
         if (hit.maxHits > 0 && this.dashed.size >= hit.maxHits) continue;
         const outcome = this.applyDashReact(enemies, i, pack, react, first);
         if (outcome === 'bounce') break;
-        if (outcome === 'hit' && first) this.dashed.add(i);
+        if (outcome === 'hit' && first) {
+          this.dashed.add(i);
+          this.reclockHitSeg = true;
+          if (pack.blame && !this.blamedThisDash) {
+            enemies.blame(i, pack.blame.duration, pack.blame.radius, pack.blame.count);
+            this.blamedThisDash = true;
+          }
+        }
       }
+      this.jamT = 0;
     } else {
       const speed = SPEED * (this.slowT > 0 ? this.slowMul : 1);
       this.body.setLinvel({ x: moveX * speed, y: cur.y, z: moveZ * speed }, true);
+      const inputLen = Math.hypot(moveX, moveZ);
+      const horiz = Math.hypot(cur.x, cur.z);
+      if (!this.menuGhost && this.phasedT <= 0 && inputLen > 0.35 && horiz < JAM_SPEED) {
+        this.jamT += dt;
+        if (this.jamT >= JAM_TIME) {
+          this.jamT = 0;
+          this.phasedT = Math.max(this.phasedT, 0.45);
+          this.body.applyImpulse({ x: moveX * 180, y: 40, z: moveZ * 180 }, true);
+        }
+      } else {
+        this.jamT = 0;
+      }
     }
 
     if (wasDashing && this.dashT <= 0 && this.stunT <= 0) {
@@ -303,16 +369,47 @@ export class Player {
       if (pack.phantom && pack.phantom.phaseTime > 0) {
         this.phasedT = Math.max(this.phasedT, pack.phantom.phaseTime);
       }
+      if (pack.blame && !this.blamedThisDash && pack.blame.groundRadius > 0) {
+        const p = this.pos;
+        enemies.blameNearest(p.x, p.z, pack.blame.duration, pack.blame.groundRadius, pack.blame.count);
+        this.blamedThisDash = true;
+      }
+      if (pack.reclock) {
+        if (this.reclockSeg === 0) {
+          this.reclockSeg = 1;
+          this.reclockT = pack.reclock.window;
+          if (this.reclockHitSeg) this.reclockHitAll = true;
+        } else if (this.reclockSeg === 2) {
+          if (this.reclockHitSeg && pack.reclock.hitRefund > 0) {
+            this.dashCd = Math.max(0.15, this.dashCd - pack.reclock.hitRefund);
+          }
+          if (pack.reclock.autoThird && this.reclockHitAll && this.reclockHitSeg) {
+            this.dashT = pack.hit.time * 0.45;
+            this.reclockSeg = 3;
+          } else {
+            this.reclockSeg = 0;
+            this.reclockT = 0;
+          }
+        } else {
+          this.reclockSeg = 0;
+          this.reclockT = 0;
+        }
+      }
     }
 
-    const phased =
+    let wantPhase =
       this.menuGhost ||
       this.phasedT > 0 ||
       (this.dashT > 0 && !!dashFx((line ?? 'none') as DashKey, lv || 1).phantom);
-    if (phased !== this.phasedNow) {
-      this.phasedNow = phased;
-      this.collider.setCollisionGroups(phased ? PLAYER_PHASED_GROUPS : PLAYER_GROUPS);
-      for (const m of this.ghostMats) m.opacity = phased ? 0.42 : 1;
+    // 虚化结束时若还叠在同事身上，先别恢复碰撞，否则会永久卡死
+    if (!wantPhase && this.phasedNow && this.overlapsEnemy(enemies)) {
+      this.phasedT = Math.max(this.phasedT, 0.12);
+      wantPhase = true;
+    }
+    if (wantPhase !== this.phasedNow) {
+      this.phasedNow = wantPhase;
+      this.collider.setCollisionGroups(wantPhase ? PLAYER_PHASED_GROUPS : PLAYER_GROUPS);
+      for (const m of this.ghostMats) m.opacity = wantPhase ? 0.42 : 1;
     }
 
     if (this.stunT <= 0) {
@@ -364,11 +461,17 @@ export class Player {
     const sane = this.ragFactory.isSane(rag);
     this.ragFactory.despawn(rag);
     this.rag = null;
-    const x = sane ? p.x : this.ragOrigin.x;
-    const z = sane ? p.z : this.ragOrigin.z;
+    const rawX = sane ? p.x : this.ragOrigin.x;
+    const rawZ = sane ? p.z : this.ragOrigin.z;
+    const [x, z] = this.findFreeSpot(rawX, rawZ);
     this.body = this.makeBody(x, z);
     this.collider = this.makeCollider(this.body);
     this.phasedNow = false;
+    // 起身短虚化，避免胶囊嵌进墙/桌/人堆后永久卡死
+    this.phasedT = Math.max(this.phasedT, GETUP_PHASE);
+    this.collider.setCollisionGroups(PLAYER_PHASED_GROUPS);
+    this.phasedNow = true;
+    for (const m of this.ghostMats) m.opacity = 0.42;
     this.group.visible = !this.menuGhost;
     this.group.rotation.order = 'YXZ';
     this.group.rotation.set(0, this.yaw, 0);
@@ -382,6 +485,44 @@ export class Player {
     }
   }
 
+  private findFreeSpot(x: number, z: number): [number, number] {
+    const f = this.nav;
+    if (!f) return [x, z];
+    const minX = f.ox + 0.6;
+    const maxX = f.ox + f.nx * f.cell - 0.6;
+    const minZ = f.oz + 0.6;
+    const maxZ = f.oz + f.nz * f.cell - 0.6;
+    const cx = Math.max(minX, Math.min(maxX, x));
+    const cz = Math.max(minZ, Math.min(maxZ, z));
+    if (!f.isBlockedAt(cx, cz)) return [cx, cz];
+    for (let r = 0.5; r <= 3.5; r += 0.5) {
+      for (let a = 0; a < 8; a++) {
+        const ang = (a / 8) * Math.PI * 2;
+        const nx = Math.max(minX, Math.min(maxX, cx + Math.cos(ang) * r));
+        const nz = Math.max(minZ, Math.min(maxZ, cz + Math.sin(ang) * r));
+        if (!f.isBlockedAt(nx, nz)) return [nx, nz];
+      }
+    }
+    // 最后退回起飞点（通常更安全）
+    const ox = Math.max(minX, Math.min(maxX, this.ragOrigin.x));
+    const oz = Math.max(minZ, Math.min(maxZ, this.ragOrigin.z));
+    if (!f.isBlockedAt(ox, oz)) return [ox, oz];
+    return [cx, cz];
+  }
+
+  private overlapsEnemy(enemies: Enemies) {
+    const p = this.pos;
+    for (let i = 0; i < enemies.cap; i++) {
+      const s = enemies.state[i];
+      if (s !== EState.Chase && s !== EState.Knock && s !== EState.Getup) continue;
+      const dx = enemies.posX[i] - p.x;
+      const dz = enemies.posZ[i] - p.z;
+      const rr = enemies.actorId(i) === 'heavy' ? 1.15 : 0.72;
+      if (dx * dx + dz * dz < rr * rr) return true;
+    }
+    return false;
+  }
+
   private applyDashReact(
     enemies: Enemies,
     i: number,
@@ -393,6 +534,16 @@ export class Player {
     switch (react.kind) {
       case 'none': {
         if (react.bounce && !pack.phantom) {
+          // 反弹冲：碰主管折向续冲，而不是自己弹飞硬直
+          if (pack.rebound && pack.rebound.heavyOk && this.reboundLeft > 0) {
+            const dx = enemies.posX[i] - this.pos.x;
+            const dz = enemies.posZ[i] - this.pos.z;
+            this.reflectAwayFrom(dx, dz);
+            this.reboundLeft--;
+            this.pulseReboundShock(enemies, pack);
+            sfx.play('dash_bounce');
+            return 'hit';
+          }
           const slow = this.slowReact(pack);
           if (slow) this.pulseSlow(enemies, this.pos.x, this.pos.z, pack, slow);
           this.dashT = 0;
@@ -422,6 +573,58 @@ export class Player {
         if (react.stun > 0) enemies.stun(i, react.stun);
         if (first) sfx.play('dash_hit');
         return 'hit';
+    }
+  }
+
+  private tryReboundWall(pack: DashLevelFx, enemies: Enemies) {
+    const rb = pack.rebound;
+    if (!rb || this.reboundLeft <= 0 || !this.nav) return;
+    const p = this.pos;
+    const probe = rb.probe;
+    const fx = p.x + this.dashDirX * probe;
+    const fz = p.z + this.dashDirZ * probe;
+    if (!this.nav.isBlockedAt(fx, fz)) return;
+    const blockX = this.nav.isBlockedAt(p.x + this.dashDirX * probe, p.z);
+    const blockZ = this.nav.isBlockedAt(p.x, p.z + this.dashDirZ * probe);
+    if (blockX) this.dashDirX *= -1;
+    if (blockZ) this.dashDirZ *= -1;
+    if (!blockX && !blockZ) {
+      this.dashDirX *= -1;
+      this.dashDirZ *= -1;
+    }
+    const len = Math.hypot(this.dashDirX, this.dashDirZ) || 1;
+    this.dashDirX /= len;
+    this.dashDirZ /= len;
+    this.reboundLeft--;
+    this.yaw = Math.atan2(this.dashDirX, this.dashDirZ);
+    this.pulseReboundShock(enemies, pack);
+    sfx.play('dash_bounce');
+  }
+
+  private reflectAwayFrom(dx: number, dz: number) {
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = dx / len;
+    const nz = dz / len;
+    const dot = this.dashDirX * nx + this.dashDirZ * nz;
+    this.dashDirX -= 2 * dot * nx;
+    this.dashDirZ -= 2 * dot * nz;
+    const n = Math.hypot(this.dashDirX, this.dashDirZ) || 1;
+    this.dashDirX /= n;
+    this.dashDirZ /= n;
+    this.yaw = Math.atan2(this.dashDirX, this.dashDirZ);
+  }
+
+  private pulseReboundShock(enemies: Enemies, pack: DashLevelFx) {
+    const rb = pack.rebound;
+    if (!rb || rb.shockRadius <= 0) return;
+    const p = this.pos;
+    for (let i = 0; i < enemies.cap; i++) {
+      if (enemies.state[i] !== EState.Chase) continue;
+      if (enemies.actorId(i) === 'heavy') continue;
+      const dx = enemies.posX[i] - p.x;
+      const dz = enemies.posZ[i] - p.z;
+      if (dx * dx + dz * dz > rb.shockRadius * rb.shockRadius) continue;
+      enemies.shove(i, this.dashDirX, this.dashDirZ, rb.shockImpulse);
     }
   }
 

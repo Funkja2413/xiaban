@@ -10,16 +10,19 @@ import {
   HALO_STYLE_META,
   hexColor,
   loadFxCatalog,
+  normalizeThrowGlowStyle,
   parseHex,
   playerRingFx,
   replaceFx,
   resetFx,
   setPath,
+  THROW_GLOW_STYLE_META,
   type CrowdActorId,
   type DashKey,
   type DashReactKind,
   type HaloStyle,
   type Lv,
+  type ThrowGlowStyle,
 } from '../../../src/fx/catalog';
 import { bustCatalogAssets, catalogLookStamp, ENEMY_SKILL_META, loadCatalog, lookForSlotOnDay, type ColleagueCatalog, type EnemySkillId } from '../../../src/catalog';
 import { loadLevelCatalog, WEEKDAYS, type LevelCatalog, type WeekdayId } from '../../../src/levels';
@@ -87,12 +90,14 @@ function playKindOf(id: TrackId): PlayKind {
 function syncPreview() {
   const t = trackOf(selected);
   preview.track = selected;
+  preview.day = currentDay;
   preview.skillLv = t.hasLevel ? level : 1;
   preview.actorEdit = selectedActor !== null;
   preview.actorSkill = actorSkillOf(selectedActor);
   if (selectedActor) preview.actorId = selectedActor;
   preview.refreshOvertime();
   preview.applyActorLayout();
+  if (selectedActor === null && selected === 'keyboard') preview.refreshThrowLook();
 }
 
 function playCurrent() {
@@ -298,6 +303,30 @@ function renderField(f: Field, box: HTMLElement) {
   }
 }
 
+function renderThrowGlowStyles(box: HTMLElement) {
+  const path = `skills.keyboard.${level}.keyboard.glowStyle`;
+  const cur = normalizeThrowGlowStyle(getPath(fx(), path));
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent = '光晕样式（只改当前 LV；都是加色低面数）。';
+  box.appendChild(hint);
+  const row = document.createElement('div');
+  row.className = 'styleRow';
+  for (const s of THROW_GLOW_STYLE_META) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = cur === s.id ? 'active' : '';
+    btn.innerHTML = `<b>${s.name}</b><span>${s.blurb}</span>`;
+    btn.addEventListener('click', () => {
+      setPath(fx() as unknown as Record<string, unknown>, path, s.id as ThrowGlowStyle);
+      renderFields();
+      schedulePush();
+    });
+    row.appendChild(btn);
+  }
+  box.appendChild(row);
+}
+
 function renderHaloStyles(box: HTMLElement) {
   const h = document.createElement('h3');
   h.className = 'sec';
@@ -411,6 +440,7 @@ function renderFields() {
     h.className = 'sec';
     h.textContent = sec.title;
     box.appendChild(h);
+    if (def.id === 'keyboard' && sec.title.startsWith('飞出物样子')) renderThrowGlowStyles(box);
     for (const f of sec.fields) renderField(f, box);
   }
 }
@@ -424,6 +454,7 @@ let pushing = false;
 
 function schedulePush() {
   preview.refreshOvertime();
+  if (selected === 'keyboard') preview.refreshThrowLook();
   window.clearTimeout(pushTimer);
   pushTimer = window.setTimeout(() => {
     void pushToBattle(true);

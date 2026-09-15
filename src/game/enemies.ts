@@ -120,6 +120,11 @@ export class Enemies {
   private hasteT: Float32Array;
   private hasteMul: Float32Array;
   private rallyLeft = 2;
+  /** 甩锅：被背锅的同事下标，周围人改追他 */
+  private blameI = -1;
+  private blameT = 0;
+  private blameR = 0;
+  private blameN = 0;
   skillOf: ((id: CrowdActorId) => EnemySkillId | null) | null = null;
   onSkill: ((id: EnemySkillId, phase: 'windup' | 'fire', x: number, z: number, i: number) => void) | null = null;
   private ragCount = 0;
@@ -321,6 +326,11 @@ export class Enemies {
     return this.types[i] === EType.C ? 1.38 : 1;
   }
 
+  /** 胶囊中心高度；与玩家 standY 同公式，须随 bodyScale 变，不能写死 0.66/0.92 */
+  private standYOf(i: number) {
+    return 0.66 * this.scaleOf(i);
+  }
+
   private hitRadiusOf(i: number) {
     return 0.42 * this.scaleOf(i);
   }
@@ -374,7 +384,7 @@ export class Enemies {
     const s = this.scaleOf(i);
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(x, 0.66 * s, z)
+        .setTranslation(x, this.standYOf(i), z)
         .lockRotations()
         .setLinearDamping(2.5)
     );
@@ -709,8 +719,7 @@ export class Enemies {
       const b = this.bodies[i];
       if (!b || this.state[i] === EState.Inactive) continue;
       if (this.state[i] === EState.Ragdoll) continue;
-      const y = this.types[i] === EType.C ? 0.92 : 0.66;
-      b.setTranslation({ x: this.anchorX[i], y, z: this.anchorZ[i] }, true);
+      b.setTranslation({ x: this.anchorX[i], y: this.standYOf(i), z: this.anchorZ[i] }, true);
       b.setLinvel({ x: 0, y: 0, z: 0 }, true);
       this.posX[i] = this.anchorX[i];
       this.posZ[i] = this.anchorZ[i];
@@ -736,6 +745,13 @@ export class Enemies {
     this.forceChase = opts?.forceChase === true;
     this.aimPX = playerX;
     this.aimPZ = playerZ;
+    if (this.blameT > 0) {
+      this.blameT -= dt;
+      if (this.blameT <= 0 || this.blameI < 0 || this.state[this.blameI] === EState.Inactive) {
+        this.blameI = -1;
+        this.blameT = 0;
+      }
+    }
     this.hash.clear();
     for (let i = 0; i < this.cap; i++) {
       const s = this.state[i];
@@ -956,15 +972,63 @@ export class Enemies {
     }
   }
 
+  /** 甩锅：附近最多 n 人改追被撞的人 */
+  blame(i: number, duration: number, radius: number, count: number) {
+    if (i < 0 || i >= this.cap || this.state[i] === EState.Inactive) return;
+    this.blameI = i;
+    this.blameT = duration;
+    this.blameR = radius;
+    this.blameN = Math.max(1, count | 0);
+  }
+
+  /** 空挥甩锅：半径内随机一个 Chase 同事背锅 */
+  blameNearest(x: number, z: number, duration: number, radius: number, count: number) {
+    let best = -1;
+    let bestD = radius * radius;
+    for (let i = 0; i < this.cap; i++) {
+      if (this.state[i] !== EState.Chase) continue;
+      const dx = this.posX[i] - x;
+      const dz = this.posZ[i] - z;
+      const d = dx * dx + dz * dz;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    if (best >= 0) this.blame(best, duration, radius, count);
+  }
+
+  private blameChaseOf(i: number, px: number, pz: number): { x: number; z: number } {
+    if (this.blameT <= 0 || this.blameI < 0 || i === this.blameI) return { x: px, z: pz };
+    const bx = this.posX[this.blameI];
+    const bz = this.posZ[this.blameI];
+    const dx = bx - this.posX[i];
+    const dz = bz - this.posZ[i];
+    if (dx * dx + dz * dz > this.blameR * this.blameR) return { x: px, z: pz };
+    // 粗限人数：用下标模数 + 距离门槛，避免全图改追
+    let nearer = 0;
+    const myD = dx * dx + dz * dz;
+    for (let j = 0; j < this.cap; j++) {
+      if (j === i || j === this.blameI || this.state[j] !== EState.Chase) continue;
+      const jx = this.posX[j] - bx;
+      const jz = this.posZ[j] - bz;
+      const jd = jx * jx + jz * jz;
+      if (jd <= this.blameR * this.blameR && jd < myD) nearer++;
+      if (nearer >= this.blameN) return { x: px, z: pz };
+    }
+    return { x: bx, z: bz };
+  }
+
   private updateChase(i: number, dt: number, px: number, pz: number, suppressChannel: boolean, skillTarget?: SkillTarget) {
+    const bait = this.blameChaseOf(i, px, pz);
     const x = this.posX[i];
     const z = this.posZ[i];
-    const dxp = px - x;
-    const dzp = pz - z;
+    const dxp = bait.x - x;
+    const dzp = bait.z - z;
     const distSq = dxp * dxp + dzp * dzp;
 
     if (skillTarget) this.tickSkill(i, dt, px, pz, skillTarget);
-    this.steerDir(i, px, pz, distSq, this.flowDir);
+    this.steerDir(i, bait.x, bait.z, distSq, this.flowDir);
     if (this.burstT[i] > 0) {
       this.burstT[i] -= dt;
       this.toward(this.burstX[i], this.burstZ[i], x, z, this.flowDir);
@@ -1231,7 +1295,7 @@ export class Enemies {
       const v = body.linvel();
       const hSpeed = Math.hypot(v.x, v.z);
       const scale = this.scaleOf(i);
-      const yOff = this.types[i] === EType.C ? 0.92 : 0.66;
+      const yOff = this.standYOf(i);
 
       const heavy = this.types[i] === EType.C;
       const pose = this.poseIndex(i, hSpeed, dt);
