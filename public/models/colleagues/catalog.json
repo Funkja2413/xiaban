@@ -500,7 +500,7 @@
           "kitHair": "hair_tail",
           "kitHairMap": "/models/colleagues/skins/skin-colleague-a-f-monday-hair.png",
           "kitSkirt": "skirt_pencil",
-          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "kitSkirtMap": "/models/colleagues/skins/skin-colleague-a-f-monday-skirt.png",
           "thumb": "/models/colleagues/thumbs/monday-colleague-a-f.png",
           "thumbCam": {
             "position": [
@@ -634,9 +634,9 @@
           "bodyMorph": 0.6,
           "bodyScale": 1.38,
           "kitHair": "hair_bob",
-          "kitHairMap": "/models/kit/textures/hair_albedo.png",
+          "kitHairMap": "/models/colleagues/skins/skin-heavy-monday-hair.png",
           "kitSkirt": "skirt_pencil",
-          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-monday-skirt.png",
           "thumb": "/models/colleagues/thumbs/monday-heavy.png",
           "thumbCam": {
             "position": [
@@ -701,9 +701,9 @@
           ],
           "bodyMorph": 0.9,
           "bodyScale": 1,
-          "kitHair": "hair_bob",
+          "kitHair": null,
           "kitHairMap": "/models/kit/textures/hair_albedo.png",
-          "kitSkirt": "skirt_pencil",
+          "kitSkirt": null,
           "kitSkirtMap": "/models/kit/textures/skirt_black.png",
           "thumb": "/models/colleagues/thumbs/monday-interceptor.png",
           "thumbCam": {
@@ -979,10 +979,10 @@
           ],
           "bodyMorph": 0.6,
           "bodyScale": 0.92,
-          "kitHair": "hair_bob",
-          "kitHairMap": "/models/kit/textures/hair_albedo.png",
-          "kitSkirt": "skirt_pencil",
-          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "kitHair": null,
+          "kitHairMap": "/models/colleagues/skins/skin-heavy-tuesday-hair.png",
+          "kitSkirt": null,
+          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-tuesday-skirt.png",
           "thumb": "/models/colleagues/thumbs/tuesday-heavy.png",
           "thumbCam": {
             "position": [
@@ -1325,10 +1325,10 @@
           ],
           "bodyMorph": -0.46,
           "bodyScale": 1.38,
-          "kitHair": "hair_bob",
-          "kitHairMap": "/models/kit/textures/hair_albedo.png",
-          "kitSkirt": "skirt_pencil",
-          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "kitHair": null,
+          "kitHairMap": "/models/colleagues/skins/skin-heavy-hair.png",
+          "kitSkirt": null,
+          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-skirt.png",
           "thumb": "/models/colleagues/thumbs/wednesday-heavy.png",
           "thumbCam": {
             "position": [
@@ -1671,10 +1671,10 @@
           ],
           "bodyMorph": 1,
           "bodyScale": 1.38,
-          "kitHair": "hair_bob",
-          "kitHairMap": "/models/kit/textures/hair_albedo.png",
-          "kitSkirt": "skirt_pencil",
-          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "kitHair": null,
+          "kitHairMap": "/models/colleagues/skins/skin-heavy-thursday-hair.png",
+          "kitSkirt": null,
+          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-thursday-skirt.png",
           "thumb": "/models/colleagues/thumbs/thursday-heavy.png",
           "thumbCam": {
             "position": [
@@ -1717,9 +1717,9 @@
           "props": [],
           "bodyMorph": 0.9,
           "bodyScale": 1,
-          "kitHair": "hair_bob",
+          "kitHair": null,
           "kitHairMap": "/models/kit/textures/hair_albedo.png",
-          "kitSkirt": "skirt_pencil",
+          "kitSkirt": null,
           "kitSkirtMap": "/models/kit/textures/skirt_black.png",
           "thumb": "/models/colleagues/thumbs/thursday-interceptor.png",
           "thumbCam": {
@@ -2037,10 +2037,10 @@
           ],
           "bodyMorph": 1,
           "bodyScale": 1.3,
-          "kitHair": "hair_bob",
-          "kitHairMap": "/models/kit/textures/hair_albedo.png",
-          "kitSkirt": "skirt_pencil",
-          "kitSkirtMap": "/models/kit/textures/skirt_black.png",
+          "kitHair": null,
+          "kitHairMap": "/models/colleagues/skins/skin-heavy-friday-hair.png",
+          "kitSkirt": null,
+          "kitSkirtMap": "/models/colleagues/skins/skin-heavy-friday-skirt.png",
           "thumb": "/models/colleagues/thumbs/friday-heavy.png",
           "thumbCam": {
             "position": [
