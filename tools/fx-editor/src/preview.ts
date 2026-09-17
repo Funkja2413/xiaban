@@ -56,8 +56,8 @@ interface SkillProp {
   flying: boolean;
 }
 
-/** 挤在冲刺廊道里，默认半径 1、时长 0.18 能扫到一整群 */
-const CROWD: { slot: number; x: number; z: number }[] = [
+/** 挤在冲刺廊道里的点位池；演示人数从这里截取，不够再往外扩 */
+const CROWD_SPOTS: { slot: number; x: number; z: number }[] = [
   { slot: 0, x: -0.78, z: 1.18 },
   { slot: 1, x: -0.26, z: 1.12 },
   { slot: 0, x: 0.28, z: 1.2 },
@@ -74,6 +74,43 @@ const CROWD: { slot: number; x: number; z: number }[] = [
   { slot: 0, x: 0.05, z: -0.22 },
   { slot: 3, x: 0.58, z: -0.32 },
 ];
+
+const CROWD_COUNT_MIN = 1;
+const CROWD_COUNT_MAX = 24;
+const CROWD_COUNT_DEFAULT = 15;
+
+function clampCrowdCount(n: number) {
+  return Math.max(CROWD_COUNT_MIN, Math.min(CROWD_COUNT_MAX, Math.round(n)));
+}
+
+/** 取前 n 个点；人数≥4 时尽量带齐各槽位，方便点角色预览主动技。 */
+function crowdSpots(n: number): { slot: number; x: number; z: number }[] {
+  const count = clampCrowdCount(n);
+  const pool = CROWD_SPOTS.map((s) => ({ ...s }));
+  const slots = [0, 1, 2, 3];
+  let extra = 0;
+  while (pool.length < count) {
+    const i = pool.length;
+    const col = (i % 5) - 2;
+    const row = Math.floor(i / 5);
+    pool.push({
+      slot: slots[i % slots.length]!,
+      x: col * 0.52 + (extra % 2) * 0.06,
+      z: 1.15 - row * 0.48,
+    });
+    extra++;
+  }
+  const picked = pool.slice(0, count);
+  if (count >= 4) {
+    for (const slot of slots) {
+      if (picked.some((p) => p.slot === slot)) continue;
+      const donor = pool.find((p) => p.slot === slot) ?? { slot, x: slot * 0.4 - 0.6, z: -0.55 };
+      const dup = picked.findIndex((p) => picked.filter((q) => q.slot === p.slot).length > 1);
+      picked[dup >= 0 ? dup : picked.length - 1] = { ...donor };
+    }
+  }
+  return picked;
+}
 
 const PLAYER_START_Z = 2.35;
 const HOLD_AFTER_DASH = 2.15;
@@ -93,6 +130,8 @@ export class FxPreview {
   /** 当前关这个角色挂的主动技能。播放角色时走技能预览。 */
   actorSkill: EnemySkillId | null = null;
   castState: CastState = 'idle';
+  /** 演示区同事人数（仅编辑器预览） */
+  crowdCount = CROWD_COUNT_DEFAULT;
 
   private world: RAPIER.World;
   private rags: RagdollFactory;
@@ -219,6 +258,48 @@ export class FxPreview {
     this.scene.add(this.playerFig.group);
     this.spawnDummies(kit);
     this.resetPose();
+  }
+
+  /** 改演示人数：立刻重摆，不碰战场。 */
+  setCrowdCount(n: number) {
+    const next = clampCrowdCount(n);
+    if (next === this.crowdCount && this.dummies.length === next) return;
+    this.crowdCount = next;
+    this.play = null;
+    this.casterRunning = false;
+    this.extrasRunning = false;
+    this.playerLocked = false;
+    this.clearGlow();
+    this.clearRags();
+    this.clearSkillProps();
+    if (this.keyboard) {
+      this.scene.remove(this.keyboard);
+      this.keyboard = null;
+    }
+    if (this.decoy) {
+      this.scene.remove(this.decoy);
+      this.decoy = null;
+    }
+    if (this.crate) {
+      this.scene.remove(this.crate);
+      this.crate = null;
+    }
+    for (const d of this.dummies) this.scene.remove(d.fig.group);
+    this.dummies.length = 0;
+    this.spawnDummies(this.kit);
+    if (this.actorEdit && this.actorSkill && this.actorId !== 'player') {
+      this.layoutSkillStage();
+      this.skillStaged = true;
+      this.stagedActor = this.actorId;
+      this.stagedSkill = this.actorSkill;
+    } else {
+      this.restoreCrowdLayout();
+      this.skillStaged = false;
+      this.stagedActor = null;
+      this.stagedSkill = null;
+    }
+    if (this.track === 'keyboard') this.placeKeyboard();
+    this.onStatus?.(`演示人数 ${next}`);
   }
 
   castRows(): CastRow[] {
@@ -766,6 +847,7 @@ export class FxPreview {
       this.stagedActor = null;
       this.stagedSkill = null;
     }
+    if (this.track === 'keyboard') this.placeKeyboard();
     this.onStatus?.(msg);
   }
 
@@ -832,7 +914,11 @@ export class FxPreview {
 
   /** 拖滑条时立刻改飞出物样子，不用重播。 */
   refreshThrowLook() {
-    if (!this.keyboard) return;
+    if (!this.keyboard) {
+      if (this.track !== 'keyboard') return;
+      this.placeKeyboard();
+      return;
+    }
     applyThrowLook(this.keyboard, throwLookOf(skillFx('keyboard', this.skillLv).keyboard));
   }
 
@@ -878,7 +964,7 @@ export class FxPreview {
   }
 
   private spawnDummies(kit: HumanoidKit) {
-    for (const spot of CROWD) {
+    for (const spot of crowdSpots(this.crowdCount)) {
       const fig = cloneBattleFigure(kit, spot.slot);
       fig.group.position.set(spot.x, 0, spot.z);
       fig.group.rotation.y = 0;

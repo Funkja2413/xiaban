@@ -308,7 +308,7 @@ function renderThrowGlowStyles(box: HTMLElement) {
   const cur = normalizeThrowGlowStyle(getPath(fx(), path));
   const hint = document.createElement('p');
   hint.className = 'hint';
-  hint.textContent = '光晕样式（只改当前 LV；都是加色低面数）。';
+  hint.textContent = '光晕样式（只改当前 LV；软边贴图，几乎不占性能）。';
   box.appendChild(hint);
   const row = document.createElement('div');
   row.className = 'styleRow';
@@ -527,6 +527,14 @@ function bindPose() {
     $('btnRunPose').classList.add('active');
     $('btnIdle').classList.remove('active');
   });
+  const crowd = $('crowdCount') as HTMLInputElement;
+  const crowdV = $('crowdCountV');
+  const syncCrowd = () => {
+    const n = Math.round(Number(crowd.value));
+    crowdV.textContent = String(n);
+    preview.setCrowdCount(n);
+  };
+  crowd.addEventListener('input', syncCrowd);
 }
 
 function setLoading(title: string, hint?: string) {

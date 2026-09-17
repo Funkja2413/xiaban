@@ -7,7 +7,15 @@ Kenney (https://kenney.nl) · CC0
   prop-laptop.glb   Furniture Kit · laptop
   prop-radio.glb    Furniture Kit · radio
   prop-papers.glb   Furniture Kit · books
-  prop-toilet.glb   Furniture Kit · toilet
+
+Poly Haven (https://polyhaven.com) · CC0
+  prop-lens.glb     Magnifying Glass 01  https://polyhaven.com/a/magnifying_glass_01
+                    （Nazar Borodavka · 贴图压到 512，面数约减半）
+
+loafbrr via OpenGameArt · CC0
+  prop-toilet.glb   Toilets 包里的 Toilet_Round_A
+                    https://opengameart.org/content/toilets
+                    （Diffuse 贴图压到 512）
 
 Quaternius (https://quaternius.com) · CC0
   prop-pack.glb     Survival / RPG · backpack（壳体改浅蓝色）
@@ -27,9 +35,6 @@ CreativeTrio (https://creativetrio.art) · CC0
   prop-mic.glb      Breaking Tea 手持话筒 1k（圆顶网罩贴图 + 红色台标字贴图）
   prop-swatter.glb  手搓低模苍蝇拍
   prop-keys.glb     手搓钥匙串（环上十把钥匙 + 红牌 + 遥控）
-
-Akil A. Antoine via Poly Pizza · CC-BY 3.0（须署名）
-  prop-lens.glb     Magnifying Glass  https://poly.pizza/m/5JVDqcBclY6
 
 Shuo Liu via Poly Pizza · CC-BY 3.0（须署名）
   prop-horn.glb     Loudspearker (News)  https://poly.pizza/m/dDoyTGTyOcO

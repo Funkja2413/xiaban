@@ -1,4 +1,4 @@
-import { CharacterPreview } from './preview';
+import { CharacterPreview, STUDIO_PRESETS, type StudioLights } from './preview';
 import { drawSkinPreview, imageFromUrl, loadSkinMap, pngBytesFromUrl, skinFromFile } from './skin';
 import { HairRig, countTris, loadHairFile, loadPropFile } from './hair';
 import {
@@ -341,6 +341,7 @@ async function boot() {
       pickKitSkirt(null);
       void pickHairMap(KIT_HAIR_ALBEDO, true);
       void pickSkirtMap(KIT_SKIRT_ALBEDO, true);
+      preview.resetCamera();
       toast(`「${slot.label}」未指定，调完点保存到该角色`);
     }
     renderRoster();
@@ -482,7 +483,11 @@ async function boot() {
     if (v.kitSkirtMap) await pickSkirtMap(v.kitSkirtMap, true);
     else await pickSkirtMap(KIT_SKIRT_ALBEDO, true);
     setEditTarget(hatUse ? 'hat' : heldUse ? 'held' : backUse ? 'back' : 'hat');
-    toast(`已还原 ${v.label}`);
+    // 先落体型再还原封面机位；多等一帧避开 OrbitControls 阻尼残留
+    const cam = v.thumbCam ?? null;
+    preview.setCameraPose(cam);
+    requestAnimationFrame(() => preview.setCameraPose(cam));
+    toast(cam ? `已还原 ${v.label} · 封面机位` : `已还原 ${v.label}`);
   }
 
   // —— 官方皮 / 对照 ——
@@ -574,6 +579,64 @@ async function boot() {
   for (const el of document.querySelectorAll('.bodyScaleRange')) {
     el.addEventListener('input', () => setScaleUi(Number((el as HTMLInputElement).value)));
   }
+
+  function syncLightUi(L: StudioLights) {
+    const setNum = (id: string, v: number) => {
+      const el = $(id) as HTMLInputElement;
+      el.value = String(v);
+      const label = document.querySelector(`.v[data-for="${id}"]`);
+      if (label) label.textContent = v.toFixed(2);
+    };
+    setNum('lightHemi', L.hemi);
+    setNum('lightKey', L.key);
+    setNum('lightFill', L.fill);
+    setNum('lightRim', L.rim);
+    setNum('lightChin', L.chin);
+    ($('lightKeyColor') as HTMLInputElement).value = L.keyColor;
+    ($('lightFillColor') as HTMLInputElement).value = L.fillColor;
+    ($('lightRimColor') as HTMLInputElement).value = L.rimColor;
+    ($('lightChinColor') as HTMLInputElement).value = L.chinColor;
+    ($('lightBg') as HTMLInputElement).value = L.bg;
+  }
+  function readLightUi(): StudioLights {
+    return {
+      hemi: Number(($('lightHemi') as HTMLInputElement).value),
+      key: Number(($('lightKey') as HTMLInputElement).value),
+      fill: Number(($('lightFill') as HTMLInputElement).value),
+      rim: Number(($('lightRim') as HTMLInputElement).value),
+      chin: Number(($('lightChin') as HTMLInputElement).value),
+      keyColor: ($('lightKeyColor') as HTMLInputElement).value,
+      fillColor: ($('lightFillColor') as HTMLInputElement).value,
+      rimColor: ($('lightRimColor') as HTMLInputElement).value,
+      chinColor: ($('lightChinColor') as HTMLInputElement).value,
+      bg: ($('lightBg') as HTMLInputElement).value,
+    };
+  }
+  function applyLightUi() {
+    const L = readLightUi();
+    preview.applyStudioLights(L);
+    syncLightUi(L);
+  }
+  function pickLightPreset(id: keyof typeof STUDIO_PRESETS) {
+    preview.applyStudioPreset(id);
+    syncLightUi(preview.getStudioLights());
+    $('lightPresetStudio').classList.toggle('active', id === 'studio');
+    $('lightPresetWarm').classList.toggle('active', id === 'warm');
+    $('lightPresetCool').classList.toggle('active', id === 'cool');
+    $('lightPresetFlat').classList.toggle('active', id === 'flat');
+    toast(`封面光：${id === 'studio' ? '棚拍' : id === 'warm' ? '暖轮廓' : id === 'cool' ? '冷霓虹' : '平光'}`);
+  }
+  for (const id of ['lightHemi', 'lightKey', 'lightFill', 'lightRim', 'lightChin']) {
+    $(id).addEventListener('input', () => applyLightUi());
+  }
+  for (const id of ['lightKeyColor', 'lightFillColor', 'lightRimColor', 'lightChinColor', 'lightBg']) {
+    $(id).addEventListener('input', () => applyLightUi());
+  }
+  $('lightPresetStudio').addEventListener('click', () => pickLightPreset('studio'));
+  $('lightPresetWarm').addEventListener('click', () => pickLightPreset('warm'));
+  $('lightPresetCool').addEventListener('click', () => pickLightPreset('cool'));
+  $('lightPresetFlat').addEventListener('click', () => pickLightPreset('flat'));
+  syncLightUi(preview.getStudioLights());
 
   const kitSkinBox = $('kitSkinBtns');
   for (const def of KIT_SKINS) {
@@ -915,6 +978,7 @@ async function boot() {
     if (!(await persistProp('hat')) || !(await persistProp('held')) || !(await persistProp('back'))) return;
 
     let thumb: string | null = lookForSlot(catalog, id)?.thumb ?? null;
+    const thumbCam = preview.getCameraPose();
     try {
       const dataUrl = preview.captureThumb();
       const buf = await (await fetch(dataUrl)).arrayBuffer();
@@ -978,12 +1042,15 @@ async function boot() {
       kitSkirt: preview.kitSkirt,
       kitSkirtMap: skirtMapFile,
       thumb,
+      thumbCam,
       enemySkill: isPlayerSlotId(id) ? null : migrateEnemySkill(($('enemySkill') as HTMLSelectElement).value),
     });
 
     const b = budgetReport(catalog);
     if (b.over) toast('已保存，但皮肤/道具超预算');
-    await persist(`已保存到「${label}」· ${WEEKDAYS.find((d) => d.id === currentDay)?.label}`);
+    await persist(
+      `已保存到「${label}」· ${WEEKDAYS.find((d) => d.id === currentDay)?.label} · 封面机位已记`
+    );
     thumbNonce += 1;
     refreshBudget();
     renderDays();

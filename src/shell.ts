@@ -1,4 +1,4 @@
-import { WEEKDAYS, weekdaySlot, type WeekdayId } from './levels';
+import { WEEKDAYS, nextWeekday, weekdaySlot, type WeekdayId } from './levels';
 import {
   continueDay,
   isUnlocked,
@@ -419,6 +419,40 @@ const LOSE_TAUNT_STORE = 'loseTaunt.i';
 const LOSE_TIP_STORE = 'loseTip.i';
 const WIN_TAUNT_STORE = 'winTaunt.i';
 const WIN_TIP_STORE = 'winTip.i';
+const FINALE_TAUNT_STORE = 'finaleTaunt.i';
+const FINALE_TIP_STORE = 'finaleTip.i';
+
+/** 大结局副标题：周末祝福，带点打工人梗 */
+const FINALE_TAUNTS = [
+  '本周 KPI 已结案，周末只对枕头负责。',
+  '群已免打扰，世界先自行闭环。',
+  '老板的「很快」到不了周六。',
+  '周一的我还没入职，先享受失业 48 小时。',
+  '工位已下线，人设切换成沙发生物。',
+  '加班申请已自动驳回：理由是周末。',
+  '周报可以躺平，人也行。',
+  '电梯到家了，需求还在排队。',
+  '打工人下线，干饭人上线。',
+  '公司放假，良心也放假。',
+  '闹钟已批准年假：到周一。',
+  '会议纪要：周末无事发生。',
+];
+
+/** 大结局建议：热爱生活，别把周末也交给工位 */
+const FINALE_TIPS = [
+  '出门晒会儿太阳，别把周末也交给屏幕哦',
+  '吃顿热的，别用泡面给周五庆功哦',
+  '约个人走走，沙发以外也有生活哦',
+  '睡到自然醒，补回本周欠自己的觉哦',
+  '未读消息先放着，先对自己好一点哦',
+  '做点没用的事，周末不靠产出证明自己哦',
+  '去吹吹风，工位外的空气也认识你哦',
+  '把运动服找出来，哪怕只走两站路哦',
+  '给喜欢的人发条消息，别只回已读哦',
+  '收拾一角房间，生活会回你一点秩序哦',
+  '周末留白，别把日历填得比工作日还满哦',
+  '好好吃饭好好笑，热爱从准点下班开始哦',
+];
 
 function nextFromPool(pool: readonly string[], store: string) {
   let last = -1;
@@ -454,6 +488,14 @@ function nextWinTip() {
   return `建议：${nextFromPool(WIN_TIPS, WIN_TIP_STORE)}`;
 }
 
+function nextFinaleTaunt() {
+  return nextFromPool(FINALE_TAUNTS, FINALE_TAUNT_STORE);
+}
+
+function nextFinaleTip() {
+  return `建议：${nextFromPool(FINALE_TIPS, FINALE_TIP_STORE)}`;
+}
+
 function playResultIn() {
   const overlay = document.getElementById('overlay')!;
   overlay.classList.remove('is-play');
@@ -461,14 +503,22 @@ function playResultIn() {
   overlay.classList.add('is-play');
 }
 
-function resultArtFile(kind: 'won' | 'lost', player: PlayerSlotId) {
+function resultArtFile(kind: 'won' | 'lost' | 'finale', player: PlayerSlotId) {
   const female = player === 'player-f';
+  if (kind === 'finale') return female ? 'result-finale-f.png' : 'result-finale.png';
   if (kind === 'won') return female ? 'result-win-f.png' : 'result-win.png';
   return female ? 'result-lose-f.png' : 'result-lose.png';
 }
 
 function preloadResultArt() {
-  for (const file of ['result-win.png', 'result-win-f.png', 'result-lose.png', 'result-lose-f.png']) {
+  for (const file of [
+    'result-win.png',
+    'result-win-f.png',
+    'result-finale.png',
+    'result-finale-f.png',
+    'result-lose.png',
+    'result-lose-f.png',
+  ]) {
     const img = new Image();
     img.decoding = 'async';
     img.src = assetUrl(`ui/${file}`);
@@ -491,14 +541,20 @@ export function showResult(
   const nextBtn = document.getElementById('resultNext') as HTMLButtonElement;
   const retryBtn = document.getElementById('resultRetry') as HTMLButtonElement;
 
+  const finale = kind === 'won' && !nextWeekday(day);
+  const view = finale ? 'finale' : kind;
+
   // 先写好 kind / 文案，但等结算图就绪再露出来，避免默认失败图闪一下
-  overlay.dataset.kind = kind;
+  overlay.dataset.kind = view;
   overlay.dataset.player = player;
-  stamp.textContent = kind === 'won' ? '成功下班' : '下班失败';
-  title.textContent = kind === 'won' ? '成功下班！' : '今晚走不了了…';
+  stamp.textContent = finale ? '周末快乐' : kind === 'won' ? '成功下班' : '下班失败';
+  title.textContent = finale ? '周末快乐！' : kind === 'won' ? '成功下班！' : '今晚走不了了…';
   if (kind === 'lost') {
     taunt.textContent = nextLoseTaunt();
     tip.textContent = nextLoseTip();
+  } else if (finale) {
+    taunt.textContent = nextFinaleTaunt();
+    tip.textContent = nextFinaleTip();
   } else {
     taunt.textContent = nextWinTaunt();
     tip.textContent = nextWinTip();
@@ -509,12 +565,11 @@ export function showResult(
 
   if (kind === 'won') {
     const nxt = markBeaten(day);
-    if (nxt) {
+    if (finale || !nxt) {
+      nextBtn.style.display = 'none';
+    } else {
       nextBtn.setAttribute('aria-label', `下一关 · ${weekdaySlot(nxt)?.label ?? ''}`);
       nextBtn.onclick = () => confirmPlay(nxt, player);
-    } else {
-      nextBtn.style.display = 'none';
-      body.innerHTML = sub + '<br>本周班都下完了。';
     }
   } else {
     retryBtn.onclick = () => confirmPlay(day, player);
@@ -530,7 +585,7 @@ export function showResult(
     return;
   }
 
-  const file = resultArtFile(kind, player);
+  const file = resultArtFile(view, player);
   const next = assetUrl(`ui/${file}`);
   const already =
     art.complete &&

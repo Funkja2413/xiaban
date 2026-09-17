@@ -46,10 +46,10 @@ game
     } else {
       setMode('home');
       const preview = new URLSearchParams(location.search).get('result');
-      if (preview === 'lost' || preview === 'won') {
+      if (preview === 'lost' || preview === 'won' || preview === 'finale') {
         showResult(
-          preview,
-          bootDay,
+          preview === 'lost' ? 'lost' : 'won',
+          preview === 'finale' ? 'friday' : preview === 'won' ? 'monday' : bootDay,
           preview === 'lost'
             ? '任务塞到了 24:00<br>下次试着把人群引开、用冲刺撞穿薄弱处'
             : '逃亡用时 01:08<br>最终下班时间 18:24',

@@ -160,6 +160,12 @@
           <button type="button" id="btnIdle" class="active">待机</button>
           <button type="button" id="btnRunPose">跑步</button>
         </div>
+        <label class="slider" style="margin-top:8px">
+          演示人数
+          <input type="range" id="crowdCount" min="1" max="24" step="1" value="15">
+          <span class="v" id="crowdCountV">15</span>
+        </label>
+        <p class="hint">只影响编辑器预览，不改战场人数。</p>
         <h2 id="lvHead">等级</h2>
         <div class="row" id="lvRow">
           <button type="button" id="btnLv1" class="active">LV1</button>

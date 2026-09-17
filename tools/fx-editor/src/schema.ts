@@ -551,7 +551,7 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
       min: 0.4,
       max: 2.4,
       step: 0.05,
-      hint: `只改 LV${lv}。相对各关默认皮（鼠标/键盘/电脑/回旋镖）再缩放。`,
+      hint: `只改 LV${lv}。相对各关默认皮（鼠标/键盘/电脑/OKR）再缩放。`,
     },
     { path: `${p}.keyboard.color`, label: '染色', kind: 'color', hint: '白 = 不染色，保留皮本身颜色。' },
   ];

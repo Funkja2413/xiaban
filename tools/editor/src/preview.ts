@@ -22,6 +22,7 @@ import {
   type KitHairId,
   type KitSkirtId,
 } from './kit';
+import type { ThumbCam } from '../../../src/catalog';
 
 const HEIGHT = 1.72;
 
@@ -93,6 +94,74 @@ function normalizeToGround(root: THREE.Object3D) {
   root.updateMatrixWorld(true);
 }
 
+export type StudioLights = {
+  hemi: number;
+  key: number;
+  fill: number;
+  rim: number;
+  chin: number;
+  keyColor: string;
+  fillColor: string;
+  rimColor: string;
+  chinColor: string;
+  bg: string;
+};
+
+export const STUDIO_PRESETS: Record<string, StudioLights> = {
+  studio: {
+    hemi: 1.1,
+    key: 1.6,
+    fill: 0.45,
+    rim: 0.55,
+    chin: 0.4,
+    keyColor: '#fff1dc',
+    fillColor: '#c8d6f0',
+    rimColor: '#ffe0c2',
+    chinColor: '#ffe8d2',
+    bg: '#2a2c33',
+  },
+  warm: {
+    hemi: 0.85,
+    key: 1.45,
+    fill: 0.35,
+    rim: 1.15,
+    chin: 0.55,
+    keyColor: '#ffd4a8',
+    fillColor: '#8fa8c8',
+    rimColor: '#ff8a4a',
+    chinColor: '#ffc090',
+    bg: '#1e1820',
+  },
+  cool: {
+    hemi: 0.7,
+    key: 1.2,
+    fill: 0.55,
+    rim: 1.35,
+    chin: 0.35,
+    keyColor: '#e8f0ff',
+    fillColor: '#6ec8ff',
+    rimColor: '#ff4fd8',
+    chinColor: '#a8d8ff',
+    bg: '#141820',
+  },
+  flat: {
+    hemi: 1.6,
+    key: 0.9,
+    fill: 0.85,
+    rim: 0.15,
+    chin: 0.25,
+    keyColor: '#ffffff',
+    fillColor: '#ffffff',
+    rimColor: '#ffffff',
+    chinColor: '#ffffff',
+    bg: '#2a2c33',
+  },
+};
+
+function hexColor(hex: string) {
+  return new THREE.Color(hex);
+}
+
 export class CharacterPreview {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -127,8 +196,12 @@ export class CharacterPreview {
   private compareOfficial = false;
   private officialId = OFFICIAL_SKINS[0].id;
   private customMap: THREE.Texture | null = null;
-  /** 底座转盘（截封面时隐藏） */
-  private stageProps: THREE.Object3D[] = [];
+  private hemi: THREE.HemisphereLight;
+  private key: THREE.DirectionalLight;
+  private fill: THREE.DirectionalLight;
+  private rim: THREE.DirectionalLight;
+  private chin: THREE.DirectionalLight;
+  private lights: StudioLights = { ...STUDIO_PRESETS.studio };
 
   constructor(private host: HTMLElement) {
     this.scene.background = new THREE.Color(0x2a2c33);
@@ -139,6 +212,7 @@ export class CharacterPreview {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(this.renderer.domElement);
 
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
@@ -153,36 +227,67 @@ export class CharacterPreview {
     });
     this.scene.add(this.gizmo.getHelper());
 
-    this.scene.add(new THREE.HemisphereLight(0xfff4e8, 0x4a5060, 1.1));
-    const key = new THREE.DirectionalLight(0xfff1dc, 1.6);
-    key.position.set(2.4, 4.2, 2.2);
-    key.castShadow = true;
-    this.scene.add(key);
+    this.hemi = new THREE.HemisphereLight(0xfff4e8, 0x4a5060, 1.1);
+    this.key = new THREE.DirectionalLight(0xfff1dc, 1.6);
+    this.key.position.set(2.4, 4.2, 2.2);
+    this.key.castShadow = true;
+    this.key.shadow.mapSize.set(2048, 2048);
+    this.key.shadow.bias = -0.0008;
+    this.key.shadow.normalBias = 0.02;
+    this.key.shadow.camera.near = 0.5;
+    this.key.shadow.camera.far = 14;
+    this.key.shadow.camera.left = -2.2;
+    this.key.shadow.camera.right = 2.2;
+    this.key.shadow.camera.top = 2.4;
+    this.key.shadow.camera.bottom = -0.4;
+    this.key.shadow.camera.updateProjectionMatrix();
+    this.fill = new THREE.DirectionalLight(0xc8d6f0, 0.45);
+    this.fill.position.set(-2.8, 2.2, 1.4);
+    this.rim = new THREE.DirectionalLight(0xffe0c2, 0.55);
+    this.rim.position.set(-1.2, 2.8, -3.2);
+    // 下巴底光：从前下方往上打，提亮下颌阴影
+    this.chin = new THREE.DirectionalLight(0xffe8d2, 0.4);
+    this.chin.position.set(0.15, -0.8, 1.6);
+    this.scene.add(this.hemi, this.key, this.fill, this.rim, this.chin);
+    this.applyStudioLights(this.lights);
 
-    const pedestalH = 0.07;
-    const pedestal = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.36, 0.4, pedestalH, 48),
-      new THREE.MeshLambertMaterial({ color: 0x3d4048 })
+    // 隐形接影面：不要转盘，只要影子能落在脚底（预览和封面都保留）
+    const shadowFloor = new THREE.Mesh(
+      new THREE.CircleGeometry(1.6, 48),
+      new THREE.ShadowMaterial({ opacity: 0.42 })
     );
-    pedestal.position.y = -pedestalH / 2;
-    pedestal.receiveShadow = true;
-    this.scene.add(pedestal);
-    const cap = new THREE.Mesh(
-      new THREE.CircleGeometry(0.36, 48),
-      new THREE.MeshLambertMaterial({ color: 0x555861 })
-    );
-    cap.rotation.x = -Math.PI / 2;
-    cap.position.y = 0;
-    cap.receiveShadow = true;
-    this.scene.add(cap);
-    const grid = new THREE.GridHelper(0.72, 4, 0x6a6e78, 0x4a4e56);
-    grid.position.y = 0.001;
-    this.scene.add(grid);
-    this.stageProps = [pedestal, cap, grid];
+    shadowFloor.name = 'shadowFloor';
+    shadowFloor.rotation.x = -Math.PI / 2;
+    shadowFloor.position.y = 0.001;
+    shadowFloor.receiveShadow = true;
+    this.scene.add(shadowFloor);
 
     this.resize();
     new ResizeObserver(() => this.resize()).observe(host);
     this.renderer.setAnimationLoop(() => this.tick());
+  }
+
+  getStudioLights(): StudioLights {
+    return { ...this.lights };
+  }
+
+  applyStudioLights(next: Partial<StudioLights>) {
+    this.lights = { ...this.lights, ...next };
+    const L = this.lights;
+    this.hemi.intensity = L.hemi;
+    this.key.intensity = L.key;
+    this.key.color.copy(hexColor(L.keyColor));
+    this.fill.intensity = L.fill;
+    this.fill.color.copy(hexColor(L.fillColor));
+    this.rim.intensity = L.rim;
+    this.rim.color.copy(hexColor(L.rimColor));
+    this.chin.intensity = L.chin;
+    this.chin.color.copy(hexColor(L.chinColor));
+    this.scene.background = hexColor(L.bg);
+  }
+
+  applyStudioPreset(id: keyof typeof STUDIO_PRESETS) {
+    this.applyStudioLights(STUDIO_PRESETS[id]);
   }
 
   async load() {
@@ -379,50 +484,104 @@ export class CharacterPreview {
   }
 
   resetCamera() {
-    this.camera.position.set(1.65, 0.9, 2.15);
-    this.orbit.target.set(0, 0.68, 0);
-    this.orbit.update();
+    this.setCameraPose({
+      position: [1.65, 0.9, 2.15],
+      target: [0, 0.68, 0],
+      fov: 40,
+    });
   }
 
+  getCameraPose(): ThumbCam {
+    const p = this.camera.position;
+    const t = this.orbit.target;
+    const r = (n: number) => Math.round(n * 1000) / 1000;
+    return {
+      position: [r(p.x), r(p.y), r(p.z)],
+      target: [r(t.x), r(t.y), r(t.z)],
+      fov: Math.round(this.camera.fov * 100) / 100,
+    };
+  }
+
+  setCameraPose(pose: ThumbCam | null | undefined) {
+    if (!pose?.position || !pose?.target) {
+      this.camera.fov = 40;
+      this.camera.updateProjectionMatrix();
+      this.camera.position.set(1.65, 0.9, 2.15);
+      this.orbit.target.set(0, 0.68, 0);
+      this.clearOrbitInertia();
+      this.orbit.update();
+      return;
+    }
+    const [px, py, pz] = pose.position;
+    const [tx, ty, tz] = pose.target;
+    if (![px, py, pz, tx, ty, tz].every((n) => Number.isFinite(n))) {
+      this.resetCamera();
+      return;
+    }
+    const fov = Number.isFinite(pose.fov) && pose.fov > 5 && pose.fov < 120 ? pose.fov : 40;
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
+    this.camera.position.set(px, py, pz);
+    this.orbit.target.set(tx, ty, tz);
+    this.camera.lookAt(this.orbit.target);
+    this.clearOrbitInertia();
+    this.orbit.update();
+    // 再清一次，避免 damping 把刚写好的位姿冲掉
+    this.clearOrbitInertia();
+  }
+
+  /** OrbitControls 内部惯性；不清理的话 set 完 position 会被下一帧 update 带偏 */
+  private clearOrbitInertia() {
+    const o = this.orbit as OrbitControls & {
+      _sphericalDelta?: { set: (r: number, phi: number, theta: number) => void };
+      _panOffset?: THREE.Vector3;
+      _scale?: number;
+    };
+    o._sphericalDelta?.set(0, 0, 0);
+    o._panOffset?.set(0, 0, 0);
+    if (typeof o._scale === 'number') o._scale = 1;
+  }
+
+  /**
+   * 用当前机位按 2:3 竖构图离屏渲染封面，保证和「还原机位」看到的角色大小/位置一致
+   * （不再从宽屏画布中心裁一刀，避免封面和预览对不上）。
+   */
   captureThumb(): string {
     const helper = this.gizmo.getHelper();
     const helperOn = helper.visible;
     const enabled = this.gizmo.enabled;
-    const stageVis = this.stageProps.map((o) => o.visible);
     this.gizmo.enabled = false;
     helper.visible = false;
-    for (const o of this.stageProps) o.visible = false;
+
+    this.plantOnGround();
+    this.clearOrbitInertia();
     this.orbit.update();
-    this.renderer.render(this.scene, this.camera);
-    const src = this.renderer.domElement;
+
     const w = 320;
     const h = 480; // 2:3 封面
-    const c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
-    const ctx = c.getContext('2d')!;
-    const sw = src.width;
-    const sh = src.height;
-    const destAspect = w / h;
-    const srcAspect = sw / Math.max(1, sh);
-    let sx = 0;
-    let sy = 0;
-    let cw = sw;
-    let ch = sh;
-    if (srcAspect > destAspect) {
-      cw = sh * destAspect;
-      sx = (sw - cw) / 2;
-    } else {
-      ch = sw / destAspect;
-      sy = (sh - ch) / 2;
-    }
-    ctx.drawImage(src, sx, sy, cw, ch, 0, 0, w, h);
+    const pose = this.getCameraPose();
+    const shot = this.camera.clone();
+    shot.aspect = w / h;
+    shot.fov = pose.fov;
+    shot.position.set(...pose.position);
+    shot.lookAt(pose.target[0], pose.target[1], pose.target[2]);
+    shot.updateProjectionMatrix();
+
+    const prevSize = new THREE.Vector2();
+    this.renderer.getSize(prevSize);
+    const prevRatio = this.renderer.getPixelRatio();
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(w, h, false);
+    this.renderer.render(this.scene, shot);
+    const dataUrl = this.renderer.domElement.toDataURL('image/png');
+    this.renderer.setPixelRatio(prevRatio);
+    this.renderer.setSize(prevSize.x, prevSize.y, false);
+    this.camera.aspect = Math.max(prevSize.x, 1) / Math.max(prevSize.y, 1);
+    this.camera.updateProjectionMatrix();
+
     this.gizmo.enabled = enabled;
     helper.visible = helperOn;
-    this.stageProps.forEach((o, i) => {
-      o.visible = stageVis[i] ?? true;
-    });
-    return c.toDataURL('image/png');
+    return dataUrl;
   }
 
   attachGizmo(obj: THREE.Object3D | null) {

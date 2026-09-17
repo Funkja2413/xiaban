@@ -113,9 +113,21 @@ export interface VariantDef {
   kitSkirtMap?: string | null;
   /** 角色规划缩略图，编辑器保存时写入 */
   thumb?: string | null;
+  /**
+   * 保存封面时的棚拍构图：相机位 + 注视点 + FOV。
+   * 点选该角色时还原，方便接着调；不进战场。
+   */
+  thumbCam?: ThumbCam | null;
   /** 周三起个别同事的主动。玩家槽不要挂。 */
   enemySkill?: EnemySkillId | null;
 }
+
+/** 编辑器封面构图（只影响预览/缩略图） */
+export type ThumbCam = {
+  position: [number, number, number];
+  target: [number, number, number];
+  fov: number;
+};
 
 export interface ColleagueDay {
   id: WeekdayId;
@@ -306,6 +318,7 @@ export function ensureRosterLooks(cat: ColleagueCatalog): boolean {
       kitSkirt: null,
       kitSkirtMap: null,
       thumb: null,
+      thumbCam: null,
       enemySkill: null,
     });
     added = true;
@@ -388,6 +401,7 @@ function stripOverlayHair(v: VariantDef) {
   v.kitSkirt ??= null;
   v.kitSkirtMap ??= null;
   v.thumb ??= null;
+  v.thumbCam ??= null;
   v.enemySkill = migrateEnemySkill(v.enemySkill);
 }
 

@@ -307,16 +307,20 @@
 
     /* 结算页：Figma 750×1334 全幅插画，按胜负+男女换图。 */
     #overlay[data-kind="lost"],
-    #overlay[data-kind="won"] {
+    #overlay[data-kind="won"],
+    #overlay[data-kind="finale"] {
       align-items: stretch; justify-content: stretch;
       container-type: size;
       overflow: hidden;
       background: #0a0c18;
     }
     #overlay[data-kind="lost"] #resultNext,
-    #overlay[data-kind="won"] #resultRetry { display: none; }
+    #overlay[data-kind="won"] #resultRetry,
+    #overlay[data-kind="finale"] #resultNext,
+    #overlay[data-kind="finale"] #resultRetry { display: none; }
     #overlay[data-kind="lost"] .resultArt,
-    #overlay[data-kind="won"] .resultArt {
+    #overlay[data-kind="won"] .resultArt,
+    #overlay[data-kind="finale"] .resultArt {
       display: block;
       inset: auto;
       top: 50%; left: 50%;
@@ -324,28 +328,36 @@
       transform: translate(-50%, -50%);
     }
     #overlay[data-kind="lost"] .resultVeil,
-    #overlay[data-kind="won"] .resultVeil {
+    #overlay[data-kind="won"] .resultVeil,
+    #overlay[data-kind="finale"] .resultVeil {
       display: block;
       background: #0a0c18;
       backdrop-filter: none;
     }
     #overlay[data-kind="lost"].is-play .resultVeil,
-    #overlay[data-kind="won"].is-play .resultVeil { animation: none; opacity: 1; }
+    #overlay[data-kind="won"].is-play .resultVeil,
+    #overlay[data-kind="finale"].is-play .resultVeil { animation: none; opacity: 1; }
     #overlay[data-kind="lost"] .resultStamp,
     #overlay[data-kind="lost"] .otitle,
     #overlay[data-kind="lost"] .osub,
     #overlay[data-kind="won"] .resultStamp,
     #overlay[data-kind="won"] .otitle,
-    #overlay[data-kind="won"] .osub { display: none; }
+    #overlay[data-kind="won"] .osub,
+    #overlay[data-kind="finale"] .resultStamp,
+    #overlay[data-kind="finale"] .otitle,
+    #overlay[data-kind="finale"] .osub { display: none; }
     #overlay[data-kind="lost"] .resultSheet,
-    #overlay[data-kind="won"] .resultSheet {
+    #overlay[data-kind="won"] .resultSheet,
+    #overlay[data-kind="finale"] .resultSheet {
       width: 100%; height: 100%;
       display: block; gap: 0;
     }
     #overlay[data-kind="lost"] .resultTaunt,
     #overlay[data-kind="lost"] .resultTip,
     #overlay[data-kind="won"] .resultTaunt,
-    #overlay[data-kind="won"] .resultTip {
+    #overlay[data-kind="won"] .resultTip,
+    #overlay[data-kind="finale"] .resultTaunt,
+    #overlay[data-kind="finale"] .resultTip {
       position: absolute;
       left: calc(100% * 70 / 750);
       right: calc(100% * 70 / 750);
@@ -358,20 +370,23 @@
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
     }
     #overlay[data-kind="lost"] .resultTaunt,
-    #overlay[data-kind="won"] .resultTaunt {
+    #overlay[data-kind="won"] .resultTaunt,
+    #overlay[data-kind="finale"] .resultTaunt {
       top: calc(100% * 338 / 1334);
       height: calc(100% * 32 / 1334);
       font-size: clamp(13px, 3.6cqi, 16px);
     }
     #overlay[data-kind="lost"] .resultTip,
-    #overlay[data-kind="won"] .resultTip {
+    #overlay[data-kind="won"] .resultTip,
+    #overlay[data-kind="finale"] .resultTip {
       top: calc(100% * 372 / 1334);
       height: calc(100% * 44 / 1334);
       font-size: clamp(12px, 3.3cqi, 15px);
       color: rgba(246, 238, 228, 0.5);
     }
     #overlay[data-kind="lost"] .resultActions,
-    #overlay[data-kind="won"] .resultActions {
+    #overlay[data-kind="won"] .resultActions,
+    #overlay[data-kind="finale"] .resultActions {
       position: absolute;
       left: 0; right: 0;
       top: calc(100% * 1184 / 1334);
@@ -379,15 +394,18 @@
       display: block;
     }
     #overlay[data-kind="lost"] .resultImgBtn,
-    #overlay[data-kind="won"] .resultImgBtn {
+    #overlay[data-kind="won"] .resultImgBtn,
+    #overlay[data-kind="finale"] .resultImgBtn {
       position: absolute;
       padding: 0; margin: 0; border: none; border-radius: 0;
       background: transparent; line-height: 0;
     }
     #overlay[data-kind="lost"] .resultImgBtn span,
-    #overlay[data-kind="won"] .resultImgBtn span { display: none; }
+    #overlay[data-kind="won"] .resultImgBtn span,
+    #overlay[data-kind="finale"] .resultImgBtn span { display: none; }
     #overlay[data-kind="lost"] .resultImgBtn img,
-    #overlay[data-kind="won"] .resultImgBtn img {
+    #overlay[data-kind="won"] .resultImgBtn img,
+    #overlay[data-kind="finale"] .resultImgBtn img {
       display: block; width: 100%; height: auto; pointer-events: none;
     }
     #overlay[data-kind="lost"] #resultHome,
@@ -418,11 +436,26 @@
       object-fit: cover;
     }
     #overlay[data-kind="lost"] .resultImgBtn:active,
-    #overlay[data-kind="won"] .resultImgBtn:active { filter: brightness(0.94); transform: scale(0.98); }
+    #overlay[data-kind="won"] .resultImgBtn:active,
+    #overlay[data-kind="finale"] .resultImgBtn:active { filter: brightness(0.94); transform: scale(0.98); }
     #overlay[data-kind="lost"] #resultHome:active,
-    #overlay[data-kind="won"] #resultHome:active { transform-origin: center; }
+    #overlay[data-kind="won"] #resultHome:active,
+    #overlay[data-kind="finale"] #resultHome:active { transform-origin: center; }
     #overlay[data-kind="lost"] #resultRetry:active,
     #overlay[data-kind="won"] #resultNext:active { transform-origin: center; }
+
+    /* 周五大结局：只留居中回主页，文案压在「周末快乐」标题下沿 */
+    #overlay[data-kind="finale"] #resultHome {
+      left: calc(100% * 273 / 750);
+      top: calc(100% * 5 / 77);
+      width: calc(100% * 203 / 750);
+    }
+    #overlay[data-kind="finale"] .resultTaunt {
+      top: calc(100% * 318 / 1334);
+    }
+    #overlay[data-kind="finale"] .resultTip {
+      top: calc(100% * 352 / 1334);
+    }
 
     #overlay .resultVeil,
     #overlay .resultArt,
@@ -453,7 +486,9 @@
     #overlay[data-kind="lost"].is-play .resultTaunt,
     #overlay[data-kind="lost"].is-play .resultTip,
     #overlay[data-kind="won"].is-play .resultTaunt,
-    #overlay[data-kind="won"].is-play .resultTip {
+    #overlay[data-kind="won"].is-play .resultTip,
+    #overlay[data-kind="finale"].is-play .resultTaunt,
+    #overlay[data-kind="finale"].is-play .resultTip {
       animation: resultVeilIn 0.32s ease-out 0.26s both;
     }
     #overlay.is-play .osub {

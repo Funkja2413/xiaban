@@ -67,7 +67,7 @@ export function skillNameOnDay(day: WeekdayId, id: SkillKey): string {
 /** 抽卡角标：跟当天皮名走 */
 export function skillGlyphOnDay(day: WeekdayId, id: SkillKey): string {
   if (id === 'keyboard') {
-    if (day === 'friday') return '🪃';
+    if (day === 'friday') return 'OKR';
     if (day === 'thursday') return '💻';
     if (day === 'wednesday') return '⌨️';
     return '🖱️';

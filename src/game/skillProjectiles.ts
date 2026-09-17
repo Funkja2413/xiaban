@@ -21,8 +21,8 @@ export const DEFAULT_THROW_LOOK: ThrowLook = {
   color: 0xffffff,
   glowStyle: 'soft',
   glowColor: 0xffd257,
-  glowOpacity: 0.32,
-  glowSize: 1.45,
+  glowOpacity: 0.55,
+  glowSize: 1.55,
 };
 
 export function throwSkinOnDay(day: WeekdayId): ThrowSkin {
@@ -44,17 +44,116 @@ function lambert(color: number) {
   return new THREE.MeshLambertMaterial({ color });
 }
 
-function glowMat(color: number, opacity: number, side: THREE.Side = THREE.DoubleSide) {
-  return new THREE.MeshBasicMaterial({
+/** 软边光斑贴图（径向渐隐），全场共用，比硬壳 mesh 好看且便宜 */
+function glowCanvas(size: number, draw: (ctx: CanvasRenderingContext2D, s: number) => void) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d')!, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
+let BLOB_TEX: THREE.CanvasTexture | null = null;
+let RING_TEX: THREE.CanvasTexture | null = null;
+let STREAK_TEX: THREE.CanvasTexture | null = null;
+
+function blobTex() {
+  if (BLOB_TEX) return BLOB_TEX;
+  BLOB_TEX = glowCanvas(128, (ctx, s) => {
+    const m = s / 2;
+    const g = ctx.createRadialGradient(m, m, 0, m, m, m);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.18, 'rgba(255,255,255,0.72)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.22)');
+    g.addColorStop(0.75, 'rgba(255,255,255,0.06)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+  });
+  return BLOB_TEX;
+}
+
+function ringTex() {
+  if (RING_TEX) return RING_TEX;
+  RING_TEX = glowCanvas(128, (ctx, s) => {
+    const m = s / 2;
+    const g = ctx.createRadialGradient(m, m, m * 0.28, m, m, m * 0.92);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.08)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.85)');
+    g.addColorStop(0.72, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+  });
+  return RING_TEX;
+}
+
+function streakTex() {
+  if (STREAK_TEX) return STREAK_TEX;
+  STREAK_TEX = glowCanvas(128, (ctx, s) => {
+    const m = s / 2;
+    const g = ctx.createRadialGradient(m, m, 0, m, m, m);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.2, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.1)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    // 压成细长光带
+    ctx.globalCompositeOperation = 'destination-in';
+    const band = ctx.createLinearGradient(0, m, s, m);
+    band.addColorStop(0, 'rgba(0,0,0,0)');
+    band.addColorStop(0.2, 'rgba(0,0,0,0.55)');
+    band.addColorStop(0.5, 'rgba(0,0,0,1)');
+    band.addColorStop(0.8, 'rgba(0,0,0,0.55)');
+    band.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 0, s, s);
+    const v = ctx.createLinearGradient(m, 0, m, s);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(0.35, 'rgba(0,0,0,1)');
+    v.addColorStop(0.65, 'rgba(0,0,0,1)');
+    v.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, s, s);
+  });
+  return STREAK_TEX;
+}
+
+function spriteMat(map: THREE.Texture, color: number, opacity: number) {
+  return new THREE.SpriteMaterial({
+    map,
     color,
     transparent: true,
     opacity,
     depthWrite: false,
-    depthTest: false,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
-    side,
   });
+}
+
+function meshGlowMat(map: THREE.Texture, color: number, opacity: number) {
+  return new THREE.MeshBasicMaterial({
+    map,
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    side: THREE.DoubleSide,
+  });
+}
+
+function markGlow(o: THREE.Object3D) {
+  o.userData.throwGlow = true;
+  o.frustumCulled = false;
+  o.renderOrder = 6;
+  o.castShadow = false;
+  return o;
 }
 
 /** 可飞出去的投掷物；按关换外形，再套本级样子。 */
@@ -70,6 +169,11 @@ function clearThrowGlow(root: THREE.Object3D) {
   if (!old) return;
   root.remove(old);
   old.traverse((o) => {
+    const sprite = o as THREE.Sprite;
+    if (sprite.isSprite) {
+      sprite.material.dispose();
+      return;
+    }
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     mesh.geometry?.dispose();
@@ -93,35 +197,39 @@ function buildThrowGlow(style: ThrowGlowStyle, look: ThrowLook): THREE.Object3D 
   const s = look.glowSize;
 
   if (style === 'soft') {
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 8), glowMat(c, op * 0.85, THREE.BackSide));
-    shell.scale.setScalar(s);
-    shell.userData.throwGlow = true;
-    g.add(shell);
+    const outer = markGlow(new THREE.Sprite(spriteMat(blobTex(), c, op * 0.75)));
+    outer.scale.setScalar(1.15 * s);
+    g.add(outer);
+    const inner = markGlow(new THREE.Sprite(spriteMat(blobTex(), 0xffffff, Math.min(1, op * 0.55))));
+    inner.scale.setScalar(0.42 * s);
+    g.add(inner);
   } else if (style === 'ring') {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.035, 6, 22), glowMat(c, Math.min(1, op * 1.15)));
-    ring.rotation.x = Math.PI / 2;
-    ring.scale.setScalar(s);
-    ring.userData.throwGlow = true;
-    g.add(ring);
+    const disc = markGlow(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), meshGlowMat(ringTex(), c, Math.min(1, op * 1.05))));
+    disc.rotation.x = -Math.PI / 2;
+    disc.scale.setScalar(1.35 * s);
+    g.add(disc);
+    const soft = markGlow(new THREE.Sprite(spriteMat(blobTex(), c, op * 0.28)));
+    soft.scale.setScalar(0.7 * s);
+    g.add(soft);
   } else if (style === 'core') {
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), glowMat(0xffffff, Math.min(1, op * 1.4)));
-    core.userData.throwGlow = true;
+    const halo = markGlow(new THREE.Sprite(spriteMat(blobTex(), c, op * 0.7)));
+    halo.scale.setScalar(1.25 * s);
+    g.add(halo);
+    const core = markGlow(new THREE.Sprite(spriteMat(blobTex(), 0xffffff, Math.min(1, op * 1.15))));
+    core.scale.setScalar(0.32 * s);
     g.add(core);
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), glowMat(c, op * 0.55, THREE.BackSide));
-    shell.scale.setScalar(s);
-    shell.userData.throwGlow = true;
-    g.add(shell);
   } else {
-    // flare：两片交叉薄片，比球壳更像能量闪
-    const w = 0.95 * s;
-    const h = 0.22 * s;
-    const a = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glowMat(c, op));
-    a.userData.throwGlow = true;
+    // flare：软边光带交叉，仍跟物体转
+    const w = 1.35 * s;
+    const h = 0.55 * s;
+    const a = markGlow(new THREE.Mesh(new THREE.PlaneGeometry(w, h), meshGlowMat(streakTex(), c, op)));
     g.add(a);
-    const b = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glowMat(c, op * 0.85));
+    const b = markGlow(new THREE.Mesh(new THREE.PlaneGeometry(w, h), meshGlowMat(streakTex(), c, op * 0.85)));
     b.rotation.y = Math.PI / 2;
-    b.userData.throwGlow = true;
     g.add(b);
+    const nub = markGlow(new THREE.Sprite(spriteMat(blobTex(), 0xffffff, Math.min(1, op * 0.5))));
+    nub.scale.setScalar(0.28 * s);
+    g.add(nub);
   }
 
   return g;
@@ -224,22 +332,81 @@ function makeLaptop() {
   return g;
 }
 
+function addBox(
+  parent: THREE.Group,
+  mat: THREE.Material,
+  w: number,
+  h: number,
+  d: number,
+  x: number,
+  y: number,
+  z: number
+) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  parent.add(m);
+  return m;
+}
+
+/** 块状字母：和办公低模一调，不引字体资源。 */
+function makeLetterO(mat: THREE.Material) {
+  const g = new THREE.Group();
+  const t = 0.07;
+  const d = 0.12;
+  const w = 0.34;
+  const h = 0.42;
+  addBox(g, mat, w, t, d, 0, h / 2 - t / 2, 0);
+  addBox(g, mat, w, t, d, 0, -h / 2 + t / 2, 0);
+  addBox(g, mat, t, h - 2 * t, d, -w / 2 + t / 2, 0, 0);
+  addBox(g, mat, t, h - 2 * t, d, w / 2 - t / 2, 0, 0);
+  return g;
+}
+
+function makeLetterK(mat: THREE.Material) {
+  const g = new THREE.Group();
+  const t = 0.07;
+  const d = 0.12;
+  const h = 0.42;
+  addBox(g, mat, t, h, d, -0.13, 0, 0);
+  const up = addBox(g, mat, 0.24, t, d, 0.02, 0.09, 0);
+  up.rotation.z = 0.58;
+  const dn = addBox(g, mat, 0.24, t, d, 0.02, -0.09, 0);
+  dn.rotation.z = -0.58;
+  return g;
+}
+
+function makeLetterR(mat: THREE.Material) {
+  const g = new THREE.Group();
+  const t = 0.07;
+  const d = 0.12;
+  const h = 0.42;
+  addBox(g, mat, t, h, d, -0.13, 0, 0);
+  addBox(g, mat, 0.2, t, d, 0.01, 0.175, 0);
+  addBox(g, mat, t, 0.15, d, 0.09, 0.105, 0);
+  addBox(g, mat, 0.2, t, d, 0.01, 0.04, 0);
+  const leg = addBox(g, mat, 0.22, t, d, 0.05, -0.11, 0);
+  leg.rotation.z = -0.7;
+  return g;
+}
+
+/** 周五 OKR回旋镖：O K R 三字排成可飞的道具。 */
 function makeBoomerang() {
   const g = new THREE.Group();
-  g.userData.skinScale = 1;
-  const mat = lambert(0xff8a4a);
-  const armA = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.06, 0.14), mat);
-  armA.position.set(0.16, 0, -0.12);
-  armA.rotation.y = 0.55;
-  armA.castShadow = true;
-  g.add(armA);
-  const armB = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.06, 0.14), mat);
-  armB.position.set(-0.16, 0, -0.12);
-  armB.rotation.y = -0.55;
-  armB.castShadow = true;
-  g.add(armB);
-  const joint = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.16), lambert(0xffc14d));
-  joint.position.set(0, 0, 0.02);
-  g.add(joint);
+  g.userData.skinScale = 1.05;
+  const oMat = lambert(0xff8a4a);
+  const kMat = lambert(0xffc14d);
+  const rMat = lambert(0xff6b3d);
+  const O = makeLetterO(oMat);
+  O.position.set(-0.4, 0, 0);
+  O.rotation.y = 0.28;
+  const K = makeLetterK(kMat);
+  K.position.set(0, 0, 0.02);
+  const R = makeLetterR(rMat);
+  R.position.set(0.4, 0, 0);
+  R.rotation.y = -0.28;
+  g.add(O, K, R);
+  const bar = addBox(g, lambert(0xd45c2a), 0.98, 0.045, 0.05, 0, -0.015, -0.03);
+  bar.castShadow = false;
   return g;
 }

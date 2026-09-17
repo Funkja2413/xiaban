@@ -128,22 +128,41 @@
       display: grid; grid-template-columns: 28px 1fr 28px 44px; align-items: center; gap: 8px;
       margin: 0; color: var(--text); font-weight: 700;
     }
-    .morph-row input[type="range"],
-    #morphBar input[type="range"] {
+    .morph-row input[type="range"] {
       width: 100%; height: 28px; margin: 0;
       accent-color: var(--accent);
       background: transparent;
     }
-    .morph-row .morphVal, #morphBar .morphVal {
+    .morph-row .morphVal {
       font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--accent);
     }
-    #morphBar {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%; padding: 8px 12px;
-      border-top: 1px solid var(--line); background: #1a1b20;
-      color: var(--text); font-weight: 700;
+    .light-card {
+      background: #1a1b20;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px 12px;
+      margin: 0 0 14px;
     }
-    #morphBar .morph-label { color: var(--accent); letter-spacing: 0.06em; flex-shrink: 0; }
+    .light-card h2 { margin: 0 0 4px; color: var(--text); letter-spacing: 0.06em; }
+    .light-card .hint { margin-bottom: 6px; }
+    .light-row {
+      display: grid; grid-template-columns: 52px 1fr 44px; align-items: center; gap: 8px;
+      margin: 4px 0; color: var(--muted);
+    }
+    .light-row input[type="range"] {
+      width: 100%; height: 22px; margin: 0; accent-color: var(--accent); background: transparent;
+    }
+    .light-row .v {
+      font-variant-numeric: tabular-nums; text-align: right; color: var(--accent); font-size: 11px;
+    }
+    .light-color {
+      display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 8px;
+      margin: 4px 0; color: var(--muted);
+    }
+    .light-color input[type="color"] {
+      width: 100%; height: 28px; padding: 0; border: 1px solid var(--line);
+      border-radius: 4px; background: #12131a; cursor: pointer;
+    }
     #loading {
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       background: var(--bg); z-index: 30; flex-direction: column; gap: 8px;
@@ -186,6 +205,28 @@
             <span class="bodyScaleVal">1.00</span>
           </div>
         </div>
+
+        <div class="light-card">
+          <h2>封面棚拍灯</h2>
+          <p class="hint">只影响编辑器预览和保存缩略图，不进战场。名册封面用保存时的截图。</p>
+          <div class="row" style="margin-bottom:6px">
+            <button type="button" id="lightPresetStudio" class="active">棚拍</button>
+            <button type="button" id="lightPresetWarm">暖轮廓</button>
+            <button type="button" id="lightPresetCool">冷霓虹</button>
+            <button type="button" id="lightPresetFlat">平光</button>
+          </div>
+          <div class="light-row"><span>环境</span><input type="range" id="lightHemi" min="0" max="2.5" step="0.05" value="1.1"><span class="v" data-for="lightHemi">1.10</span></div>
+          <div class="light-row"><span>主光</span><input type="range" id="lightKey" min="0" max="3" step="0.05" value="1.6"><span class="v" data-for="lightKey">1.60</span></div>
+          <div class="light-row"><span>补光</span><input type="range" id="lightFill" min="0" max="2" step="0.05" value="0.45"><span class="v" data-for="lightFill">0.45</span></div>
+          <div class="light-row"><span>轮廓</span><input type="range" id="lightRim" min="0" max="2.5" step="0.05" value="0.55"><span class="v" data-for="lightRim">0.55</span></div>
+          <div class="light-row"><span>底光</span><input type="range" id="lightChin" min="0" max="2" step="0.05" value="0.4"><span class="v" data-for="lightChin">0.40</span></div>
+          <div class="light-color"><span>主光色</span><input type="color" id="lightKeyColor" value="#fff1dc"></div>
+          <div class="light-color"><span>补光色</span><input type="color" id="lightFillColor" value="#c8d6f0"></div>
+          <div class="light-color"><span>轮廓色</span><input type="color" id="lightRimColor" value="#ffe0c2"></div>
+          <div class="light-color"><span>底光色</span><input type="color" id="lightChinColor" value="#ffe8d2"></div>
+          <div class="light-color"><span>背景</span><input type="color" id="lightBg" value="#2a2c33"></div>
+        </div>
+
         <h2>Kit（进战场）</h2>
         <p class="hint">三款头发、包内皮、胖瘦会随「保存到角色」写入 catalog，游戏读同一份。</p>
         <p class="hint" style="margin-top:6px">头发块（全关 = 图集短发）</p>
@@ -292,23 +333,11 @@ CC0 或自有版权。</p>
 
       <section id="center">
         <div id="viewport"></div>
-        <div id="morphBar" title="体型 morph：瘦 −1 … 0 … +1 胖；整体缩放相对 1.72m">
-          <span class="morph-label">体型</span>
-          <span>瘦</span>
-          <input type="range" class="bodyMorphRange" min="-1" max="1" step="0.02" value="0">
-          <span>胖</span>
-          <span class="morphVal">中</span>
-          <span class="morph-label">缩放</span>
-          <span>小</span>
-          <input type="range" class="bodyScaleRange" min="0.5" max="2" step="0.02" value="1">
-          <span>大</span>
-          <span class="bodyScaleVal">1.00</span>
-        </div>
         <div id="toolbar">
           <button type="button" id="btnIdle" class="active">idle</button>
           <button type="button" id="btnRun">run</button>
           <button type="button" id="btnJump">jump</button>
-          <button type="button" id="btnCam">重置相机</button>
+          <button type="button" id="btnCam" title="回到默认棚拍位；点选角色会恢复上次保存封面时的相机">重置相机</button>
           <span style="width:8px"></span>
           <button type="button" id="btnEditHat" class="active">头顶</button>
           <button type="button" id="btnEditHeld">右手</button>
@@ -332,24 +361,6 @@ CC0 或自有版权。</p>
           <button type="button" id="btnFromMon">从周一带入形象</button>
         </div>
 
-        <div class="morph-card">
-          <h2>体型 · 瘦 ↔ 胖</h2>
-          <p class="hint">和左侧同一根滑杆。保存后战场用同一套 fat/thin。</p>
-          <div class="morph-row">
-            <span>瘦</span>
-            <input type="range" class="bodyMorphRange" min="-1" max="1" step="0.02" value="0">
-            <span>胖</span>
-            <span class="morphVal">中</span>
-          </div>
-          <h2 style="margin-top:12px">角色缩放</h2>
-          <p class="hint">整个人的大小，不是配件 scl。1 = 约 1.72 米。主管默认 1.38。</p>
-          <div class="morph-row">
-            <span>小</span>
-            <input type="range" class="bodyScaleRange" min="0.5" max="2" step="0.02" value="1">
-            <span>大</span>
-            <span class="bodyScaleVal">1.00</span>
-          </div>
-        </div>
         <h2>当前配件变换</h2>
         <p class="hint" id="xformHint">正在调头顶（Head 局部）。拖滑杆即可。</p>
         <div class="sliders" id="xformSliders">
