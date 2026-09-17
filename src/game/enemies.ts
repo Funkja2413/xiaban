@@ -149,6 +149,9 @@ export class Enemies {
   private tmpHair = new THREE.Matrix4();
   private blobMesh: THREE.InstancedMesh;
   private lastPose: Uint8Array;
+  private lastSet: Uint8Array;
+  private hidden: Uint8Array;
+  private dirty = new Set<THREE.InstancedMesh>();
   private lastBody: THREE.Matrix4[];
   private tmpGlow = new THREE.Matrix4();
 
@@ -219,6 +222,8 @@ export class Enemies {
     this.hasteT = new Float32Array(capacity);
     this.hasteMul = new Float32Array(capacity);
     this.lastPose = new Uint8Array(capacity);
+    this.lastSet = new Uint8Array(capacity);
+    this.hidden = new Uint8Array(capacity);
     this.lastBody = Array.from({ length: capacity }, () => new THREE.Matrix4());
 
     const blobGeo = new THREE.CircleGeometry(0.34, 14);
@@ -1182,19 +1187,28 @@ export class Enemies {
     return this.gender[i] ? 1 : 0;
   }
 
+  private markDirty(mesh: THREE.InstancedMesh | null | undefined) {
+    if (mesh) this.dirty.add(mesh);
+  }
+
+  private zeroAt(mesh: THREE.InstancedMesh | null | undefined, i: number) {
+    if (!mesh) return;
+    this.tmpM2.makeScale(0, 0, 0);
+    mesh.setMatrixAt(i, this.tmpM2);
+    this.dirty.add(mesh);
+  }
+
   private hideInstance(i: number) {
-    this.tmpM.makeScale(0, 0, 0);
-    for (const mesh of this.poseSets.flat()) mesh.setMatrixAt(i, this.tmpM);
-    for (const mesh of this.hairMeshes) mesh?.setMatrixAt(i, this.tmpM);
-    for (const mesh of this.hatMeshes) mesh?.setMatrixAt(i, this.tmpM);
-    for (const mesh of this.heldMeshes) mesh?.setMatrixAt(i, this.tmpM);
-    for (const mesh of this.backMeshes) mesh?.setMatrixAt(i, this.tmpM);
-    for (const mesh of this.kitHairMeshes) mesh?.setMatrixAt(i, this.tmpM);
-    for (const set of this.skirtPoseSets) {
-      if (!set) continue;
-      for (const mesh of set) mesh.setMatrixAt(i, this.tmpM);
-    }
-    this.blobMesh.setMatrixAt(i, this.tmpM);
+    const s = this.lastSet[i];
+    const p = this.lastPose[i];
+    this.zeroAt(this.poseSets[s]?.[p], i);
+    this.zeroAt(this.skirtPoseSets[s]?.[p], i);
+    this.zeroAt(this.hairMeshes[s], i);
+    this.zeroAt(this.hatMeshes[s], i);
+    this.zeroAt(this.heldMeshes[s], i);
+    this.zeroAt(this.backMeshes[s], i);
+    this.zeroAt(this.kitHairMeshes[s], i);
+    this.zeroAt(this.blobMesh, i);
   }
 
   /** 开跑/停步阀值：体型越大巡航越慢，阀值按 scale 压低，避免大块头永远 idle 滑步。 */
@@ -1223,28 +1237,27 @@ export class Enemies {
     return 1 + (((Math.floor(this.walkClock[i] * walkN) % walkN) + walkN) % walkN);
   }
 
-  private setBodyPose(i: number, pose: number, matrix: THREE.Matrix4) {
-    this.tmpM2.makeScale(0, 0, 0);
+  private setBodyPose(i: number, pose: number, matrix: THREE.Matrix4, prevSet: number, prevPose: number) {
     const mineIdx = this.poseSetOf(i);
-    for (let s = 0; s < this.poseSets.length; s++) {
-      const poses = this.poseSets[s];
-      for (let p = 0; p < poses.length; p++) {
-        poses[p].setMatrixAt(i, s === mineIdx && p === pose ? matrix : this.tmpM2);
-      }
+    if (prevSet !== mineIdx || prevPose !== pose) {
+      this.zeroAt(this.poseSets[prevSet]?.[prevPose], i);
+      this.zeroAt(this.skirtPoseSets[prevSet]?.[prevPose], i);
     }
-    this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotHair, this.kit.headLocals, this.hairMeshes);
-    this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotHat, this.kit.headLocals, this.hatMeshes);
-    this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotHeld, this.kit.handLocals, this.heldMeshes);
-    this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotBack, this.kit.backLocals, this.backMeshes);
-    this.setAttachPose(i, pose, matrix, mineIdx, this.kit.slotKitHair, this.kit.headLocals, this.kitHairMeshes);
-    this.tmpM2.makeScale(0, 0, 0);
-    for (let s = 0; s < this.skirtPoseSets.length; s++) {
-      const poses = this.skirtPoseSets[s];
-      if (!poses) continue;
-      for (let p = 0; p < poses.length; p++) {
-        poses[p].setMatrixAt(i, s === mineIdx && p === pose ? matrix : this.tmpM2);
-      }
+    const cur = this.poseSets[mineIdx]?.[pose];
+    if (cur) {
+      cur.setMatrixAt(i, matrix);
+      this.markDirty(cur);
     }
+    const skirt = this.skirtPoseSets[mineIdx]?.[pose];
+    if (skirt) {
+      skirt.setMatrixAt(i, matrix);
+      this.markDirty(skirt);
+    }
+    this.setAttachPose(i, pose, matrix, mineIdx, prevSet, this.kit.slotHair, this.kit.headLocals, this.hairMeshes);
+    this.setAttachPose(i, pose, matrix, mineIdx, prevSet, this.kit.slotHat, this.kit.headLocals, this.hatMeshes);
+    this.setAttachPose(i, pose, matrix, mineIdx, prevSet, this.kit.slotHeld, this.kit.handLocals, this.heldMeshes);
+    this.setAttachPose(i, pose, matrix, mineIdx, prevSet, this.kit.slotBack, this.kit.backLocals, this.backMeshes);
+    this.setAttachPose(i, pose, matrix, mineIdx, prevSet, this.kit.slotKitHair, this.kit.headLocals, this.kitHairMeshes);
   }
 
   private setAttachPose(
@@ -1252,19 +1265,24 @@ export class Enemies {
     pose: number,
     body: THREE.Matrix4,
     mineIdx: number,
+    prevSet: number,
     slots: (typeof this.kit.slotHair)[number][],
     locals: THREE.Matrix4[],
     meshes: (THREE.InstancedMesh | null)[]
   ) {
-    this.tmpM2.makeScale(0, 0, 0);
     const item = slots[mineIdx];
     const bone = locals[pose] ?? locals[0];
-    if (item && bone) this.tmpHair.copy(body).multiply(bone).multiply(item.attach);
-    for (let s = 0; s < meshes.length; s++) {
-      const mesh = meshes[s];
-      if (!mesh) continue;
-      mesh.setMatrixAt(i, s === mineIdx && item && bone ? this.tmpHair : this.tmpM2);
+    if (prevSet !== mineIdx) this.zeroAt(meshes[prevSet], i);
+    const mesh = meshes[mineIdx];
+    if (!mesh) return;
+    if (item && bone) {
+      this.tmpHair.copy(body).multiply(bone).multiply(item.attach);
+      mesh.setMatrixAt(i, this.tmpHair);
+    } else {
+      this.tmpM2.makeScale(0, 0, 0);
+      mesh.setMatrixAt(i, this.tmpM2);
     }
+    this.markDirty(mesh);
   }
 
   syncVisuals(time: number) {
@@ -1276,19 +1294,27 @@ export class Enemies {
     const axis = this.tmpAxis;
     const dt = this.visTime > 0 ? Math.min(0.05, Math.max(0, time - this.visTime)) : 1 / 60;
     this.visTime = time;
+    this.dirty.clear();
 
     for (let i = 0; i < this.cap; i++) {
       const s = this.state[i];
       if (s === EState.Ragdoll) {
         const rag = this.rags[i];
         if (rag) this.ragFactory.sync(rag);
-        this.hideInstance(i);
+        if (!this.hidden[i]) {
+          this.hideInstance(i);
+          this.hidden[i] = 1;
+        }
         continue;
       }
       if (s === EState.Inactive) {
-        this.hideInstance(i);
+        if (!this.hidden[i]) {
+          this.hideInstance(i);
+          this.hidden[i] = 1;
+        }
         continue;
       }
+      this.hidden[i] = 0;
 
       const body = this.bodies[i]!;
       const t = body.translation();
@@ -1355,23 +1381,19 @@ export class Enemies {
         sy = scale * (dip + (1 - dip) * u * u);
       }
       m.compose(pos, q, this.tmpS.set(scale, sy, scale));
+      const prevPose = this.lastPose[i];
+      const prevSet = this.lastSet[i];
+      this.setBodyPose(i, pose, m, prevSet, prevPose);
       this.lastPose[i] = pose;
+      this.lastSet[i] = this.poseSetOf(i);
       this.lastBody[i]!.copy(m);
-      this.setBodyPose(i, pose, m);
 
       m2.compose(this.tmpV.set(t.x, 0.02, t.z), this.tmpQL.identity(), this.tmpS.set(scale * 1.2, 1, scale * 1.2));
       this.blobMesh.setMatrixAt(i, m2);
+      this.dirty.add(this.blobMesh);
 
     }
-    for (const mesh of this.poseSets.flat()) mesh.instanceMatrix.needsUpdate = true;
-    for (const mesh of [...this.hairMeshes, ...this.hatMeshes, ...this.heldMeshes, ...this.backMeshes, ...this.kitHairMeshes]) {
-      if (mesh) mesh.instanceMatrix.needsUpdate = true;
-    }
-    for (const set of this.skirtPoseSets) {
-      if (!set) continue;
-      for (const mesh of set) mesh.instanceMatrix.needsUpdate = true;
-    }
-    this.blobMesh.instanceMatrix.needsUpdate = true;
+    for (const mesh of this.dirty) mesh.instanceMatrix.needsUpdate = true;
   }
 
   get channelingCount() {

@@ -375,24 +375,57 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
   const interceptorSkin = skinForSlot(catalog, 'interceptor');
   const slotIds = [...BATTLE_SLOT_IDS];
 
-  const loadMap = async (skin: { file: string; flipY: boolean }) => {
-    const map = await texLoader.loadAsync(assetUrl(skin.file));
-    map.colorSpace = THREE.SRGBColorSpace;
-    map.flipY = false;
+  const capMap = (map: THREE.Texture, max = 1024) => {
+    const img = map.image as { width?: number; height?: number } | undefined;
+    const w = img?.width ?? 0;
+    const h = img?.height ?? 0;
+    if (w > max || h > max) {
+      const scale = max / Math.max(w, h);
+      const cw = Math.max(1, Math.round(w * scale));
+      const ch = Math.max(1, Math.round(h * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      if (ctx && img) ctx.drawImage(img as CanvasImageSource, 0, 0, cw, ch);
+      map.image = canvas;
+    }
+    map.generateMipmaps = true;
+    map.minFilter = THREE.LinearMipmapLinearFilter;
     map.needsUpdate = true;
     return map;
   };
 
-  const loadKitMap = async (file: string, repeat: boolean) => {
-    const map = await texLoader.loadAsync(assetUrl(file));
-    map.colorSpace = THREE.SRGBColorSpace;
-    map.flipY = false;
-    if (repeat) {
-      map.wrapS = THREE.RepeatWrapping;
-      map.wrapT = THREE.RepeatWrapping;
+  const loadMap = async (skin: { file: string; flipY: boolean }) => {
+    try {
+      const map = await texLoader.loadAsync(assetUrl(skin.file));
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.flipY = false;
+      return capMap(map);
+    } catch (err) {
+      console.warn('皮肤未加载', skin.file, err);
+      const map = await texLoader.loadAsync(assetUrl('/models/kit/textures/survivorMaleB.png'));
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.flipY = false;
+      return capMap(map);
     }
-    map.needsUpdate = true;
-    return map;
+  };
+
+  const loadKitMap = async (file: string, repeat: boolean, fallback = file) => {
+    try {
+      const map = await texLoader.loadAsync(assetUrl(file));
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.flipY = false;
+      if (repeat) {
+        map.wrapS = THREE.RepeatWrapping;
+        map.wrapT = THREE.RepeatWrapping;
+      }
+      return capMap(map);
+    } catch (err) {
+      if (fallback !== file) return loadKitMap(fallback, repeat, fallback);
+      console.warn('配件贴图未加载', file, err);
+      throw err;
+    }
   };
 
   const hairFileOf = (id: string) => kitHairMapForSlot(catalogForPlayerSlot(catalog, id), id) || KIT_HAIR_ALBEDO;
@@ -412,8 +445,8 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
       loadMap(interceptorSkin),
       fbxLoader.loadAsync(assetUrl(catalog.base.idle)).catch(() => null),
       fbxLoader.loadAsync(assetUrl(catalog.base.run)).catch(() => null),
-      Promise.all(hairMapFiles.map((f) => loadKitMap(f, true))),
-      Promise.all(skirtMapFiles.map((f) => loadKitMap(f, false))),
+      Promise.all(hairMapFiles.map((f) => loadKitMap(f, true, KIT_HAIR_ALBEDO))),
+      Promise.all(skirtMapFiles.map((f) => loadKitMap(f, false, KIT_SKIRT_ALBEDO))),
     ]);
 
   const hairMaps = new Map(hairMapFiles.map((f, i) => [f, hairTexList[i]!]));
