@@ -375,20 +375,23 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
   const interceptorSkin = skinForSlot(catalog, 'interceptor');
   const slotIds = [...BATTLE_SLOT_IDS];
 
-  const capMap = (map: THREE.Texture, max = 1024) => {
-    const img = map.image as { width?: number; height?: number } | undefined;
-    const w = img?.width ?? 0;
-    const h = img?.height ?? 0;
-    if (w > max || h > max) {
-      const scale = max / Math.max(w, h);
-      const cw = Math.max(1, Math.round(w * scale));
-      const ch = Math.max(1, Math.round(h * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = cw;
-      canvas.height = ch;
-      const ctx = canvas.getContext('2d');
-      if (ctx && img) ctx.drawImage(img as CanvasImageSource, 0, 0, cw, ch);
-      map.image = canvas;
+  const capMap = async (map: THREE.Texture, max = 1024) => {
+    const img = map.image as ImageBitmap | HTMLImageElement | undefined;
+    const w = img && 'width' in img ? img.width : 0;
+    const h = img && 'height' in img ? img.height : 0;
+    if (img && (w > max || h > max) && typeof createImageBitmap === 'function') {
+      try {
+        const scale = max / Math.max(w, h);
+        const bitmap = await createImageBitmap(img, {
+          resizeWidth: Math.max(1, Math.round(w * scale)),
+          resizeHeight: Math.max(1, Math.round(h * scale)),
+          resizeQuality: 'high',
+        });
+        if ('close' in img && typeof img.close === 'function') img.close();
+        map.image = bitmap;
+      } catch {
+        /* 缩放失败就用原图，避免 canvas 贴图在 WebGPU 上变成白模 */
+      }
     }
     map.generateMipmaps = true;
     map.minFilter = THREE.LinearMipmapLinearFilter;
