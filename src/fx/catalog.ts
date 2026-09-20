@@ -12,19 +12,6 @@ export const DASH_KEYS = ['none', ...LINE_IDS] as const;
 export type SkillKey = 'decoy' | 'keyboard' | 'coffee';
 export type Lv = 1 | 2 | 3;
 
-export interface ShockRingFx {
-  color: number;
-  opacity: number;
-  duration: number;
-  startScale: number;
-  grow: number;
-  y: number;
-  yStep: number;
-  recycle: boolean;
-  additive: boolean;
-  fillOpacity: number;
-}
-
 export interface PaperBurstFx {
   count: number;
   heavyCount: number;
@@ -70,9 +57,6 @@ export interface OvertimeFx {
   outline: boolean;
   outlineColor: number;
 }
-
-/** @deprecated 用 OvertimeFx */
-export type HeadFx = OvertimeFx;
 
 export const CROWD_ACTOR_IDS = ['colleague-a-m', 'colleague-a-f', 'heavy', 'interceptor'] as const;
 export type CrowdActorId = (typeof CROWD_ACTOR_IDS)[number];
@@ -437,7 +421,6 @@ export interface PlayerRingFx {
 export interface PoolsFx {
   paper: number;
   mist: number;
-  ring: number;
   trail: number;
 }
 
@@ -535,19 +518,6 @@ function levels<T>(lv1: T, lv2: DeepPartial<T> = {}, lv3: DeepPartial<T> = {}): 
     3: mergeDeep(mergeDeep(clone(lv1), lv2), lv3),
   };
 }
-
-const RING: ShockRingFx = {
-  color: 0xffe7a0,
-  opacity: 0.7,
-  duration: 0.28,
-  startScale: 0.4,
-  grow: 2.4,
-  y: 0.06,
-  yStep: 0,
-  recycle: true,
-  additive: true,
-  fillOpacity: 0.22,
-};
 
 const PAPER: PaperBurstFx = {
   count: 8,
@@ -705,10 +675,11 @@ function reactOf(kind: DashReactKind, over: Partial<DashReact> = {}): DashReact 
 }
 
 function crowdReact(normal: DashReact, heavy: DashReact): CrowdReact {
+  const block = normal.kind === 'knock' || normal.kind === 'shove';
   return {
     'colleague-a-m': clone(normal),
     'colleague-a-f': clone(normal),
-    interceptor: clone(normal),
+    interceptor: clone(block ? reactOf('none', { bounce: true }) : normal),
     heavy: clone(heavy),
   };
 }
@@ -721,22 +692,32 @@ export function dashImpulseOf(pack: DashLevelFx, react: DashReact): number {
 
 export function dashReactOf(pack: DashLevelFx, id: CrowdActorId): DashReact {
   const r = pack.react?.[id];
-  if (r?.kind) return { ...dashReactDefaults(r.kind), ...r };
-  if (pack.phantom) {
-    return reactOf('stun', { stun: id === 'heavy' ? pack.phantom.heavyStun : pack.phantom.stun, bounce: false });
+  let resolved: DashReact;
+  if (r?.kind) {
+    resolved = { ...dashReactDefaults(r.kind), ...r };
+  } else if (pack.phantom) {
+    resolved = reactOf('stun', { stun: id === 'heavy' ? pack.phantom.heavyStun : pack.phantom.stun, bounce: false });
+  } else if (pack.slump) {
+    if (id === 'heavy' && !pack.slump.heavy) resolved = reactOf('none', { bounce: true });
+    else {
+      resolved = reactOf('slow', {
+        impulse: pack.hit.impulse,
+        duration: pack.slump.duration,
+        factor: pack.slump.factor,
+        radius: pack.slump.radius,
+        bounce: false,
+      });
+    }
+  } else if (id === 'heavy') {
+    resolved = reactOf('none', { bounce: true });
+  } else {
+    resolved = reactOf('knock', { impulse: pack.hit.impulse });
   }
-  if (pack.slump) {
-    if (id === 'heavy' && !pack.slump.heavy) return reactOf('none', { bounce: true });
-    return reactOf('slow', {
-      impulse: pack.hit.impulse,
-      duration: pack.slump.duration,
-      factor: pack.slump.factor,
-      radius: pack.slump.radius,
-      bounce: false,
-    });
+  // 前台拦路虎：冲撞打不开，玩家弹开；减速/幻影晕仍生效
+  if (id === 'interceptor' && (resolved.kind === 'knock' || resolved.kind === 'shove')) {
+    return reactOf('none', { bounce: true });
   }
-  if (id === 'heavy') return reactOf('none', { bounce: true });
-  return reactOf('knock', { impulse: pack.hit.impulse });
+  return resolved;
 }
 
 function dash(hit: DashHitLevel, color: number, extra: DeepPartial<DashLevelFx> = {}): DashLevelFx {
@@ -866,7 +847,7 @@ function ringFromUnknown(raw: unknown): PlayerRingFx {
 export const DEFAULT_FX: FxCatalog = {
   version: 3,
   common: {
-    pools: { paper: 64, mist: 56, ring: 10, trail: 16 },
+    pools: { paper: 64, mist: 56, trail: 16 },
     hitObject: clone(HIT_OBJECT),
   },
   actors: {
@@ -1455,7 +1436,6 @@ function migrateLegacy(raw: Record<string, unknown>): Partial<FxCatalog> {
       pools: {
         paper: Number(paper.pool) || Number(isRec(common.pools) ? common.pools.paper : 64) || 64,
         mist: Number(mist.pool) || Number(isRec(common.pools) ? common.pools.mist : 56) || 56,
-        ring: Number(isRec(common.pools) ? common.pools.ring : 10) || 10,
         trail: Number(trailSrc.pool) || Number(isRec(common.pools) ? common.pools.trail : 16) || 16,
       },
       hitObject: isRec(obj.paper) || isRec(obj.mist) ? hitFromLegacy(isRec(obj.paper) ? obj.paper : {}, isRec(obj.mist) ? obj.mist : {}) : clone(HIT_OBJECT),

@@ -163,7 +163,7 @@ function corridorWidth(
 
 /**
  * 按当前墙/桌布局自动铺刷新点：
- * A 铺在可走区域、离玩家稍远；C 站必经窄口；F 蹲在通往电梯的后半段。
+ * A/C 铺在可走区域、离玩家稍远；F 蹲在通往电梯的后半段。
  */
 export function layoutSpawns(
   map: MapBounds,
@@ -268,8 +268,19 @@ export function layoutSpawns(
       const open = n4(blocked, nx, nz, cx, cz);
       const dPlayer = distP[i] * CELL;
 
-      if (dPlayer > 7) {
-        aCands.push({ x, z, score: dPlayer + (open === 4 ? 4 : 0) + Math.random() });
+      if (dPlayer > 5.5) {
+        const nearRoute = distP[i] + distE[i] <= pathSlack + 14;
+        const along = shortest > 0 ? distP[i] / shortest : 0;
+        // 铺在起点→电梯主路上，不要堆到最远端死胡同
+        aCands.push({
+          x,
+          z,
+          score:
+            (nearRoute ? 100 : 6) +
+            (1 - Math.abs(along - 0.55)) * 22 +
+            (open === 4 ? 2 : 0) +
+            Math.random(),
+        });
       }
 
       const onPath = distP[i] + distE[i] <= pathSlack;
@@ -304,20 +315,29 @@ export function layoutSpawns(
     );
   }
 
-  let enemySpawns = pickSpaced(aCands, 22, 3.2);
-  if (enemySpawns.length < 8) {
-    const loose: { x: number; z: number; score: number }[] = [];
-    for (let cz = 1; cz < nz - 1; cz++) {
-      for (let cx = 1; cx < nx - 1; cx++) {
-        const i = cz * nx + cx;
-        if (blocked[i] || distP[i] < 0) continue;
-        const dPlayer = distP[i] * CELL;
-        if (dPlayer < 4) continue;
-        const { x, z } = world(cx, cz);
-        loose.push({ x, z, score: dPlayer });
-      }
+  const aRoute = aCands.filter((c) => c.score >= 100);
+  const aElse = aCands.filter((c) => c.score < 100);
+  const enemySpawns: Xz[] = [];
+  const bins = 6;
+  const perBin = 6;
+  for (let b = 0; b < bins; b++) {
+    const lo = b / bins;
+    const hi = (b + 1) / bins;
+    const band = aRoute.filter((c) => {
+      const [cx, cz] = cellOf(c.x, c.z);
+      const along = shortest > 0 ? distP[cz * nx + cx] / shortest : 0;
+      return along >= lo && along < hi + (b === bins - 1 ? 0.02 : 0);
+    });
+    for (const p of pickSpaced(band, perBin, 1.75)) {
+      if (enemySpawns.some((q) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < 1.75 * 1.75)) continue;
+      enemySpawns.push(p);
     }
-    enemySpawns = pickSpaced(loose, 22, 2.4);
+  }
+  if (enemySpawns.length < 24) {
+    for (const p of pickSpaced(aElse, 32 - enemySpawns.length, 2.0)) {
+      if (enemySpawns.some((q) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < 2.0 * 2.0)) continue;
+      enemySpawns.push(p);
+    }
   }
 
   return {

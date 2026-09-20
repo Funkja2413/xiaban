@@ -10,6 +10,7 @@ import {
   deskBox,
   containFaceSize,
   hexToInt,
+  isInVoid,
   isRectVoid,
   outlineSkirts,
   perimeterSolids,
@@ -192,7 +193,7 @@ export class Level {
   readonly elevatorPoint: { x: number; z: number };
   elevator!: ElevatorRig;
 
-  private obstacles: { minX: number; minZ: number; maxX: number; maxZ: number; h: number; tall?: boolean }[] = [];
+  private obstacles: { minX: number; minZ: number; maxX: number; maxZ: number; h: number; tall?: boolean; nav?: boolean }[] = [];
   private deskRects: { minX: number; minZ: number; maxX: number; maxZ: number }[] = [];
   private woodMat!: THREE.Material;
   private wallMap!: THREE.Texture;
@@ -254,7 +255,13 @@ export class Level {
     await this.buildFloor();
     this.dressProps();
     const auto = layoutSpawns(this.map, this.obstacles, this.playerStart, this.elevatorPoint, this.def.voids);
-    this.enemySpawns = this.def.enemySpawns.length ? this.def.enemySpawns.map((s) => ({ x: s.x, z: s.z })) : auto.enemySpawns;
+    const onFloor = (x: number, z: number) =>
+      x > this.map.minX + 0.4 && x < this.map.maxX - 0.4 &&
+      z > this.map.minZ + 0.4 && z < this.map.maxZ - 0.4 &&
+      !isInVoid(x, z, this.def.voids, 0.5);
+    const authored = this.def.enemySpawns.filter((s) => onFloor(s.x, s.z));
+    this.enemySpawns = (authored.length ? authored : auto.enemySpawns.filter((s) => onFloor(s.x, s.z)))
+      .map((s) => ({ x: s.x, z: s.z }));
     this.heavyAnchors = this.def.heavyAnchors.length
       ? this.def.heavyAnchors.map((s) => ({ x: s.x, z: s.z }))
       : auto.heavyAnchors;
@@ -317,9 +324,9 @@ export class Level {
 
   private addObstacle(
     minX: number, minZ: number, maxX: number, maxZ: number,
-    h: number, opts: { tall?: boolean } = {}
+    h: number, opts: { tall?: boolean; nav?: boolean } = {}
   ) {
-    this.obstacles.push({ minX, minZ, maxX, maxZ, h, tall: opts.tall });
+    this.obstacles.push({ minX, minZ, maxX, maxZ, h, tall: opts.tall, nav: opts.nav });
   }
 
   private wallMaterial(hex: string, mapPath?: string) {
@@ -502,7 +509,10 @@ export class Level {
         placeOfficeProp(g, p.kind, tone, p, this.def.atmosphere.sky ?? 'day');
         if (spec?.block) {
           const box = yawedAabb(p.x, p.z, spec.block.hx, spec.block.hz, yaw);
-          this.addObstacle(box.minX, box.minZ, box.maxX, box.maxZ, spec.block.h);
+          // 危险物可被清掉：只留物理，不挖寻路洞，避免空气墙
+          this.addObstacle(box.minX, box.minZ, box.maxX, box.maxZ, spec.block.h, {
+            nav: spec.move !== 'hazard',
+          });
         }
       }
       this.group.add(g);
@@ -537,14 +547,12 @@ export class Level {
   }
 
   applyToFlow(flow: FlowField) {
+    // 寻路 = 地图 − 不可移动实体。可推/椅子/危险区不挖洞。
     for (const o of this.obstacles) {
-      flow.blockRect(o.minX, o.minZ, o.maxX, o.maxZ);
+      if (o.nav === false) continue;
+      flow.blockRect(o.minX, o.minZ, o.maxX, o.maxZ, 0.1);
     }
     const shaped = (this.def.voids ?? []).filter((v) => !isRectVoid(v));
-    if (shaped.length) flow.blockIf((x, z) => shaped.some((v) => pointInVoid(x, z, v, 0.18)));
-  }
-
-  get bulletBlockers() {
-    return this.obstacles.filter((o) => o.h >= 1.0);
+    if (shaped.length) flow.blockIf((x, z) => shaped.some((v) => pointInVoid(x, z, v, 0.1)));
   }
 }

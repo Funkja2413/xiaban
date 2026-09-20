@@ -8,7 +8,6 @@ export class Hud {
   private toastEl = document.getElementById('toast')!;
   private dashBtn = document.getElementById('dashBtn')!;
   private elevEl = document.getElementById('elevTimer')!;
-  private overlayEl = document.getElementById('overlay')!;
   private readyEl = document.getElementById('readyCount')!;
 
   private frames = 0;
@@ -98,12 +97,6 @@ export class Hud {
     }
     this.readyEl.classList.remove('go', 'tap');
     this.readyEl.textContent = String(value);
-  }
-
-  showOverlay(title: string, sub: string) {
-    this.overlayEl.style.display = 'flex';
-    this.overlayEl.querySelector('.otitle')!.textContent = title;
-    this.overlayEl.querySelector('.osub')!.innerHTML = sub;
   }
 
   /** 当前预计下班时间文本（结算用） */

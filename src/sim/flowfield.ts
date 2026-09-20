@@ -82,10 +82,20 @@ export class FlowField {
 
   /** 从目标位置（玩家）重建流场 */
   rebuild(targetX: number, targetZ: number) {
-    const snap = this.snapWalkable(targetX, targetZ, 32);
+    let snap = this.snapWalkable(targetX, targetZ, 32);
     if (snap) {
       this.bfsFrom(snap.cx, snap.cz);
-      const reach = this.countReached();
+      let reach = this.countReached();
+      let walkable = 0;
+      for (let i = 0; i < this.blocked.length; i++) if (!this.blocked[i]) walkable++;
+      if (reach < Math.min(200, walkable * 0.25)) {
+        const wider = this.snapLargestNear(targetX, targetZ, 10, reach);
+        if (wider) {
+          snap = wider;
+          this.bfsFrom(snap.cx, snap.cz);
+          reach = this.countReached();
+        }
+      }
       const sameFloor = !this.hasLastGood || reach >= this.lastReach - 8;
       if (sameFloor) {
         this.lastGoodCx = snap.cx;
@@ -127,6 +137,65 @@ export class FlowField {
       this.hasLastGood = true;
     }
     this.fillDirs();
+  }
+
+  /** 出生点贴墙时可能吸进小岛：在附近改贴最大连通块 */
+  private snapLargestNear(x: number, z: number, maxR: number, minReach: number): { cx: number; cz: number } | null {
+    const { nx, nz, blocked } = this;
+    const n = nx * nz;
+    const label = new Int32Array(n).fill(-1);
+    const sizes: number[] = [];
+    const q = this.queue;
+    let id = 0;
+    for (let i = 0; i < n; i++) {
+      if (blocked[i] || label[i] !== -1) continue;
+      let head = 0;
+      let tail = 0;
+      q[tail++] = i;
+      label[i] = id;
+      let size = 0;
+      while (head < tail) {
+        const cur = q[head++];
+        size++;
+        const cx = cur % nx;
+        const cz = (cur / nx) | 0;
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dz === 0) continue;
+            const nxx = cx + dx;
+            const nzz = cz + dz;
+            if (nxx < 0 || nzz < 0 || nxx >= nx || nzz >= nz) continue;
+            const ni = nzz * nx + nxx;
+            if (blocked[ni] || label[ni] !== -1) continue;
+            if (dx !== 0 && dz !== 0 && (blocked[cz * nx + nxx] || blocked[nzz * nx + cx])) continue;
+            label[ni] = id;
+            q[tail++] = ni;
+          }
+        }
+      }
+      sizes[id++] = size;
+    }
+    const [tx, tz] = this.cellOf(x, z);
+    let best: { cx: number; cz: number } | null = null;
+    let bestScore = minReach;
+    for (let r = 0; r <= maxR; r++) {
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (r > 0 && Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+          const cx = tx + dx;
+          const cz = tz + dz;
+          if (cx < 0 || cz < 0 || cx >= nx || cz >= nz) continue;
+          const i = this.idx(cx, cz);
+          if (blocked[i] || label[i] < 0) continue;
+          const size = sizes[label[i]] ?? 0;
+          if (size > bestScore) {
+            bestScore = size;
+            best = { cx, cz };
+          }
+        }
+      }
+    }
+    return best;
   }
 
   private snapWalkable(x: number, z: number, maxR: number): { cx: number; cz: number } | null {
@@ -198,6 +267,10 @@ export class FlowField {
         let best = cost[i];
         let bx = 0;
         let bz = 0;
+        let bestAlign = -2;
+        const gx = this.lastGoodCx - cx;
+        const gz = this.lastGoodCz - cz;
+        const gLen = Math.hypot(gx, gz) || 1;
         for (let dz = -1; dz <= 1; dz++) {
           for (let dx = -1; dx <= 1; dx++) {
             if (dx === 0 && dz === 0) continue;
@@ -207,12 +280,43 @@ export class FlowField {
             const ni = nzz * nx + nxx;
             if (blocked[ni] || cost[ni] === -1) continue;
             if (dx !== 0 && dz !== 0 && (blocked[cz * nx + nxx] || blocked[nzz * nx + cx])) continue;
-            if (cost[ni] < best) {
+            if (cost[ni] >= cost[i]) continue;
+            const step = Math.hypot(dx, dz);
+            const align = (dx * gx + dz * gz) / (step * gLen);
+            if (cost[ni] < best || (cost[ni] === best && align > bestAlign + 1e-4)) {
               best = cost[ni];
+              bestAlign = align;
               bx = dx;
               bz = dz;
             }
           }
+        }
+        if (bx === 0 && bz === 0) {
+          let alt = 1e9;
+          let altAlign = -2;
+          for (let dz = -1; dz <= 1; dz++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dz === 0) continue;
+              const nxx = cx + dx;
+              const nzz = cz + dz;
+              if (nxx < 0 || nzz < 0 || nxx >= nx || nzz >= nz) continue;
+              const ni = nzz * nx + nxx;
+              if (blocked[ni] || cost[ni] < 0) continue;
+              if (dx !== 0 && dz !== 0 && (blocked[cz * nx + nxx] || blocked[nzz * nx + cx])) continue;
+              const step = Math.hypot(dx, dz);
+              const align = (dx * gx + dz * gz) / (step * gLen);
+              if (cost[ni] < alt || (cost[ni] === alt && align > altAlign + 1e-4)) {
+                alt = cost[ni];
+                altAlign = align;
+                bx = dx;
+                bz = dz;
+              }
+            }
+          }
+        }
+        if (bx === 0 && bz === 0) {
+          bx = Math.sign(gx);
+          bz = Math.sign(gz);
         }
         const len = Math.hypot(bx, bz) || 1;
         dirX[i] = bx / len;
@@ -256,9 +360,13 @@ export class FlowField {
     return a + b;
   }
 
+  private centerOfCell(cx: number, cz: number): { x: number; z: number } {
+    return { x: this.ox + (cx + 0.5) * this.cell, z: this.oz + (cz + 0.5) * this.cell };
+  }
+
   private cellCenter(x: number, z: number): { x: number; z: number } {
     const [cx, cz] = this.cellOf(x, z);
-    return { x: this.ox + (cx + 0.5) * this.cell, z: this.oz + (cz + 0.5) * this.cell };
+    return this.centerOfCell(cx, cz);
   }
 
   /**
@@ -315,6 +423,27 @@ export class FlowField {
     return fallback;
   }
 
+  /** 两点之间格子都可走：开阔地直奔，不要绕流场 */
+  clearShot(x: number, z: number, tx: number, tz: number): boolean {
+    const dx = tx - x;
+    const dz = tz - z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.35) return true;
+    const steps = Math.max(2, Math.ceil(d / (this.cell * 0.55)));
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      if (this.isBlockedAt(x + dx * t, z + dz * t)) return false;
+    }
+    return true;
+  }
+
+  /** 最近可走格中心；用来把卡进障碍/空洞边的人拔出来 */
+  nearestWalkable(x: number, z: number, maxR = 10): { x: number; z: number } | null {
+    const snap = this.snapWalkable(x, z, maxR);
+    if (!snap) return null;
+    return this.centerOfCell(snap.cx, snap.cz);
+  }
+
   /** 取某世界坐标的追踪方向（单位向量，写入 out）；落在阻挡格时回退到相邻可走格 */
   sample(x: number, z: number, out: { x: number; z: number }) {
     const [cx, cz] = this.cellOf(x, z);
@@ -322,19 +451,28 @@ export class FlowField {
     out.x = this.dirX[i];
     out.z = this.dirZ[i];
     if (out.x !== 0 || out.z !== 0) return;
-    for (let dz = -1; dz <= 1; dz++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dz === 0) continue;
-        const nxx = cx + dx;
-        const nzz = cz + dz;
-        if (nxx < 0 || nzz < 0 || nxx >= this.nx || nzz >= this.nz) continue;
-        const ni = nzz * this.nx + nxx;
-        if (this.dirX[ni] !== 0 || this.dirZ[ni] !== 0) {
-          out.x = this.dirX[ni];
-          out.z = this.dirZ[ni];
-          return;
+    let best = 1e9;
+    let bx = 0;
+    let bz = 0;
+    for (let r = 1; r <= 4; r++) {
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+          const nxx = cx + dx;
+          const nzz = cz + dz;
+          if (nxx < 0 || nzz < 0 || nxx >= this.nx || nzz >= this.nz) continue;
+          const ni = nzz * this.nx + nxx;
+          if (this.dirX[ni] === 0 && this.dirZ[ni] === 0) continue;
+          const c = this.cost[ni];
+          if (c < 0 || c >= best) continue;
+          best = c;
+          bx = this.dirX[ni];
+          bz = this.dirZ[ni];
         }
       }
+      if (bx !== 0 || bz !== 0) break;
     }
+    out.x = bx;
+    out.z = bz;
   }
 }

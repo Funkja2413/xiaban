@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { FlowField } from '../sim/flowfield';
-import { ENEMY_CUT_GROUPS, ENEMY_GROUPS } from '../sim/physics';
+import { ENEMY_CUT_GROUPS } from '../sim/physics';
 import { RagdollFactory, type RagdollHandle } from './ragdoll';
 import type { HumanoidKit } from './humanoid';
 import { enemySkillFx, type CrowdActorId, type EnemySkillId } from '../fx/catalog';
@@ -18,8 +18,8 @@ export enum EState { Inactive = 0, Chase = 1, Knock = 2, Ragdoll = 3, Getup = 4 
 
 /**
  * 敌人体系：每种类型只违反基础规则（被玩家吸引、可被撞开）中的一条。
- * A 普通同事：成群追玩家，可撞飞。
- * C 重量级：用身体封必经窄口，冲刺撞不动；被引出来后全场最快，回家也快，把门重新封上。
+ * A 普通同事：成群全场追玩家，可撞飞。
+ * C 重量级：同样全场追；冲刺撞不动，身板更沉。
  * F 拦截者：抢占玩家通往电梯的前方卡口，不追当前位置。
  */
 export enum EType { A = 0, C = 1, F = 2 }
@@ -30,20 +30,18 @@ const COLOR_F = 0xe05252;
 
 const RAGDOLL_IMPULSE = 400;
 const STAGGER_TO_RAGDOLL = 3;
-/** 被引开后最远离开卡口这么远，再远就强制回家 */
-const HEAVY_LEASH = 12;
-/** 要贴到卡口这么近才勾引成功 */
-const HEAVY_ZONE = 3;
-/** 玩家离开这片区域才脱仇（按离锚点，不按有没有跑过主管） */
-const HEAVY_LOSE = 14;
-/** 主管归位后站岗半径 */
-const HEAVY_POST = 0.55;
-/** 被勾引后加快，但仍慢于玩家，避免两个人夹死 */
-const HEAVY_SPRINT = 3.6;
-/** F 认为已经抢到拦截点 */
-const INTERCEPT_ARRIVE = 1.25;
-/** 已占点时，玩家挤过来才上前堵 */
-const INTERCEPT_ENGAGE = 1.45;
+/** 主管追人时略快于普通同事，仍慢于冲刺玩家 */
+const HEAVY_CHASE = 2.55;
+/** 前台拦路虎：玩家进自己卡口这么近才离开岗位去堵 */
+const INTERCEPT_ZONE = 4.2;
+/** 玩家离开自己卡口这么远就回家 */
+const INTERCEPT_LOSE = 10;
+/** 追出去最远，再远强制回自己的卡口 */
+const INTERCEPT_LEASH = 8;
+/** 回到卡口这么近开始巡逻 */
+const INTERCEPT_POST = 0.85;
+/** 无事时在卡口附近走的半径 */
+const INTERCEPT_PATROL = 1.55;
 /** 贴身交任务半径 */
 const CHANNEL_RANGE = 1.15;
 /** 本局第一次交任务（让几乎每局都会加时） */
@@ -95,6 +93,8 @@ export class Enemies {
   private rushing: Uint8Array;
   /** 1 = 主管已被勾引，正在压向玩家 */
   private aggro: Uint8Array;
+  /** 卡住计时：速度过低且离目标还远就侧步解卡 */
+  private stuckT: Float32Array;
   private aimPX = 0;
   private aimPZ = 0;
   /** 平滑后的水平速度，主管转向只看这个，不跟物理抖动 */
@@ -200,6 +200,7 @@ export class Enemies {
     this.posting = new Uint8Array(capacity);
     this.rushing = new Uint8Array(capacity);
     this.aggro = new Uint8Array(capacity);
+    this.stuckT = new Float32Array(capacity);
     this.faceX = new Float32Array(capacity);
     this.faceZ = new Float32Array(capacity);
     this.anchorX = new Float32Array(capacity);
@@ -336,10 +337,6 @@ export class Enemies {
     return 0.66 * this.scaleOf(i);
   }
 
-  private hitRadiusOf(i: number) {
-    return 0.42 * this.scaleOf(i);
-  }
-
   private colorOf(i: number) {
     const t = this.types[i];
     if (t === EType.C) return COLOR_C;
@@ -348,6 +345,11 @@ export class Enemies {
   }
 
   spawn(x: number, z: number, type: EType = EType.A): boolean {
+    const safe = this.flow.nearestWalkable(x, z);
+    if (safe) {
+      x = safe.x;
+      z = safe.z;
+    }
     for (let i = 0; i < this.cap; i++) {
       if (this.state[i] !== EState.Inactive) continue;
       this.state[i] = EState.Chase;
@@ -359,6 +361,7 @@ export class Enemies {
       this.posting[i] = 0;
       this.rushing[i] = 0;
       this.aggro[i] = 0;
+      this.stuckT[i] = 0;
       this.faceX[i] = 0;
       this.faceZ[i] = 0;
       this.stagger[i] = 0;
@@ -367,7 +370,7 @@ export class Enemies {
       this.anchorZ[i] = z;
       this.gender[i] = type === EType.A && Math.random() < 0.5 ? 1 : 0;
       this.speed[i] =
-        type === EType.C ? 1.0 + Math.random() * 0.2 :
+        type === EType.C ? HEAVY_CHASE + Math.random() * 0.25 :
         type === EType.F ? 3.2 + Math.random() * 0.3 :
         2.1 + Math.random() * 0.9;
       this.slowT[i] = 0;
@@ -395,36 +398,14 @@ export class Enemies {
     );
     const desc = heavy
       ? RAPIER.ColliderDesc.capsule(0.35 * s, 0.3 * s).setMass(220).setFriction(0.3)
-      : RAPIER.ColliderDesc.capsule(0.35 * s, 0.3 * s).setMass(60).setFriction(0.2);
-    desc.setCollisionGroups(this.types[i] === EType.F ? ENEMY_CUT_GROUPS : ENEMY_GROUPS);
+      : RAPIER.ColliderDesc.capsule(0.35 * s, 0.3 * s)
+          .setMass(this.types[i] === EType.F ? 200 : 60)
+          .setFriction(this.types[i] === EType.F ? 0.3 : 0.2);
+    desc.setCollisionGroups(ENEMY_CUT_GROUPS);
     this.world.createCollider(desc, body);
     this.bodies[i] = body;
     this.posX[i] = x;
     this.posZ[i] = z;
-  }
-
-  raycastSegment(x0: number, z0: number, x1: number, z1: number): number {
-    const dx = x1 - x0;
-    const dz = z1 - z0;
-    const lenSq = dx * dx + dz * dz || 1e-9;
-    let best = -1;
-    let bestT = Infinity;
-    for (let i = 0; i < this.cap; i++) {
-      const s = this.state[i];
-      if (s !== EState.Chase && s !== EState.Knock && s !== EState.Getup) continue;
-      const R = this.hitRadiusOf(i);
-      const px = this.posX[i] - x0;
-      const pz = this.posZ[i] - z0;
-      let t = (px * dx + pz * dz) / lenSq;
-      t = Math.max(0, Math.min(1, t));
-      const ex = px - dx * t;
-      const ez = pz - dz * t;
-      if (ex * ex + ez * ez < R * R && t < bestT) {
-        best = i;
-        bestT = t;
-      }
-    }
-    return best;
   }
 
   hit(i: number, dirX: number, dirZ: number, impulse: number, opts: HitOpts = {}) {
@@ -438,7 +419,7 @@ export class Enemies {
 
     const heavy = this.types[i] === EType.C;
     if (heavy) {
-      // 重量级：只有高速椅子能砸翻；其余攻击只能微推 + 打断读条
+      // 重量级：只有高速椅子 / 蛮力冲能砸翻；冲刺和道具只能微推 + 打断读条
       if (opts.force && opts.heavyOk) {
         this.toRagdoll(i, dirX, dirZ, Math.min(impulse, 900), opts.cannon === true);
         return;
@@ -735,6 +716,7 @@ export class Enemies {
       this.posting[i] = 0;
       this.rushing[i] = 0;
       this.aggro[i] = 0;
+      this.stuckT[i] = 0;
       this.clearChannel(i);
       this.faceX[i] = 0;
       this.faceZ[i] = 0;
@@ -848,10 +830,6 @@ export class Enemies {
     const z = this.posZ[i];
     const type = this.types[i];
 
-    if (!this.forceChase && type === EType.C) {
-      this.steerHeavy(i, px, pz, outDir);
-      return;
-    }
     if (!this.forceChase && type === EType.F) {
       this.steerInterceptor(i, px, pz, distSq, outDir);
       return;
@@ -859,14 +837,7 @@ export class Enemies {
 
     this.posting[i] = 0;
     this.rushing[i] = 0;
-    if (distSq < 2.8 * 2.8) {
-      const d = Math.sqrt(distSq) || 1;
-      outDir.x = (px - x) / d;
-      outDir.z = (pz - z) / d;
-      return;
-    }
-    this.flow.sample(x, z, outDir);
-    if (outDir.x === 0 && outDir.z === 0) this.toward(px, pz, x, z, outDir);
+    this.goTo(px, pz, x, z, outDir);
   }
 
   private toward(tx: number, tz: number, x: number, z: number, outDir: { x: number; z: number }) {
@@ -877,64 +848,71 @@ export class Enemies {
     outDir.z = dz / d;
   }
 
-  private steerHeavy(i: number, px: number, pz: number, outDir: { x: number; z: number }) {
-    const x = this.posX[i];
-    const z = this.posZ[i];
-    const ax = this.anchorX[i] - x;
-    const az = this.anchorZ[i] - z;
-    const aDist = Math.hypot(ax, az);
-    const pFromAnchor = Math.hypot(px - this.anchorX[i], pz - this.anchorZ[i]);
-
-    this.rushing[i] = 0;
-    if (aDist > HEAVY_LEASH) {
-      this.aggro[i] = 0;
-      this.posting[i] = 0;
-      this.toward(this.anchorX[i], this.anchorZ[i], x, z, outDir);
+  private goTo(tx: number, tz: number, x: number, z: number, outDir: { x: number; z: number }) {
+    if (this.flow.isBlockedAt(x, z)) {
+      const safe = this.flow.nearestWalkable(x, z);
+      if (safe) {
+        const sx = safe.x - x;
+        const sz = safe.z - z;
+        if (sx * sx + sz * sz > 0.16) {
+          this.toward(safe.x, safe.z, x, z, outDir);
+          return;
+        }
+        x = safe.x;
+        z = safe.z;
+      }
+    }
+    const dSq = (tx - x) * (tx - x) + (tz - z) * (tz - z);
+    if (dSq < 2.8 * 2.8 && this.flow.clearShot(x, z, tx, tz)) {
+      this.toward(tx, tz, x, z, outDir);
       return;
     }
-    if (pFromAnchor < HEAVY_ZONE) this.aggro[i] = 1;
-    else if (pFromAnchor > HEAVY_LOSE) this.aggro[i] = 0;
-    if (this.aggro[i] && aDist < HEAVY_LEASH - 0.25) {
-      this.posting[i] = 0;
-      this.toward(px, pz, x, z, outDir);
-      return;
+    this.flow.sample(x, z, outDir);
+    if (outDir.x === 0 && outDir.z === 0 && this.flow.clearShot(x, z, tx, tz)) {
+      this.toward(tx, tz, x, z, outDir);
     }
-    if (aDist > HEAVY_POST) {
-      this.posting[i] = 0;
-      this.toward(this.anchorX[i], this.anchorZ[i], x, z, outDir);
-      return;
-    }
-    this.posting[i] = 1;
-    outDir.x = 0;
-    outDir.z = 0;
   }
 
-  private steerInterceptor(i: number, px: number, pz: number, distSq: number, outDir: { x: number; z: number }) {
+  private steerInterceptor(i: number, px: number, pz: number, _distSq: number, outDir: { x: number; z: number }) {
     const x = this.posX[i];
     const z = this.posZ[i];
-    const dI = Math.hypot(this.interceptAtX - x, this.interceptAtZ - z);
-    const dP = Math.sqrt(distSq);
+    const ax = this.anchorX[i];
+    const az = this.anchorZ[i];
+    const aDist = Math.hypot(ax - x, az - z);
+    const pFromPost = Math.hypot(px - ax, pz - az);
 
-    if (dI <= INTERCEPT_ARRIVE) {
-      this.rushing[i] = 0;
-      if (dP < INTERCEPT_ENGAGE) {
-        this.posting[i] = 0;
-        this.toward(px, pz, x, z, outDir);
-      } else {
-        this.posting[i] = 1;
-        outDir.x = 0;
-        outDir.z = 0;
-      }
+    if (aDist > INTERCEPT_LEASH) {
+      this.aggro[i] = 0;
+      this.posting[i] = 0;
+      this.rushing[i] = 1;
+      this.goTo(ax, az, x, z, outDir);
+      return;
+    }
+    if (pFromPost < INTERCEPT_ZONE) this.aggro[i] = 1;
+    else if (pFromPost > INTERCEPT_LOSE) this.aggro[i] = 0;
+
+    if (this.aggro[i] && aDist < INTERCEPT_LEASH - 0.35) {
+      this.posting[i] = 0;
+      this.rushing[i] = 1;
+      this.goTo(px, pz, x, z, outDir);
       return;
     }
 
-    this.rushing[i] = 1;
-    this.posting[i] = 0;
-    if (this.interceptFlow) {
-      this.interceptFlow.sample(x, z, outDir);
-      if (outDir.x !== 0 || outDir.z !== 0) return;
+    this.rushing[i] = 0;
+    if (aDist > INTERCEPT_POST) {
+      this.posting[i] = 0;
+      this.goTo(ax, az, x, z, outDir);
+      return;
     }
-    this.toward(this.interceptAtX, this.interceptAtZ, x, z, outDir);
+    this.posting[i] = 0;
+    const t = this.walkClock[i] + i * 1.7;
+    this.toward(
+      ax + Math.cos(t * 0.65) * INTERCEPT_PATROL,
+      az + Math.sin(t * 0.5 + i) * INTERCEPT_PATROL,
+      x,
+      z,
+      outDir
+    );
   }
 
   private tickSkill(i: number, dt: number, px: number, pz: number, target: SkillTarget) {
@@ -1050,8 +1028,7 @@ export class Enemies {
     const dirX = this.flowDir.x;
     const dirZ = this.flowDir.z;
     const ti0 = this.types[i];
-    const heavySprint = ti0 === EType.C && !this.posting[i];
-    let sp = this.burstT[i] > 0 ? enemySkillFx('cut-in').speed ?? 7.2 : heavySprint ? HEAVY_SPRINT : this.speed[i];
+    let sp = this.burstT[i] > 0 ? enemySkillFx('cut-in').speed ?? 7.2 : this.speed[i];
     if (this.hasteT[i] > 0) {
       this.hasteT[i] -= dt;
       sp *= this.hasteMul[i] > 0 ? this.hasteMul[i] : 1;
@@ -1080,13 +1057,12 @@ export class Enemies {
         for (const j of arr) {
           if (j === i) continue;
           const tj = this.types[j];
-          const jRush = tj === EType.F && this.rushing[j];
-          // 拦截者逆行人潮：自己不让路；占点后也不被同事挤开
-          if (ti === EType.F && (tj === EType.A || tj === EType.C)) continue;
+          // 同事互相穿过，只挡玩家；拦路虎彼此仍让一下，避免叠在同一卡口
+          if (!(ti === EType.F && tj === EType.F)) continue;
           const ddx = x - this.posX[j];
           const ddz = z - this.posZ[j];
           const dSq = ddx * ddx + ddz * ddz;
-          const rj = tj === EType.C ? 0.52 : tj === EType.F && !jRush ? 0.42 : 0.30;
+          const rj = tj === EType.C ? 0.52 : 0.30;
           const rsum = (ri + rj) * 0.88;
           if (dSq > (rsum * 1.55) * (rsum * 1.55) || dSq < 1e-6) continue;
           const d = Math.sqrt(dSq);
@@ -1097,19 +1073,17 @@ export class Enemies {
           let push = (rsum * 1.15 - d) / d;
           if (ti === EType.C) push *= 0.2;
           if (tj === EType.C) push *= 1.55;
-          if (ti === EType.A && tj === EType.F) push *= jRush ? 1.75 : 1.4;
           avX += ddx * push;
           avZ += ddz * push;
           const side = ddx * relVz - ddz * relVx;
           const s = side >= 0 ? 1 : -1;
-          const sideW = ti === EType.A && tj === EType.F ? 0.7 : 0.35;
-          avX += (-ddz / d) * s * push * sideW;
-          avZ += (ddx / d) * s * push * sideW;
+          avX += (-ddz / d) * s * push * 0.35;
+          avZ += (ddx / d) * s * push * 0.35;
         }
       }
     }
 
-    const commit = iRush || heavySprint ? 0.94 : 0.78;
+    const commit = iRush ? 0.94 : 0.78;
     const avoid = iRush ? 0.7 : 2.1;
     let vx = prefX * commit + avX * avoid;
     let vz = prefZ * commit + avZ * avoid;
@@ -1122,6 +1096,20 @@ export class Enemies {
     if (vLen > vMax) {
       vx = (vx / vLen) * vMax;
       vz = (vz / vLen) * vMax;
+    }
+    if (!this.posting[i] && distSq > 2.2 * 2.2 && vLen < sp * 0.18) {
+      this.stuckT[i] += dt;
+      if (this.stuckT[i] > 0.4) {
+        const side = this.stuckT[i] * 7.1;
+        const nx = -dirZ;
+        const nz = dirX;
+        const nLen = Math.hypot(nx, nz) || 1;
+        vx += (nx / nLen) * sp * (Math.sin(side) >= 0 ? 1 : -1);
+        vz += (nz / nLen) * sp * (Math.sin(side) >= 0 ? 1 : -1);
+        if (this.stuckT[i] > 1.1) this.stuckT[i] = 0;
+      }
+    } else {
+      this.stuckT[i] = 0;
     }
     const body = this.bodies[i]!;
     const cur = body.linvel();

@@ -128,7 +128,7 @@
       font-size: 11px; font-weight: 600; letter-spacing: 1px;
     }
 
-    /* 不暂停抽卡：记分牌正下方三选一；倒计时在预计下班描边环上 */
+    /* 不暂停抽卡：记分牌正下方三选一；倒计时在预计下班描边环上；点击即选 */
     #cardRow { pointer-events: auto; width: 100%; padding: 0 8px; }
     #cardList { display: flex; gap: 6px; justify-content: center; }
     .card {
@@ -138,6 +138,7 @@
       display: flex; flex-direction: column; align-items: center; gap: 1px;
       backdrop-filter: blur(6px);
       animation: cardIn 0.22s ease-out backwards;
+      cursor: pointer;
     }
     .card:nth-child(2) { animation-delay: 0.05s; }
     .card:nth-child(3) { animation-delay: 0.1s; }
@@ -1002,7 +1003,7 @@
     }
     #avatarGo:active:not(:disabled) { filter: brightness(0.94); transform: translateX(-50%) scale(0.97); }
     #avatarGo:disabled { opacity: 0.38; }
-    #loading { background: #121018; justify-content: center; }
+    #loading { background: #07060c; justify-content: flex-end; padding-bottom: 52px; }
 
     .artSlot {
       position: relative;
@@ -1021,7 +1022,10 @@
     }
     #loadingBg {
       position: absolute; inset: 0; border: none; border-radius: 0; z-index: 0;
+      background: #07060c;
     }
+    #loadingBg img { object-fit: cover; object-position: center 42%; }
+    #loadingHero.empty, #loadingLogo.empty { display: none; }
     #loadingHero {
       position: relative; z-index: 1; width: min(220px, 58%); aspect-ratio: 1;
       margin-bottom: 8px;
@@ -1186,7 +1190,7 @@
   <button id="resetBtn">返回</button>
 
   <div id="loading">
-    <div id="loadingBg" class="artSlot empty" data-label="Loading 背景"><img alt="" src="%BASE_URL%ui/loading-bg.png" /></div>
+    <div id="loadingBg" class="artSlot empty" data-label="Loading 背景"><img alt="" src="%BASE_URL%ui/loading-bg.jpg" /></div>
     <div id="loadingHero" class="artSlot empty" data-label="角色图"><img alt="" src="%BASE_URL%ui/loading-hero.png" /></div>
     <div id="loadingLogo" class="artSlot empty" data-label="Logo"><img alt="" src="%BASE_URL%ui/logo.png" /></div>
     <div class="title">我要下班！</div>

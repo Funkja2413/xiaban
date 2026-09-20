@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { commonFx, crowdFx, dashFx, mergeHazardFx, overtimePopText, playerRingFx, type ChannelLookFx, type HaloBandFx, type HitFx, type ImpactMistFx, type OvertimeFx, type PaperBurstFx, type ShockRingFx, type SlowLookFx, type StunElem, type StunLookFx, type TrailFx } from '../fx/catalog';
+import { commonFx, crowdFx, dashFx, mergeHazardFx, overtimePopText, playerRingFx, type ChannelLookFx, type HaloBandFx, type HitFx, type ImpactMistFx, type OvertimeFx, type PaperBurstFx, type SlowLookFx, type StunElem, type StunLookFx, type TrailFx } from '../fx/catalog';
 import type { ChairStyle, DeskDef, DeskKit, DeskTop, FurnitureTone, PlantKit, PropDef, PropKind, SkyKind } from '../levels';
 import { deskYaw, ELEVATOR_PAD_ALONG, ELEVATOR_PAD_FAR, ELEVATOR_PAD_NEAR, hexToInt, migrateHexColor } from '../levels';
 import { channelStampMap } from './channelStamp';
@@ -137,12 +137,6 @@ function clothFor(color?: string) {
   return isTinted(color) ? tex.cloth() : tex.fabric();
 }
 
-const HAIR = [0x2c1a10, 0x5c4033, 0x8b5a2b, 0xc4a574, 0x3d2914, 0x6d4c41];
-
-export function hairColor(i: number) {
-  return HAIR[i % HAIR.length];
-}
-
 /** 玩家：衬衫贴图 + 四肢，材质独立以便虚化 */
 export function buildPlayerFigure(): { group: THREE.Group; ghostMats: THREE.MeshPhongMaterial[] } {
   const group = new THREE.Group();
@@ -228,7 +222,6 @@ export function deskAO(parent: THREE.Group, w: number, d: number) {
   parent.add(mesh);
 }
 
-/** 命中冲击环 */
 function fxBlend(additive: boolean) {
   return additive ? THREE.AdditiveBlending : THREE.NormalBlending;
 }
@@ -415,136 +408,6 @@ export class PlayerHalo {
   }
 }
 
-export class ShockRing {
-  private rings: {
-    mesh: THREE.Mesh;
-    fill: THREE.Mesh;
-    life: number;
-    max: number;
-    startScale: number;
-    grow: number;
-    opacity: number;
-    fillOpacity: number;
-  }[] = [];
-  private geo = new THREE.RingGeometry(0.35, 0.55, 24);
-  private fillGeo = new THREE.CircleGeometry(0.52, 24);
-  private pool: { ring: THREE.Mesh; fill: THREE.Mesh }[] = [];
-
-  constructor(private scene: THREE.Scene) {
-    this.geo.rotateX(-Math.PI / 2);
-    this.fillGeo.rotateX(-Math.PI / 2);
-    const n = Math.max(1, commonFx().pools.ring | 0);
-    const cfg = {
-      color: 0xffe7a0,
-      opacity: 0.7,
-      additive: true,
-      fillOpacity: 0.12,
-    };
-    for (let i = 0; i < n; i++) {
-      const mat = new THREE.MeshBasicMaterial({
-        color: cfg.color,
-        transparent: true,
-        opacity: cfg.opacity,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        blending: fxBlend(cfg.additive),
-      });
-      const fillMat = new THREE.MeshBasicMaterial({
-        color: cfg.color,
-        transparent: true,
-        opacity: cfg.fillOpacity,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        blending: fxBlend(cfg.additive),
-      });
-      const ring = new THREE.Mesh(this.geo, mat);
-      const fill = new THREE.Mesh(this.fillGeo, fillMat);
-      ring.visible = false;
-      fill.visible = false;
-      ring.castShadow = false;
-      fill.castShadow = false;
-      scene.add(ring);
-      scene.add(fill);
-      this.pool.push({ ring, fill });
-    }
-  }
-
-  spawn(x: number, z: number, look?: ShockRingFx, color?: number) {
-    const cfg = look ?? {
-      color: 0xffe7a0,
-      opacity: 0.7,
-      duration: 0.28,
-      startScale: 0.4,
-      grow: 2.4,
-      y: 0.06,
-      yStep: 0,
-      recycle: true,
-      additive: true,
-      fillOpacity: 0.12,
-    };
-    const slot = this.pool.find((p) => !p.ring.visible) ?? (cfg.recycle ? this.pool[0] : undefined);
-    if (!slot) return;
-    const idx = Math.max(0, this.pool.indexOf(slot));
-    const hex = color ?? cfg.color;
-    const y = cfg.y + idx * cfg.yStep;
-    const ringMat = slot.ring.material as THREE.MeshBasicMaterial;
-    const fillMat = slot.fill.material as THREE.MeshBasicMaterial;
-    ringMat.color.setHex(hex);
-    fillMat.color.setHex(hex);
-    ringMat.opacity = cfg.opacity;
-    fillMat.opacity = cfg.fillOpacity;
-    ringMat.blending = fxBlend(cfg.additive);
-    fillMat.blending = fxBlend(cfg.additive);
-    slot.ring.position.set(x, y, z);
-    slot.fill.position.set(x, y - 0.002, z);
-    slot.ring.scale.setScalar(cfg.startScale);
-    // 心盘只留脚底闪光，不跟着环扩成一团体积光
-    slot.fill.scale.setScalar(Math.max(0.28, cfg.startScale * 0.9));
-    slot.ring.visible = true;
-    slot.fill.visible = cfg.fillOpacity > 0.01;
-    const rec = this.rings.find((r) => r.mesh === slot.ring);
-    const snap = {
-      life: cfg.duration,
-      max: cfg.duration,
-      startScale: cfg.startScale,
-      grow: cfg.grow,
-      opacity: cfg.opacity,
-      fillOpacity: cfg.fillOpacity,
-    };
-    if (rec) Object.assign(rec, snap, { fill: slot.fill });
-    else this.rings.push({ mesh: slot.ring, fill: slot.fill, ...snap });
-  }
-
-  update(dt: number) {
-    for (const r of this.rings) {
-      if (!r.mesh.visible) continue;
-      r.life -= dt;
-      const k = 1 - r.life / r.max;
-      const s = r.startScale + k * r.grow;
-      r.mesh.scale.setScalar(s);
-      r.fill.scale.setScalar(Math.max(0.28, r.startScale * 0.9));
-      (r.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, r.opacity * (1 - k));
-      (r.fill.material as THREE.MeshBasicMaterial).opacity = Math.max(0, r.fillOpacity * (1 - k) * (1 - k));
-      if (r.life <= 0) {
-        r.mesh.visible = false;
-        r.fill.visible = false;
-      }
-    }
-  }
-
-  dispose() {
-    for (const p of this.pool) {
-      this.scene.remove(p.ring);
-      this.scene.remove(p.fill);
-      (p.ring.material as THREE.Material).dispose();
-      (p.fill.material as THREE.Material).dispose();
-    }
-    this.pool.length = 0;
-    this.rings.length = 0;
-    this.geo.dispose();
-    this.fillGeo.dispose();
-  }
-}
 function deskSurface(top: DeskTop) {
   if (top === 'walnut') {
     return {
@@ -1934,24 +1797,6 @@ export function placeOfficeProp(parent: THREE.Group, kind: PropKind, tone: Furni
   else if (kind === 'alarm') addAlarm(parent, prop);
 }
 
-export function addCeilingLight(
-  parent: THREE.Group,
-  x: number,
-  z: number,
-  opts: { lampColor?: number; lampIntensity?: number } = {}
-) {
-  const tray = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.05, 0.58), phong({ color: 0x6a7078, shininess: 30 }));
-  tray.position.set(x, 2.54, z);
-  parent.add(tray);
-  const lampColor = opts.lampColor ?? 0xfff6d8;
-  const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.03, 0.42),
-    new THREE.MeshBasicMaterial({ color: lampColor })
-  );
-  panel.position.set(x, 2.51, z);
-  parent.add(panel);
-}
-
 export type ElevatorState = 'idle' | 'called' | 'ready' | 'opening';
 
 export interface ElevatorRig {
@@ -2044,6 +1889,9 @@ export function buildElevator(
   const header = new THREE.Mesh(new THREE.BoxGeometry(3.16, 0.52, 0.24), steel);
   header.position.set(0, 2.48, 0.02);
   group.add(header);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.76, 0.16, 0.62), steel);
+  hood.position.set(0, 2.3, -0.18);
+  group.add(hood);
   const track = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.05, 0.1), trim);
   track.position.set(0, 2.18, 0.08);
   group.add(track);
@@ -2051,26 +1899,30 @@ export function buildElevator(
   sill.position.set(0, 0.03, 0.06);
   group.add(sill);
 
-  const doorW = 1.08;
-  const doorH = 2.12;
+  // 门扇要盖住整孔：俯视也能看出是关着的，不能从门缝看见轿厢
+  const doorW = 1.24;
+  const doorH = 2.22;
   const makeDoor = (side: number) => {
     const g = new THREE.Group();
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.06), steel);
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.12), steel);
     leaf.position.y = doorH / 2;
     g.add(leaf);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.04, 0.08, 0.22), steelDark);
+    cap.position.set(0, doorH + 0.02, -0.02);
+    g.add(cap);
     const slit = new THREE.Mesh(
       new THREE.BoxGeometry(0.22, 1.28, 0.02),
       new THREE.MeshPhongMaterial({ color: 0x1a2228, emissive: new THREE.Color(0x22303a), emissiveIntensity: 0.2, shininess: 90 })
     );
-    slit.position.set(side * 0.22, 1.28, 0.035);
+    slit.position.set(side * 0.22, 1.28, 0.065);
     g.add(slit);
     const groove = new THREE.Mesh(new THREE.BoxGeometry(doorW - 0.1, 0.012, 0.01), trim);
-    groove.position.set(0, 1.55, 0.034);
+    groove.position.set(0, 1.55, 0.064);
     g.add(groove);
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.03, doorH - 0.08, 0.07), trim);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.04, doorH - 0.08, 0.13), trim);
     edge.position.set(-side * (doorW / 2 - 0.02), doorH / 2, 0);
     g.add(edge);
-    g.position.set(side * (doorW / 2 + 0.01), 0.06, 0.11);
+    g.position.set(side * (doorW / 2 - 0.02), 0.04, 0.08);
     return g;
   };
   const doorL = makeDoor(-1);
@@ -2132,12 +1984,13 @@ export function buildElevator(
   pad.position.set(0, 0.02, (ELEVATOR_PAD_NEAR + ELEVATOR_PAD_FAR) / 2);
   group.add(pad);
 
-  const doorClosed = doorW / 2 + 0.01;
+  const doorClosed = doorW / 2 - 0.02;
   let state: ElevatorState = 'idle';
   let openT = 0;
   let floorNo = 18;
   const arrowDownMat = arrowDown.material as THREE.MeshPhongMaterial;
   const arrowUpMat = arrowUp.material as THREE.MeshPhongMaterial;
+  const ceilGlowMat = ceilGlow.material as THREE.MeshPhongMaterial;
 
   const paint = () => {
     paintElevatorSign(ctx, 256, 96, floorNo, state !== 'idle');
@@ -2175,6 +2028,8 @@ export function buildElevator(
     },
     setState(next) {
       state = next;
+      // 只有 opening 才开门；回 idle/呼叫/到达都必须当场合上
+      if (next !== 'opening') openT = 0;
       setButton(next !== 'idle');
       paint();
     },
@@ -2186,9 +2041,11 @@ export function buildElevator(
     },
     update(dt, time) {
       if (state === 'opening') openT = Math.min(1, openT + dt / 1.15);
+      else openT = 0;
       const e = 1 - (1 - openT) ** 3;
-      doorL.position.x = -doorClosed - 1.12 * e;
-      doorR.position.x = doorClosed + 1.12 * e;
+      doorL.position.x = -doorClosed - 1.18 * e;
+      doorR.position.x = doorClosed + 1.18 * e;
+      ceilGlowMat.emissiveIntensity = 0.08 + 0.47 * e;
       setButton(state !== 'idle', state === 'called' ? (0.5 + 0.5 * Math.sin(time * 6)) : 0.15);
       setArrows(state !== 'idle', time);
       const padMat = pad.material as THREE.MeshBasicMaterial;
@@ -2675,8 +2532,6 @@ export class OvertimePop {
     this.items.length = 0;
   }
 }
-
-export { OvertimePop as HeadMark };
 
 /** 倦怠圈：撞人后地面一圈灰蓝减速波 */
 export class SlowPulse {

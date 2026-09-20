@@ -978,7 +978,7 @@
             }
           ],
           "bodyMorph": 0.6,
-          "bodyScale": 0.92,
+          "bodyScale": 1.12,
           "kitHair": null,
           "kitHairMap": "/models/colleagues/skins/skin-heavy-tuesday-hair.png",
           "kitSkirt": null,
@@ -986,14 +986,14 @@
           "thumb": "/models/colleagues/thumbs/tuesday-heavy.png",
           "thumbCam": {
             "position": [
-              0.723,
-              0.892,
-              2.798
+              1.019,
+              1.102,
+              3.845
             ],
             "target": [
-              -0.02,
-              0.847,
-              0.011
+              -0.005,
+              1.04,
+              0.004
             ],
             "fov": 40
           },

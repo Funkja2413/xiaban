@@ -15,7 +15,6 @@ import { layoutAvatarNames } from '../shell';
 import { Enemies, EState, EType } from './enemies';
 import { RagdollFactory } from './ragdoll';
 import { Chairs } from './chairs';
-import { Bullets } from './bullets';
 import { Cards } from './cards';
 import { Skills } from './skills';
 import { Slicks } from './slicks';
@@ -32,7 +31,6 @@ import { bgm, sfx } from '../audio';
 
 const FIXED_DT = 1 / 60;
 const ENEMY_CAP = 80;
-const FIRE_INTERVAL = 1 / 9;
 const FLOW_REBUILD = 0.15;
 const INTERCEPT_REBUILD = 0.3;
 const ELEVATOR_WAIT = 20;
@@ -65,7 +63,6 @@ export class Game {
   private picking = false;
   private enemies!: Enemies;
   private chairs!: Chairs;
-  private bullets!: Bullets;
   private input!: Input;
   private hud = new Hud();
   private cards!: Cards;
@@ -108,7 +105,6 @@ export class Game {
   private spawnTimer = 0;
   private stepMs = 0;
   private aiming = false;
-  private wasAiming = false;
   private heavyToastCd = 0;
 
   private guideArrow!: THREE.Mesh;
@@ -227,7 +223,6 @@ export class Game {
       }
     };
     this.chairs = new Chairs(this.scene, this.world, this.level.chairSpawns, this.level.pushables);
-    this.bullets = new Bullets(this.scene, this.level.bulletBlockers, this.level.map);
 
     // 构筑系统：击倒掉工牌 → 攒满抽卡 → 不暂停三选一
     this.cards = new Cards();
@@ -348,7 +343,6 @@ export class Game {
     this.level.elevator.setFloor(1);
     this.player.group.visible = false;
     this.player.menuGhost = true;
-    this.player.aimArrow.visible = false;
     this.guideArrow.visible = false;
     const pts = this.chasePath();
     const s = pts[0] ?? this.level.playerStart;
@@ -403,7 +397,6 @@ export class Game {
     this.elevatorOpening = false;
     this.elevTickSec = -1;
     this.clockWarned = false;
-    this.wasAiming = false;
     this.readyLeft = READY_DUR;
     this.readySecShown = -1;
     this.readyGoFlash = 0;
@@ -476,7 +469,7 @@ export class Game {
     sfx.play('ready_go');
   }
 
-  /** 初始阵容：A 离玩家稍远，C 封必经窄口，F 蹲电梯路上 */
+  /** 初始阵容：A/C 全场追，F 蹲电梯路上 */
   private spawnOpeningCrowd() {
     const start = this.level.playerStart;
     for (const s of this.level.enemySpawns) {
@@ -517,7 +510,7 @@ export class Game {
     const time = timeMs / 1000;
     this.enemies.syncVisuals(time);
     this.chairs.syncVisuals();
-    this.player.syncVisual(this.aiming);
+    this.player.syncVisual();
     if (this.player.dashing) {
       const line = this.cards.line;
       const pack = dashFx((line ?? 'none') as DashKey, this.cards.lineLv || 1);
@@ -712,7 +705,7 @@ export class Game {
     const mvX = this.input.moveX;
     const mvZ = this.input.moveY;
 
-    // 瞄准：右摇杆优先，其次鼠标按住
+    // 朝向：右摇杆 / 按住鼠标只改投掷方向，不再开火
     this.aiming = false;
     if (this.input.aiming) {
       const len = Math.hypot(this.input.aimX, this.input.aimY);
@@ -745,8 +738,6 @@ export class Game {
       if (this.input.consumeDash() && !this.player.requestDash(mvX, mvZ)) sfx.play('ui_deny');
       if (this.input.consumeSkill()) this.castSkill();
     }
-    if (this.aiming && !this.wasAiming) sfx.play('aim');
-    this.wasAiming = this.aiming;
     this.player.update(h, mvX, mvZ, this.aiming, this.enemies);
     this.hazards.update(h, this.player, this.enemies);
     this.cards.update(h);
@@ -755,19 +746,6 @@ export class Game {
     if (this.player.bouncedByHeavy && this.heavyToastCd <= 0) {
       this.heavyToastCd = 2;
       this.hud.toast('主管纹丝不动！');
-    }
-
-    // 射击
-    this.player.fireCd -= h;
-    if (this.aiming && !this.player.ragdolled && this.player.fireCd <= 0) {
-      this.player.fireCd = FIRE_INTERVAL;
-      sfx.play('staple');
-      this.bullets.spawn(
-        p.x + this.player.aimDirX * 0.55,
-        p.z + this.player.aimDirZ * 0.55,
-        this.player.aimDirX,
-        this.player.aimDirZ
-      );
     }
 
     // 分身存活时全场仇恨转向替身；虚化/引流期间无法被塞任务
@@ -789,7 +767,6 @@ export class Game {
     sfx.setChannel(this.phase === 'playing' && this.enemies.channelingCount > 0);
     this.slicks.update(h, this.enemies);
     this.chairs.checkHits(this.enemies);
-    this.bullets.update(h, this.enemies);
 
     // 主流场：追玩家（或替身）
     this.flowTimer += h;
@@ -819,7 +796,6 @@ export class Game {
     this.input.consumeDash();
     this.input.consumeSkill();
     this.aiming = false;
-    this.wasAiming = false;
     this.player.update(h, 0, 0, false, this.enemies);
     // 换关整页刷新后浏览器会锁 AudioContext；先点一下再倒计时，否则开局音效全丢
     if (!sfx.armed()) {
@@ -920,21 +896,37 @@ export class Game {
     if (inside) this.hud.setElevatorTimer('先离开门口，再靠近一次开门');
   }
 
+  /** 呼叫电梯后只在电梯所在半边补人，不写死周一的 z>-6 */
+  private spawnOnElevHalf(x: number, z: number) {
+    const { map, elevatorPoint: e } = this.level;
+    const midX = (map.minX + map.maxX) * 0.5;
+    const midZ = (map.minZ + map.maxZ) * 0.5;
+    const alongZ = Math.abs(e.z - midZ) >= Math.abs(e.x - midX);
+    return alongZ ? (e.z - midZ) * (z - midZ) >= 0 : (e.x - midX) * (x - midX) >= 0;
+  }
+
   private updateSpawning(h: number, px: number, pz: number) {
     // 电梯呼叫后加压：刷新更快，且偏向大厅方向
-    const interval = this.elevatorCalled ? 0.45 : 1.1;
+    const interval = this.elevatorCalled ? 0.4 : 0.7;
     this.spawnTimer += h;
     if (this.spawnTimer >= interval && this.enemies.activeCount < ENEMY_CAP) {
       this.spawnTimer = 0;
       const spawns = this.level.enemySpawns;
       if (!spawns.length) return;
-      for (let tries = 0; tries < 8; tries++) {
+      const playerCost = this.elevFlow.costAt(px, pz);
+      for (let tries = 0; tries < 12; tries++) {
         const s = spawns[(Math.random() * spawns.length) | 0];
         if (!s) continue;
-        if (this.elevatorCalled && s.z > -6) continue;
+        if (this.elevatorCalled) {
+          if (!this.spawnOnElevHalf(s.x, s.z)) continue;
+        } else if (playerCost >= 0) {
+          const sc = this.elevFlow.costAt(s.x, s.z);
+          // 只补在玩家前方（更靠近电梯），直跑也能碰上
+          if (sc < 0 || sc > playerCost - 2) continue;
+        }
         const dx = s.x - px;
         const dz = s.z - pz;
-        if (dx * dx + dz * dz > 81) {
+        if (dx * dx + dz * dz > 64) {
           if (this.enemies.spawn(s.x + (Math.random() - 0.5), s.z + (Math.random() - 0.5), EType.A)) {
             sfx.play('spawn');
           }

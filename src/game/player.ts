@@ -22,7 +22,6 @@ export class Player {
   body: RAPIER.RigidBody;
   private collider: RAPIER.Collider;
   group: THREE.Group;
-  aimArrow: THREE.Group;
 
   /** 朝向（未瞄准时跟随移动方向） */
   yaw = Math.PI;
@@ -42,7 +41,6 @@ export class Player {
   private reclockHitAll = false;
   /** 甩锅：本段是否已甩成功 */
   private blamedThisDash = false;
-  fireCd = 0;
   /** 撞上重量级同事后的硬直 / 布娃娃落地后的起身 */
   stunT = 0;
   /** 湿地面 / 拍桌 */
@@ -97,19 +95,7 @@ export class Player {
     this.idleAct = fig.idle;
     this.runAct = fig.run;
 
-    this.aimArrow = new THREE.Group();
-    const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.13, 0.42, 8),
-      new THREE.MeshBasicMaterial({ color: 0xffa05a, transparent: true, opacity: 0.85 })
-    );
-    cone.rotation.x = Math.PI / 2;
-    cone.position.z = 0.9;
-    this.aimArrow.add(cone);
-    this.aimArrow.position.y = 0.12;
-    this.aimArrow.visible = false;
-
     scene.add(this.group);
-    scene.add(this.aimArrow);
   }
 
   private makeBody(x: number, z: number) {
@@ -142,7 +128,6 @@ export class Player {
     this.slowT = 0;
     this.slowMul = 1;
     this.phasedT = 0;
-    this.fireCd = 0;
     this.passed.clear();
     this.dashed.clear();
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -198,7 +183,6 @@ export class Player {
     this.ragOrigin.z = t.z;
     this.world.removeRigidBody(this.body);
     this.group.visible = false;
-    this.aimArrow.visible = false;
     this.rag = this.ragFactory.spawn(t.x, t.z, 0x4f8fe8, nx, nz, power, this.kit.playerScale || 1, false, {
       kit: this.kit,
       slot: 0,
@@ -320,7 +304,7 @@ export class Player {
         const dx = enemies.posX[i] - p.x;
         const dz = enemies.posZ[i] - p.z;
         const id = enemies.actorId(i);
-        const rr = id === 'heavy' ? Math.max(hit.radius, 1.4) : hit.radius;
+        const rr = id === 'heavy' || id === 'interceptor' ? Math.max(hit.radius, 1.4) : hit.radius;
         if (dx * dx + dz * dz >= rr * rr) continue;
         const react = dashReactOf(pack, id);
         if (phase) {
@@ -517,7 +501,7 @@ export class Player {
       if (s !== EState.Chase && s !== EState.Knock && s !== EState.Getup) continue;
       const dx = enemies.posX[i] - p.x;
       const dz = enemies.posZ[i] - p.z;
-      const rr = enemies.actorId(i) === 'heavy' ? 1.15 : 0.72;
+      const rr = enemies.actorId(i) === 'heavy' || enemies.actorId(i) === 'interceptor' ? 1.15 : 0.72;
       if (dx * dx + dz * dz < rr * rr) return true;
     }
     return false;
@@ -643,11 +627,10 @@ export class Player {
     this.onSlowPulse?.(x, z, react.radius, look?.color ?? 0x7a90a8, look?.opacity ?? 0.45, look?.pulseLife ?? 0.45);
   }
 
-  syncVisual(aiming: boolean) {
+  syncVisual() {
     if (this.rag) {
       this.ragFactory.sync(this.rag);
       this.group.visible = false;
-      this.aimArrow.visible = false;
       return;
     }
 
@@ -655,11 +638,5 @@ export class Player {
     this.group.position.set(t.x, t.y - this.standY, t.z);
     this.group.rotation.order = 'YXZ';
     this.group.rotation.set(0, this.yaw, 0);
-
-    this.aimArrow.visible = aiming && this.stunT <= 0;
-    if (aiming) {
-      this.aimArrow.position.set(t.x, 0.12, t.z);
-      this.aimArrow.rotation.y = Math.atan2(this.aimDirX, this.aimDirZ);
-    }
   }
 }

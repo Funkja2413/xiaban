@@ -6,7 +6,9 @@ import { sfx } from '../audio';
 /**
  * 不暂停抽卡：一套三选一同时混入冲撞属性和主动技能。
  * 卡片出现在顶部「预计下班」正下方；倒计时为预计下班面板描边环（真实 8 秒墙钟），
- * 从 12 点逆时针收完一圈即超时自动随机一张，再飞入右下角对应按钮。
+ * 从 12 点逆时针收完一圈只停表，不代选。点击即选。
+ * 电脑键鼠误选：空格冲刺会点中 <button>，准星又常压在顶栏卡上。
+ * 卡用 div，发牌时已经按下的键/指针不算，新点一下仍然立刻选中。
  */
 export type { LineId };
 export type SkillId = SkillKey;
@@ -71,12 +73,15 @@ interface Card {
 const PICK_TIME = 8;
 const FIRST_QUOTA = 3;
 const QUOTA_STEP = 3;
+const PICK_KEYS: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2 };
 
 export class Cards {
   line: LineId | null = null;
   lineLv = 0;
   skill: SkillId | null = null;
   skillLv = 0;
+  private dashBest: Partial<Record<LineId, number>> = {};
+  private skillBest: Partial<Record<SkillId, number>> = {};
 
   private badges = 0;
   private quota = FIRST_QUOTA;
@@ -86,6 +91,14 @@ export class Cards {
   private cardEls: HTMLElement[] = [];
   /** 抽卡截止墙钟时间（ms）；≤0 表示尚未开始计时 */
   private pickUntil = 0;
+  /** 发牌序号，过期点击不算 */
+  private offerGen = 0;
+  /** 发牌时已经按下的指针 / 数字键：松开前不算选卡 */
+  private staleIds = new Set<number>();
+  private downIds = new Set<number>();
+  private staleKeys = new Set<string>();
+  private downKeys = new Set<string>();
+  private pressEl: HTMLElement | null = null;
   private ringLen = 0;
   private ringRatio = 0;
   private readonly ringStroke = 1.5;
@@ -111,16 +124,39 @@ export class Cards {
 
   constructor() {
     window.addEventListener('keydown', (e) => {
-      if (!this.open) return;
-      const map: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2 };
-      const n = map[e.code];
-      if (n !== undefined && n < this.offered.length) this.select(n);
+      this.downKeys.add(e.code);
+      if (e.code === 'Space' || e.code === 'Enter') {
+        if (this.open) e.preventDefault();
+        return;
+      }
+      if (!this.open || e.repeat) return;
+      const n = PICK_KEYS[e.code];
+      if (n === undefined || n >= this.offered.length) return;
+      if (this.staleKeys.has(e.code)) return;
+      this.select(n);
     });
+    window.addEventListener('keyup', (e) => {
+      this.downKeys.delete(e.code);
+      this.staleKeys.delete(e.code);
+    });
+    window.addEventListener('pointerdown', (e) => {
+      this.downIds.add(e.pointerId);
+    }, true);
+    const releasePtr = (e: PointerEvent) => {
+      this.downIds.delete(e.pointerId);
+      this.staleIds.delete(e.pointerId);
+    };
+    window.addEventListener('pointerup', releasePtr, true);
+    window.addEventListener('pointercancel', releasePtr, true);
     new ResizeObserver(() => {
       if (!this.open) return;
       this.layoutRing();
       this.setRing(this.ringRatio);
     }).observe(this.shellEl);
+    this.dashBtn.tabIndex = -1;
+    this.skillBtn.tabIndex = -1;
+    const resetBtn = document.getElementById('resetBtn');
+    if (resetBtn) resetBtn.tabIndex = -1;
     this.renderBadge();
     this.renderButtons();
   }
@@ -142,11 +178,17 @@ export class Cards {
     this.lineLv = 0;
     this.skill = null;
     this.skillLv = 0;
+    this.dashBest = {};
+    this.skillBest = {};
     this.badges = 0;
     this.quota = FIRST_QUOTA;
     this.open = false;
     this.offered = [];
     this.pickUntil = 0;
+    this.staleIds.clear();
+    this.staleKeys.clear();
+    this.pressEl = null;
+    this.offerGen += 1;
     for (const el of this.cardEls) el.remove();
     this.cardEls = [];
     this.listEl.innerHTML = '';
@@ -174,10 +216,11 @@ export class Cards {
     }
     // 用墙钟对齐真实秒数：不受 fixedUpdate 掉帧/限步影响
     if (this.pickUntil <= 0) return;
-    const left = this.pickUntil - performance.now();
+    const now = performance.now();
+    const left = this.pickUntil - now;
     const ratio = Math.max(0, Math.min(1, left / (PICK_TIME * 1000)));
     this.setRing(ratio);
-    if (left <= 0) this.select((Math.random() * this.offered.length) | 0, true);
+    // 超时只停表，不代选
   }
 
   /** 抽卡中：显示预计下班描边环 */
@@ -235,6 +278,7 @@ export class Cards {
     el.style.transform = 'translateY(30px) rotate(14deg)';
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 320);
+    if (this.pressEl === el) this.pressEl = null;
     this.cardEls.forEach((c, j) => {
       const k = c.querySelector('.ckey');
       if (k) k.textContent = String(j + 1);
@@ -265,7 +309,8 @@ export class Cards {
       if (id === this.line) {
         if (this.lineLv < 3) dash.push({ track: 'dash', id, toLevel: this.lineLv + 1, isSwitch: false });
       } else {
-        dash.push({ track: 'dash', id, toLevel: 1, isSwitch: this.line !== null });
+        const owned = this.dashBest[id] ?? 0;
+        dash.push({ track: 'dash', id, toLevel: Math.max(1, owned), isSwitch: this.line !== null });
       }
     }
     const skill: Card[] = [];
@@ -273,7 +318,8 @@ export class Cards {
       if (id === this.skill) {
         if (this.skillLv < 3) skill.push({ track: 'skill', id, toLevel: this.skillLv + 1, isSwitch: false });
       } else {
-        skill.push({ track: 'skill', id, toLevel: 1, isSwitch: this.skill !== null });
+        const owned = this.skillBest[id] ?? 0;
+        skill.push({ track: 'skill', id, toLevel: Math.max(1, owned), isSwitch: this.skill !== null });
       }
     }
     return { dash, skill };
@@ -281,28 +327,26 @@ export class Cards {
 
   private offer() {
     const { dash, skill } = this.buildPool();
-    shuffle(dash);
-    shuffle(skill);
+    const upgrades = [...dash, ...skill].filter((c) => c.toLevel > 1);
+    const fresh = [...dash, ...skill].filter((c) => c.toLevel === 1);
+    shuffle(upgrades);
+    shuffle(fresh);
     const picks: Card[] = [];
-    const twoDash = Math.random() < 0.5;
     const take = (src: Card[], n: number) => {
       for (let k = 0; k < n && src.length; k++) picks.push(src.pop()!);
     };
-    if (twoDash) {
-      take(dash, 2);
-      take(skill, 1);
-    } else {
-      take(skill, 2);
-      take(dash, 1);
-    }
-    const rest = [...dash, ...skill];
-    shuffle(rest);
-    while (picks.length < 3 && rest.length) picks.push(rest.pop()!);
+    // 已有的冲刺/技能优先出下一档，避免只看见同名 LV1 换系
+    take(upgrades, 2);
+    take(fresh, 3 - picks.length);
     if (!picks.length) return;
     shuffle(picks);
     this.offered = picks;
     this.open = true;
     this.pickUntil = 0;
+    this.staleIds = new Set(this.downIds);
+    this.staleKeys = new Set(this.downKeys);
+    this.pressEl = null;
+    this.offerGen += 1;
     this.renderCards();
     sfx.play('card_deal');
   }
@@ -312,28 +356,47 @@ export class Cards {
     this.cardEls = [];
     this.offered.forEach((c, i) => {
       const m = this.metaOf(c);
-      const btn = document.createElement('button');
+      const btn = document.createElement('div');
       btn.className = 'card' + (c.track === 'dash' ? ' cardDash' : '');
       btn.style.borderColor = m.color;
-      const tag = c.toLevel > 1 ? `升级 LV${c.toLevel}` : c.isSwitch ? '换系 LV1' : '新 LV1';
+      btn.setAttribute('role', 'button');
+      btn.tabIndex = -1;
+      const tag = !c.isSwitch && c.toLevel > 1
+        ? `升级 LV${c.toLevel}`
+        : c.isSwitch
+          ? `换系 LV${c.toLevel}`
+          : '新 LV1';
       btn.innerHTML =
         `<div class="cglyph">${m.glyph}</div>` +
         `<div class="cname" style="color:${m.color}">${m.name}</div>` +
         `<div class="ctag">${tag}</div>` +
         `<div class="cdesc">${m.descs[c.toLevel - 1]}</div>` +
         `<div class="ckey">${i + 1}</div>`;
-      btn.addEventListener('touchstart', (e) => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        if (this.staleIds.has(e.pointerId)) {
+          this.pressEl = null;
+          return;
+        }
+        this.pressEl = btn;
+      });
+      btn.addEventListener('click', (e) => {
         e.preventDefault();
-        this.select(this.cardEls.indexOf(btn));
-      }, { passive: false });
-      btn.addEventListener('click', () => this.select(this.cardEls.indexOf(btn)));
+        e.stopPropagation();
+        if (this.pressEl !== btn) return;
+        this.pressEl = null;
+        this.select(i);
+      });
       this.listEl.appendChild(btn);
       this.cardEls.push(btn);
     });
     this.rowEl.style.display = 'block';
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     this.setPicking(true);
+    const gen = this.offerGen;
     // 等布局完成再开表，避免环还没画就开始扣时间
     requestAnimationFrame(() => {
+      if (this.offerGen !== gen || !this.open) return;
       this.layoutRing();
       this.pickUntil = performance.now() + PICK_TIME * 1000;
       this.setRing(1);
@@ -343,6 +406,7 @@ export class Cards {
   private select(i: number, auto = false) {
     if (!this.open || i < 0 || i >= this.offered.length) return;
     this.open = false;
+    this.pressEl = null;
     sfx.play('card_pick');
     const c = this.offered[i];
     const el = this.cardEls[i];
@@ -357,24 +421,33 @@ export class Cards {
     this.fly(el, c);
     this.rowEl.style.display = 'none';
     this.pickUntil = 0;
+    this.staleIds.clear();
+    this.staleKeys.clear();
     this.setPicking(false);
+    if (document.activeElement instanceof HTMLElement && this.rowEl.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
     this.apply(c, auto);
     this.renderBadge();
   }
 
   private apply(c: Card, auto = false) {
     if (c.track === 'dash') {
-      if (c.id === this.line) this.lineLv = c.toLevel;
+      const id = c.id as LineId;
+      if (id === this.line) this.lineLv = Math.max(this.lineLv, c.toLevel);
       else {
-        this.line = c.id as LineId;
-        this.lineLv = 1;
+        this.line = id;
+        this.lineLv = Math.max(this.dashBest[id] ?? 1, c.toLevel);
       }
+      this.dashBest[id] = Math.max(this.dashBest[id] ?? 0, this.lineLv);
     } else {
-      if (c.id === this.skill) this.skillLv = c.toLevel;
+      const id = c.id as SkillId;
+      if (id === this.skill) this.skillLv = Math.max(this.skillLv, c.toLevel);
       else {
-        this.skill = c.id as SkillId;
-        this.skillLv = 1;
+        this.skill = id;
+        this.skillLv = Math.max(this.skillBest[id] ?? 1, c.toLevel);
       }
+      this.skillBest[id] = Math.max(this.skillBest[id] ?? 0, this.skillLv);
     }
     this.renderButtons();
     const m = this.metaOf(c);

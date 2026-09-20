@@ -27,8 +27,6 @@ export type SfxId =
   | 'dash'
   | 'dash_hit'
   | 'dash_bounce'
-  | 'staple'
-  | 'staple_wall'
   | 'knockdown'
   | 'getup'
   | 'wet'
@@ -44,7 +42,6 @@ export type SfxId =
   | 'ui_click'
   | 'ui_deny'
   | 'step'
-  | 'aim'
   | 'spawn'
   | 'desk_slam'
   | 'intercept'
@@ -66,8 +63,6 @@ const FILES: Record<BgmId, string> = {
 };
 
 const VOICE_CAP: Partial<Record<SfxId, number>> = {
-  staple: 3,
-  staple_wall: 2,
   dash_hit: 2,
   knockdown: 2,
   stamp: 2,
@@ -80,8 +75,6 @@ const VOICE_CAP: Partial<Record<SfxId, number>> = {
 };
 
 const COOLDOWN: Partial<Record<SfxId, number>> = {
-  staple: 0.035,
-  staple_wall: 0.05,
   channel: 0.45,
   elev_tick: 0.72,
   knockdown: 0.07,
@@ -91,7 +84,6 @@ const COOLDOWN: Partial<Record<SfxId, number>> = {
   ui_deny: 0.12,
   trip: 0.12,
   step: 0.14,
-  aim: 0.35,
   spawn: 0.28,
   chair_roll: 0.18,
   slick_slip: 0.12,
@@ -101,8 +93,6 @@ const COOLDOWN: Partial<Record<SfxId, number>> = {
 };
 
 const JITTER: Partial<Record<SfxId, number>> = {
-  staple: 0.1,
-  staple_wall: 0.08,
   knockdown: 0.07,
   dash_hit: 0.06,
   getup: 0.05,
@@ -532,16 +522,6 @@ class SfxPlayer {
       const spring = tone(t, 210) * env(t, 0.002, 0.1) * 0.18;
       return thud + spring + noise(i) * env(t, 0.002, 0.08) * 0.12;
     });
-    put('staple', 0.055, (t, i) => {
-      const metal = tone(t, 2450) * env(t, 0.0008, 0.04) * 0.38;
-      const chk = tone(t, 1680) * env(t, 0.0006, 0.028) * 0.22;
-      return metal + chk + noise(i) * env(t, 0.0005, 0.02) * 0.12;
-    });
-    put('staple_wall', 0.09, (t, i) => {
-      const chk = tone(t, 2100) * env(t, 0.0008, 0.03) * 0.28;
-      const plaster = noise(i) * env(t, 0.001, 0.07) * 0.22;
-      return chk + plaster + tone(t, 140) * env(t, 0.002, 0.06) * 0.16;
-    });
     put('knockdown', 0.28, (t, i) => {
       const chair = tone(t, 96) * env(t, 0.004, 0.14) * 0.36;
       const paper = noise(i) * env(t, 0.01, 0.22) * (0.16 + 0.1 * Math.sin(t * 70));
@@ -582,11 +562,6 @@ class SfxPlayer {
       const sole = tone(t, 78) * env(t, 0.003, 0.05) * 0.14;
       const floor = noise(i) * env(t, 0.002, 0.055) * 0.1;
       return sole + floor;
-    });
-    put('aim', 0.12, (t, i) => {
-      const paper = noise(i) * env(t, 0.008, 0.09) * 0.12;
-      const hinge = tone(t, 1320) * env(t, 0.002, 0.04) * 0.14;
-      return paper + hinge;
     });
     put('spawn', 0.2, (t, i) => {
       const whoosh = noise(i) * env(t, 0.01, 0.16) * 0.18;

@@ -4,7 +4,6 @@
     "pools": {
       "paper": 64,
       "mist": 56,
-      "ring": 10,
       "trail": 16
     },
     "hitObject": {

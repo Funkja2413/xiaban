@@ -2,8 +2,8 @@ import { clientToStage, clientToStageNdc, isStageLeft } from './stage';
 
 /**
  * 双摇杆触控 + 键鼠输入。坐标相对 9:16 舞台，不是浏览器窗口。
- * 左半屏拖动 = 移动摇杆；右半屏拖动 = 瞄准摇杆（按住即射击）。
- * 桌面端：WASD/方向键移动，鼠标瞄准，按住左键射击，Shift/空格冲刺。
+ * 左半屏拖动 = 移动摇杆；右半屏拖动 = 朝向。
+ * 桌面端：WASD/方向键移动，鼠标看向，Shift/空格冲刺。同事只能靠冲刺和道具打倒。
  */
 export class Input {
   /** 移动向量，屏幕坐标系（x 右，y 下），模长 <= 1 */

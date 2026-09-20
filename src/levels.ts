@@ -1931,22 +1931,8 @@ export function seedTuesday(): LevelDef {
       spawn('ch5', 8.6, -9.2, 'guest'),
       spawn('ch6', 0, -17.2, 'exec'),
     ],
-    enemySpawns: [
-      spawn('en-1', -8.5, 16.0),
-      spawn('en-2', 3.5, 14.0),
-      spawn('en-3', -10.5, 10.0),
-      spawn('en-4', 7.5, 10.0),
-      spawn('en-5', -0.5, 4.0),
-      spawn('en-6', -8.5, 2.0),
-      spawn('en-7', -8.5, -4.0),
-      spawn('en-8', 9.5, -10.0),
-      spawn('en-9', -4.5, -16.0),
-      spawn('en-10', -10.5, -20.0),
-      spawn('en-11', 9.5, -22.0),
-      spawn('en-12', 3.5, -24.0),
-    ],
-    heavyAnchors: [spawn('hv-1', -0.5, 6.0), spawn('hv-2', -6.5, -17.0)],
-    interceptorSpawns: [spawn('ic-1', 0.5, -24.0), spawn('ic-2', 9.5, -16.0)],
+    heavyAnchors: [],
+    interceptorSpawns: [],
     menuChase: [
       { x: -9.6, z: 23.0 },
       { x: -9.8, z: 12.0 },
@@ -2345,16 +2331,6 @@ export async function loadLevelCatalog(): Promise<LevelCatalog> {
     ensureWeekdays(fallback);
     return fallback;
   }
-}
-
-export function listedTextures(cat: LevelCatalog): string[] {
-  const out: string[] = [];
-  for (const l of cat.levels) {
-    if (l.atmosphere.floor.map) out.push(l.atmosphere.floor.map);
-    if (l.atmosphere.wall.map) out.push(l.atmosphere.wall.map);
-    out.push(...collectFaceMaps(l));
-  }
-  return out;
 }
 
 export function newId(prefix: string): string {
