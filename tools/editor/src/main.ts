@@ -909,17 +909,18 @@ async function boot() {
       const written = await writeOwnSkin(customSkin.bytes, destSkinId);
       if (!written) return;
       skinDef = written;
-    } else if (shared && isPlayerSlotId(id)) {
+    } else if (shared) {
+      const copyId = destSkinId;
       try {
-        const written = await writeOwnSkin(await pngBytesFromUrl(picked.file), ownSkinId);
+        const written = await writeOwnSkin(await pngBytesFromUrl(picked.file), copyId);
         if (!written) return;
         skinDef = written;
         if (!customSkin) {
-          customSkin = { id: ownSkinId, file: written.file, map: await loadSkinMap(written.file, false) };
+          customSkin = { id: copyId, file: written.file, map: await loadSkinMap(written.file, false) };
           preview.setCustomSkin(customSkin.map);
         }
       } catch (err) {
-        toast(`无法把贴图写成「${ownSkinId}」：${err instanceof Error ? err.message : String(err)}`);
+        toast(`无法把贴图写成「${copyId}」：${err instanceof Error ? err.message : String(err)}`);
         return;
       }
     } else {

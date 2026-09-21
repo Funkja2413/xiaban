@@ -296,6 +296,11 @@
       "flipY": false
     },
     {
+      "id": "skin-colleague-a-m-monday",
+      "file": "/models/colleagues/skins/skin-colleague-a-m-monday.png",
+      "flipY": false
+    },
+    {
       "id": "skin-colleague-a-f-tuesday",
       "file": "/models/colleagues/skins/skin-colleague-a-f-tuesday.png",
       "flipY": false
@@ -521,7 +526,7 @@
           "id": "colleague-a-m",
           "label": "甩锅侠",
           "gender": "male",
-          "skin": "kenney-male-a",
+          "skin": "skin-colleague-a-m-monday",
           "hair": null,
           "hairTransform": {
             "position": [
