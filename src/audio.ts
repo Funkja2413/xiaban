@@ -39,6 +39,7 @@ export type SfxId =
   | 'coffee'
   | 'card_deal'
   | 'card_pick'
+  | 'card_burn'
   | 'ui_click'
   | 'ui_deny'
   | 'step'
@@ -551,7 +552,16 @@ class SfxPlayer {
     put('keyboard_catch', 0.08, (t, i) => tone(t, 1340) * env(t, 0.001, 0.06) * 0.24 + noise(i) * env(t, 0.001, 0.04) * 0.1);
     put('coffee', 0.32, (t, i) => noise(i) * env(t, 0.04, 0.26) * 0.2 * (0.7 + 0.3 * Math.sin(t * 55)));
     put('card_deal', 0.24, (t, i) => noise(i) * env(t, 0.01, 0.2) * (0.16 + 0.1 * Math.sin(t * 90)));
-    put('card_pick', 0.1, (t, i) => tone(t, 980) * env(t, 0.002, 0.07) * 0.16 + noise(i) * env(t, 0.001, 0.06) * 0.14);
+    put('card_pick', 0.16, (t, i) => {
+      const ding = tone(t, 880) * env(t, 0.002, 0.11) * 0.24;
+      const tick = tone(t, 1320) * env(t, 0.001, 0.06) * 0.14;
+      return ding + tick + noise(i) * env(t, 0.001, 0.05) * 0.12;
+    });
+    put('card_burn', 0.3, (t, i) => {
+      const hiss = noise(i) * env(t, 0.02, 0.26) * 0.24 * (0.55 + 0.45 * Math.sin(t * 68));
+      const whoosh = tone(t, 380 - t * 240) * env(t, 0.012, 0.22) * 0.1;
+      return hiss + whoosh;
+    });
     put('ui_click', 0.05, (t) => tone(t, 1480) * env(t, 0.001, 0.04) * 0.18);
     put('ui_deny', 0.14, (t) => {
       const a = tone(t, 420) * env(t, 0.002, 0.05) * 0.2;

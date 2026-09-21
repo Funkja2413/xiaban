@@ -151,6 +151,31 @@
     }
     .card.cardDash { border-radius: 8px 16px 8px 16px; }
     .card.picked { transform: scale(1.06); filter: brightness(1.15); }
+    /* 裂开再碎：裁切真实卡片（emoji / 以后的图标图都会跟着碎），只走 transform */
+    .cardShatter {
+      position: fixed; z-index: 200; pointer-events: none;
+    }
+    .cardShatter > i.flash {
+      position: absolute; inset: 0;
+      border-radius: 12px; background: #fff;
+      animation: cardFlash 0.12s linear forwards;
+    }
+    .cardShatter > .card.piece {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; max-width: none; flex: none; margin: 0;
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+      animation: cardCrack 0.62s cubic-bezier(0.18, 0.72, 0.28, 1) forwards;
+      clip-path: var(--clip);
+    }
+    @keyframes cardFlash {
+      0% { opacity: 0.8; }
+      100% { opacity: 0; }
+    }
+    @keyframes cardCrack {
+      0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+      18% { transform: translate(calc(var(--dx) * 0.1), calc(var(--dy) * 0.1)) rotate(calc(var(--rot) * 0.16)); opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.86); opacity: 0; }
+    }
     .cglyph { font-size: 20px; line-height: 1.15; }
     .cname { font-size: 12px; font-weight: 800; }
     .ctag { font-size: 9px; color: #ffd873; font-weight: 700; }

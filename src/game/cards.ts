@@ -314,12 +314,12 @@ export class Cards {
     const i = (Math.random() * this.offered.length) | 0;
     this.offered.splice(i, 1);
     const el = this.cardEls.splice(i, 1)[0];
+    this.shatter(el);
     this.burnNote(el);
+    sfx.play('card_burn');
+    el.style.visibility = 'hidden';
     el.style.pointerEvents = 'none';
-    el.style.transition = 'transform 0.3s ease-in, opacity 0.3s';
-    el.style.transform = 'translateY(30px) rotate(14deg)';
-    el.style.opacity = '0';
-    setTimeout(() => el.remove(), 320);
+    setTimeout(() => el.remove(), 580);
     if (this.press?.el === el) this.press = null;
     this.cardEls.forEach((c, j) => {
       const k = c.querySelector('.ckey');
@@ -327,6 +327,45 @@ export class Cards {
     });
     if (this.offered.length === 1) this.armLastCard();
     return true;
+  }
+
+  /** 先沿锯齿缝裂开，再把真实卡片裁成碎片飞走。裁的是卡面本身，以后换成图标图也一样碎。 */
+  private shatter(el: HTMLElement) {
+    const r = el.getBoundingClientRect();
+    const layer = document.createElement('div');
+    layer.className = 'cardShatter';
+    layer.style.left = `${r.left}px`;
+    layer.style.top = `${r.top}px`;
+    layer.style.width = `${r.width}px`;
+    layer.style.height = `${r.height}px`;
+
+    const flash = document.createElement('i');
+    flash.className = 'flash';
+    layer.appendChild(flash);
+
+    const clips = [
+      'polygon(0 0, 58% 0, 50% 20%, 40% 46%, 0 36%)',
+      'polygon(58% 0, 100% 0, 100% 44%, 70% 34%, 50% 20%)',
+      'polygon(0 36%, 40% 46%, 34% 72%, 0 80%)',
+      'polygon(40% 46%, 50% 20%, 70% 34%, 100% 44%, 100% 76%, 56% 64%)',
+      'polygon(0 80%, 34% 72%, 56% 64%, 100% 76%, 100% 100%, 0 100%)',
+    ];
+    const dirs = [[-1, -1], [1, -1], [-1.1, 0.15], [1.1, 0.2], [0.05, 1.15]] as const;
+    for (let i = 0; i < clips.length; i++) {
+      const piece = el.cloneNode(true) as HTMLElement;
+      piece.classList.add('piece');
+      piece.removeAttribute('role');
+      piece.tabIndex = -1;
+      piece.style.backdropFilter = 'none';
+      piece.style.setProperty('--clip', clips[i]);
+      const dist = 70 + Math.random() * 36;
+      piece.style.setProperty('--dx', `${(dirs[i][0] * dist).toFixed(1)}px`);
+      piece.style.setProperty('--dy', `${(dirs[i][1] * dist - 10).toFixed(1)}px`);
+      piece.style.setProperty('--rot', `${(dirs[i][0] * (28 + Math.random() * 40)).toFixed(0)}deg`);
+      layer.appendChild(piece);
+    }
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 700);
   }
 
   /** 在被冲掉那张卡的位置飘一句，区分「被任务打掉」和「自己选中」 */
