@@ -105,6 +105,9 @@ export class Cards {
   private pickSpan = PICK_TIME * 1000;
   /** 上次被任务冲掉卡的时刻，用来隔开连续销毁 */
   private lastKnockAt = 0;
+  /** 工牌那一行的临时提示；到期后回到「选一张卡 / 工牌 n/m」 */
+  private hintUntil = 0;
+  private hintText = '';
   /** 发牌序号，过期点击不算 */
   private offerGen = 0;
   /** 发牌时已经按下的指针 / 数字键：松开前不算选卡 */
@@ -207,6 +210,8 @@ export class Cards {
     this.open = false;
     this.offered = [];
     this.pickUntil = 0;
+    this.hintUntil = 0;
+    this.hintText = '';
     this.staleIds.clear();
     this.staleKeys.clear();
     this.press = null;
@@ -232,6 +237,10 @@ export class Cards {
   }
 
   update(_dt: number) {
+    if (this.hintUntil > 0 && performance.now() >= this.hintUntil) {
+      this.hintUntil = 0;
+      this.renderBadge();
+    }
     if (!this.open) {
       this.tryOffer();
       return;
@@ -315,7 +324,7 @@ export class Cards {
     this.offered.splice(i, 1);
     const el = this.cardEls.splice(i, 1)[0];
     this.puff(el);
-    this.burnNote(el);
+    this.flashBadge('任务冲掉一张！');
     sfx.play('card_burn');
     el.style.visibility = 'hidden';
     el.style.pointerEvents = 'none';
@@ -334,16 +343,10 @@ export class Cards {
     puffSmoke(el.getBoundingClientRect());
   }
 
-  /** 在被冲掉那张卡的位置飘一句，区分「被任务打掉」和「自己选中」 */
-  private burnNote(el: HTMLElement) {
-    const r = el.getBoundingClientRect();
-    const note = document.createElement('div');
-    note.className = 'cardBurn';
-    note.textContent = '任务冲掉一张！';
-    note.style.left = `${r.left + r.width / 2}px`;
-    note.style.top = `${r.top + r.height / 2}px`;
-    document.body.appendChild(note);
-    setTimeout(() => note.remove(), 900);
+  private flashBadge(text: string) {
+    this.hintText = text;
+    this.hintUntil = performance.now() + 1400;
+    this.renderBadge();
   }
 
   private tryOffer() {
@@ -558,6 +561,10 @@ export class Cards {
   }
 
   private renderBadge() {
+    if (this.hintUntil > performance.now() && this.hintText) {
+      this.badgeEl.textContent = this.hintText;
+      return;
+    }
     this.badgeEl.textContent = this.open ? '选一张卡！' : `工牌 ${this.badges}/${this.quota}`;
   }
 

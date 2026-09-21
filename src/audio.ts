@@ -557,10 +557,12 @@ class SfxPlayer {
       const tick = tone(t, 1320) * env(t, 0.001, 0.06) * 0.14;
       return ding + tick + noise(i) * env(t, 0.001, 0.05) * 0.12;
     });
-    put('card_burn', 0.3, (t, i) => {
-      const hiss = noise(i) * env(t, 0.02, 0.26) * 0.24 * (0.55 + 0.45 * Math.sin(t * 68));
-      const whoosh = tone(t, 380 - t * 240) * env(t, 0.012, 0.22) * 0.1;
-      return hiss + whoosh;
+    put('card_burn', 0.32, (t, i) => {
+      // 盖过同一帧的盖章 / 加班提示音：先闷响再喷气
+      const thud = tone(t, 70) * env(t, 0.004, 0.14) * 0.58;
+      const air = noise(i) * env(t, 0.01, 0.24) * 0.48 * (0.55 + 0.45 * Math.sin(t * 52));
+      const pop = tone(t, 220 - t * 140) * env(t, 0.006, 0.16) * 0.26;
+      return thud + air + pop;
     });
     put('ui_click', 0.05, (t) => tone(t, 1480) * env(t, 0.001, 0.04) * 0.18);
     put('ui_deny', 0.14, (t) => {
