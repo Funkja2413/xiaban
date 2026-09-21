@@ -314,12 +314,12 @@ export class Cards {
     const i = (Math.random() * this.offered.length) | 0;
     this.offered.splice(i, 1);
     const el = this.cardEls.splice(i, 1)[0];
-    this.shatter(el);
+    this.puff(el);
     this.burnNote(el);
     sfx.play('card_burn');
     el.style.visibility = 'hidden';
     el.style.pointerEvents = 'none';
-    setTimeout(() => el.remove(), 580);
+    setTimeout(() => el.remove(), 400);
     if (this.press?.el === el) this.press = null;
     this.cardEls.forEach((c, j) => {
       const k = c.querySelector('.ckey');
@@ -329,43 +329,9 @@ export class Cards {
     return true;
   }
 
-  /** 先沿锯齿缝裂开，再把真实卡片裁成碎片飞走。裁的是卡面本身，以后换成图标图也一样碎。 */
-  private shatter(el: HTMLElement) {
-    const r = el.getBoundingClientRect();
-    const layer = document.createElement('div');
-    layer.className = 'cardShatter';
-    layer.style.left = `${r.left}px`;
-    layer.style.top = `${r.top}px`;
-    layer.style.width = `${r.width}px`;
-    layer.style.height = `${r.height}px`;
-
-    const flash = document.createElement('i');
-    flash.className = 'flash';
-    layer.appendChild(flash);
-
-    const clips = [
-      'polygon(0 0, 58% 0, 50% 20%, 40% 46%, 0 36%)',
-      'polygon(58% 0, 100% 0, 100% 44%, 70% 34%, 50% 20%)',
-      'polygon(0 36%, 40% 46%, 34% 72%, 0 80%)',
-      'polygon(40% 46%, 50% 20%, 70% 34%, 100% 44%, 100% 76%, 56% 64%)',
-      'polygon(0 80%, 34% 72%, 56% 64%, 100% 76%, 100% 100%, 0 100%)',
-    ];
-    const dirs = [[-1, -1], [1, -1], [-1.1, 0.15], [1.1, 0.2], [0.05, 1.15]] as const;
-    for (let i = 0; i < clips.length; i++) {
-      const piece = el.cloneNode(true) as HTMLElement;
-      piece.classList.add('piece');
-      piece.removeAttribute('role');
-      piece.tabIndex = -1;
-      piece.style.backdropFilter = 'none';
-      piece.style.setProperty('--clip', clips[i]);
-      const dist = 70 + Math.random() * 36;
-      piece.style.setProperty('--dx', `${(dirs[i][0] * dist).toFixed(1)}px`);
-      piece.style.setProperty('--dy', `${(dirs[i][1] * dist - 10).toFixed(1)}px`);
-      piece.style.setProperty('--rot', `${(dirs[i][0] * (28 + Math.random() * 40)).toFixed(0)}deg`);
-      layer.appendChild(piece);
-    }
-    document.body.appendChild(layer);
-    setTimeout(() => layer.remove(), 700);
+  /** 原卡藏掉，原地喷一股微粒烟。一块复用 canvas，不进战场 WebGPU。 */
+  private puff(el: HTMLElement) {
+    puffSmoke(el.getBoundingClientRect());
   }
 
   /** 在被冲掉那张卡的位置飘一句，区分「被任务打掉」和「自己选中」 */
@@ -635,6 +601,79 @@ export class Cards {
       if (this.cdNumEl) this.cdNumEl.textContent = txt;
     }
   }
+}
+
+const PUFF_N = 44;
+const PUFF_PX = 168;
+
+type SmokeBit = { x: number; y: number; vx: number; vy: number; r: number; a: number; life: number; max: number };
+
+let puffCanvas: HTMLCanvasElement | null = null;
+let puffCtx: CanvasRenderingContext2D | null = null;
+let puffRaf = 0;
+
+/** 复用一块小画布喷微粒。冷却保证同时最多一股，不和 3D 渲染抢 GPU。 */
+function puffSmoke(rect: DOMRect) {
+  if (!puffCanvas) {
+    puffCanvas = document.createElement('canvas');
+    puffCanvas.className = 'cardPuff';
+    puffCanvas.width = PUFF_PX;
+    puffCanvas.height = PUFF_PX;
+    puffCtx = puffCanvas.getContext('2d', { alpha: true });
+    document.body.appendChild(puffCanvas);
+  }
+  const canvas = puffCanvas;
+  const ctx = puffCtx;
+  if (!ctx) return;
+  canvas.style.left = `${rect.left + rect.width / 2 - PUFF_PX / 2}px`;
+  canvas.style.top = `${rect.top + rect.height / 2 - PUFF_PX / 2}px`;
+  canvas.style.display = 'block';
+
+  const cx = PUFF_PX / 2;
+  const cy = PUFF_PX / 2;
+  const bits: SmokeBit[] = [];
+  for (let i = 0; i < PUFF_N; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 24 + Math.random() * 86;
+    bits.push({
+      x: cx + (Math.random() - 0.5) * 16,
+      y: cy + (Math.random() - 0.5) * 12,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd * 0.62 - 28,
+      r: 1.1 + Math.random() * 2.6,
+      a: 0.5 + Math.random() * 0.45,
+      life: 0,
+      max: 0.26 + Math.random() * 0.24,
+    });
+  }
+
+  let last = performance.now();
+  const stop = last + 520;
+  cancelAnimationFrame(puffRaf);
+  const tick = (now: number) => {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    ctx.clearRect(0, 0, PUFF_PX, PUFF_PX);
+    let alive = false;
+    for (const p of bits) {
+      p.life += dt;
+      if (p.life >= p.max) continue;
+      alive = true;
+      const u = p.life / p.max;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 0.9;
+      p.vy = p.vy * 0.9 - 22 * dt;
+      const fade = u < 0.1 ? u / 0.1 : 1 - (u - 0.1) / 0.9;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(236,232,224,${(p.a * fade).toFixed(3)})`;
+      ctx.arc(p.x, p.y, p.r * (1 + u * 1.8), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (alive && now < stop) puffRaf = requestAnimationFrame(tick);
+    else canvas.style.display = 'none';
+  };
+  puffRaf = requestAnimationFrame(tick);
 }
 
 function shuffle<T>(a: T[]) {
