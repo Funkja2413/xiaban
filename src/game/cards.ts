@@ -6,9 +6,11 @@ import { sfx } from '../audio';
 /**
  * 不暂停抽卡：一套三选一同时混入冲撞属性和主动技能。
  * 卡片出现在顶部「预计下班」正下方；倒计时为预计下班面板描边环（真实 8 秒墙钟），
- * 从 12 点逆时针收完一圈只停表，不代选。点击即选。
- * 电脑键鼠误选：空格冲刺会点中 <button>，准星又常压在顶栏卡上。
- * 卡用 div，发牌时已经按下的键/指针不算，新点一下仍然立刻选中。
+ * 从 12 点逆时针收完一圈只停表，不代选。
+ * 游戏不暂停，卡片带就压在操作区上，所以选卡判定要严：只有卡片本身吃输入，
+ * 且必须按下和抬手落在同一张卡、位移不超过 TAP_SLOP 才算选中。
+ * 不用浏览器补发的 click——摇杆 preventDefault 之后触屏根本不会补。
+ * 发牌那一刻已经按下的键 / 指针一律不算，松开重按才作数。
  */
 export type { LineId };
 export type SkillId = SkillKey;
@@ -74,6 +76,8 @@ const PICK_TIME = 8;
 const FIRST_QUOTA = 3;
 const QUOTA_STEP = 3;
 const PICK_KEYS: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2 };
+/** 按下到抬手的位移上限（px）：超过就当成推摇杆划过去的，不算选卡 */
+const TAP_SLOP = 12;
 
 export class Cards {
   line: LineId | null = null;
@@ -98,7 +102,8 @@ export class Cards {
   private downIds = new Set<number>();
   private staleKeys = new Set<string>();
   private downKeys = new Set<string>();
-  private pressEl: HTMLElement | null = null;
+  /** 当前压在某张卡上的指针；抬手时要落回同一张卡且几乎没位移才算选中 */
+  private press: { el: HTMLElement; id: number; x: number; y: number } | null = null;
   private ringLen = 0;
   private ringRatio = 0;
   private readonly ringStroke = 1.5;
@@ -147,7 +152,14 @@ export class Cards {
       this.staleIds.delete(e.pointerId);
     };
     window.addEventListener('pointerup', releasePtr, true);
-    window.addEventListener('pointercancel', releasePtr, true);
+    window.addEventListener('pointercancel', (e) => {
+      releasePtr(e);
+      if (this.press?.id === e.pointerId) this.press = null;
+    }, true);
+    // 冒泡阶段兜底：卡片自己的 pointerup 先跑过了，这里只负责清掉按压态
+    window.addEventListener('pointerup', (e) => {
+      if (this.press?.id === e.pointerId) this.press = null;
+    });
     new ResizeObserver(() => {
       if (!this.open) return;
       this.layoutRing();
@@ -187,7 +199,7 @@ export class Cards {
     this.pickUntil = 0;
     this.staleIds.clear();
     this.staleKeys.clear();
-    this.pressEl = null;
+    this.press = null;
     this.offerGen += 1;
     for (const el of this.cardEls) el.remove();
     this.cardEls = [];
@@ -278,7 +290,7 @@ export class Cards {
     el.style.transform = 'translateY(30px) rotate(14deg)';
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 320);
-    if (this.pressEl === el) this.pressEl = null;
+    if (this.press?.el === el) this.press = null;
     this.cardEls.forEach((c, j) => {
       const k = c.querySelector('.ckey');
       if (k) k.textContent = String(j + 1);
@@ -338,6 +350,8 @@ export class Cards {
     // 已有的冲刺/技能优先出下一档，避免只看见同名 LV1 换系
     take(upgrades, 2);
     take(fresh, 3 - picks.length);
+    // 一边抽空了就拿另一边补满，别让牌面缩到两张
+    take(upgrades, 3 - picks.length);
     if (!picks.length) return;
     shuffle(picks);
     this.offered = picks;
@@ -345,7 +359,7 @@ export class Cards {
     this.pickUntil = 0;
     this.staleIds = new Set(this.downIds);
     this.staleKeys = new Set(this.downKeys);
-    this.pressEl = null;
+    this.press = null;
     this.offerGen += 1;
     this.renderCards();
     sfx.play('card_deal');
@@ -375,17 +389,22 @@ export class Cards {
       btn.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         if (this.staleIds.has(e.pointerId)) {
-          this.pressEl = null;
+          this.press = null;
           return;
         }
-        this.pressEl = btn;
+        this.press = { el: btn, id: e.pointerId, x: e.clientX, y: e.clientY };
       });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (this.pressEl !== btn) return;
-        this.pressEl = null;
-        this.select(i);
+      // 只认自己判定的轻点。浏览器在触屏上补发的 click 目标和时机都不受控，
+      // 而且摇杆一旦 preventDefault 就根本不会补，统一走 pointerup 两边行为才一致。
+      btn.addEventListener('pointerup', (e) => {
+        const p = this.press;
+        this.press = null;
+        if (!p || p.el !== btn || p.id !== e.pointerId) return;
+        if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > TAP_SLOP) return;
+        // 现查位置：knockOneOut 抽掉前面的卡后，发牌时的序号已经不作数
+        const at = this.cardEls.indexOf(btn);
+        if (at < 0) return;
+        this.select(at);
       });
       this.listEl.appendChild(btn);
       this.cardEls.push(btn);
@@ -403,10 +422,13 @@ export class Cards {
     });
   }
 
-  private select(i: number, auto = false) {
-    if (!this.open || i < 0 || i >= this.offered.length) return;
-    this.open = false;
-    this.pressEl = null;
+  private select(i: number) {
+    if (!this.open) return;
+    if (i < 0 || i >= this.offered.length) {
+      // 牌面和数据对不上时收掉这一轮，别让 open 永远为真把后面的发牌全挡住
+      this.dismiss();
+      return;
+    }
     sfx.play('card_pick');
     const c = this.offered[i];
     const el = this.cardEls[i];
@@ -419,6 +441,14 @@ export class Cards {
       other.style.transform = 'scale(0.85)';
     });
     this.fly(el, c);
+    this.dismiss();
+    this.apply(c);
+  }
+
+  /** 收起牌面并停表，不改卡组 */
+  private dismiss() {
+    this.open = false;
+    this.press = null;
     this.rowEl.style.display = 'none';
     this.pickUntil = 0;
     this.staleIds.clear();
@@ -427,11 +457,10 @@ export class Cards {
     if (document.activeElement instanceof HTMLElement && this.rowEl.contains(document.activeElement)) {
       document.activeElement.blur();
     }
-    this.apply(c, auto);
     this.renderBadge();
   }
 
-  private apply(c: Card, auto = false) {
+  private apply(c: Card) {
     if (c.track === 'dash') {
       const id = c.id as LineId;
       if (id === this.line) this.lineLv = Math.max(this.lineLv, c.toLevel);
@@ -452,7 +481,7 @@ export class Cards {
     this.renderButtons();
     const m = this.metaOf(c);
     const lv = c.track === 'dash' ? this.lineLv : this.skillLv;
-    this.onApplied?.(`${auto ? '随机 · ' : ''}${m.glyph}${m.name} LV${lv}`);
+    this.onApplied?.(`${m.glyph}${m.name} LV${lv}`);
   }
 
   /** 选中卡片飞入右下角按钮的动画 */

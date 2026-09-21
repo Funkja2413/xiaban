@@ -28,6 +28,7 @@ import { commonFx, crowdFx, dashFx, enemySkillFx, loadFxCatalog, overtimeMinutes
 import { dayPlayerLoadout } from '../fx/days';
 import { Hazards } from './hazards';
 import { bgm, sfx } from '../audio';
+import type { BootProgress } from '../boot-progress';
 
 const FIXED_DT = 1 / 60;
 const ENEMY_CAP = 80;
@@ -140,13 +141,16 @@ export class Game {
   async start(
     container: HTMLElement,
     day: WeekdayId = 'monday',
-    opts: { menu?: boolean; playerSlot?: PlayerSlotId } = {}
+    opts: { menu?: boolean; playerSlot?: PlayerSlotId; onProgress?: BootProgress } = {}
   ) {
     this.dayId = day;
     this.playerSlotId = opts.playerSlot ?? loadPlayerSlot();
     setPlayDayHint(day);
+    const progress = opts.onProgress;
+    progress?.phase('特效', 0.08);
     await loadFxCatalog();
     watchFxCatalog();
+    progress?.phase('物理引擎', 0.22);
     this.world = await initPhysics();
 
     this.renderer = new THREE.WebGPURenderer({ antialias: false });
@@ -156,12 +160,14 @@ export class Game {
     this.renderer.shadowMap.enabled = false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
+    progress?.phase('渲染器', 0.4);
     await this.renderer.init();
     container.appendChild(this.renderer.domElement);
     this.hud.backend = (this.renderer.backend as any).isWebGPUBackend ? 'WebGPU' : 'WebGL2';
 
     this.camera = new THREE.PerspectiveCamera(55, size.w / size.h, 0.5, 140);
 
+    progress?.phase('关卡', 0.66);
     const days = await loadLevelCatalog();
     const def = levelById(days, day);
     this.level = await Level.create(def);
@@ -173,6 +179,7 @@ export class Game {
     addLightsToScene(this.scene, this.lights);
     applyAtmosphere(this.scene, this.renderer, this.lights, def.atmosphere, def.pointLights);
 
+    progress?.phase('同事形象', 0.96);
     const humans = await loadHumanoidKit(this.playerSlotId);
     this.kit = humans;
     const { map, playerStart, elevatorPoint } = this.level;
@@ -318,6 +325,7 @@ export class Game {
 
     this.renderer.setAnimationLoop((t) => this.tick(t));
     (window as any).__game = this;
+    progress?.finish();
     if (opts.menu) this.enterMenu();
     else this.beginPlay();
   }

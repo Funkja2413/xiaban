@@ -60,10 +60,13 @@ export class Input {
     window.addEventListener('mouseup', () => (this.mouseDown = false));
 
     const opts = { passive: false } as AddEventListenerOptions;
-    canvas.addEventListener('touchstart', (e) => this.onTouchStart(e), opts);
-    canvas.addEventListener('touchmove', (e) => this.onTouchMove(e), opts);
-    canvas.addEventListener('touchend', (e) => this.onTouchEnd(e), opts);
-    canvas.addEventListener('touchcancel', (e) => this.onTouchEnd(e), opts);
+    // 绑在舞台而不是 canvas：顶栏抽卡时卡片带盖住小半个屏幕，
+    // 只听 canvas 的话手指落在卡上摇杆就彻底没反应，玩家会反复抬手重按。
+    const touchRoot = document.getElementById('stage') ?? canvas;
+    touchRoot.addEventListener('touchstart', (e) => this.onTouchStart(e as TouchEvent), opts);
+    touchRoot.addEventListener('touchmove', (e) => this.onTouchMove(e as TouchEvent), opts);
+    touchRoot.addEventListener('touchend', (e) => this.onTouchEnd(e as TouchEvent), opts);
+    touchRoot.addEventListener('touchcancel', (e) => this.onTouchEnd(e as TouchEvent), opts);
 
     const dashBtn = document.getElementById('dashBtn')!;
     dashBtn.addEventListener('touchstart', (e) => {
@@ -97,6 +100,8 @@ export class Input {
   private onTouchStart(e: TouchEvent) {
     e.preventDefault();
     for (const t of Array.from(e.changedTouches)) {
+      // 冲刺 / 技能按钮自己处理，别顺手把它当成摇杆起点
+      if ((t.target as HTMLElement | null)?.closest?.('button')) continue;
       const isLeft = isStageLeft(t.clientX);
       if (isLeft && this.moveTouchId === null) {
         this.moveTouchId = t.identifier;

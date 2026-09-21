@@ -6,6 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>我要下班！</title>
+  <link rel="preload" as="image" href="%BASE_URL%ui/loading-bg.jpg" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
@@ -129,9 +130,11 @@
     }
 
     /* 不暂停抽卡：记分牌正下方三选一；倒计时在预计下班描边环上；点击即选 */
-    #cardRow { pointer-events: auto; width: 100%; padding: 0 8px; }
+    /* 只有卡片本身吃输入，卡缝和左右余量留给画面，别在操作区上盖一条满宽的墙 */
+    #cardRow { pointer-events: none; width: 100%; padding: 0 8px; }
     #cardList { display: flex; gap: 6px; justify-content: center; }
     .card {
+      pointer-events: auto;
       position: relative; flex: 1; max-width: 112px; min-width: 0;
       padding: 8px 5px 8px; border-radius: 14px; border: 2px solid #888;
       background: rgba(18, 20, 28, 0.9); color: #eee;
@@ -1003,7 +1006,11 @@
     }
     #avatarGo:active:not(:disabled) { filter: brightness(0.94); transform: translateX(-50%) scale(0.97); }
     #avatarGo:disabled { opacity: 0.38; }
-    #loading { background: #07060c; justify-content: flex-end; padding-bottom: 52px; }
+    #loading {
+      background: #07060c url('%BASE_URL%ui/loading-bg.jpg') center 42% / cover no-repeat;
+      justify-content: flex-end;
+      padding-bottom: 52px;
+    }
 
     .artSlot {
       position: relative;
@@ -1022,9 +1029,11 @@
     }
     #loadingBg {
       position: absolute; inset: 0; border: none; border-radius: 0; z-index: 0;
-      background: #07060c;
+      background: transparent;
     }
     #loadingBg img { object-fit: cover; object-position: center 42%; }
+    #loadingBg.empty img { display: block; }
+    #loadingBg.empty::after { display: none; content: none; }
     #loadingHero.empty, #loadingLogo.empty { display: none; }
     #loadingHero {
       position: relative; z-index: 1; width: min(220px, 58%); aspect-ratio: 1;
@@ -1038,12 +1047,10 @@
       background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden;
     }
     #loadingBar > i {
-      display: block; height: 100%; width: 40%; background: #3b82f6;
-      animation: loadSlide 1.1s ease-in-out infinite;
-    }
-    @keyframes loadSlide {
-      0% { transform: translateX(-120%); }
-      100% { transform: translateX(320%); }
+      display: block; height: 100%; width: 0%;
+      background: #3b82f6;
+      transform: none;
+      transition: width 0.16s linear;
     }
     #homeLogo {
       position: absolute; left: 0; top: 0;
@@ -1190,7 +1197,7 @@
   <button id="resetBtn">返回</button>
 
   <div id="loading">
-    <div id="loadingBg" class="artSlot empty" data-label="Loading 背景"><img alt="" src="%BASE_URL%ui/loading-bg.jpg" /></div>
+    <div id="loadingBg" class="artSlot" data-label="Loading 背景"><img alt="" src="%BASE_URL%ui/loading-bg.jpg" /></div>
     <div id="loadingHero" class="artSlot empty" data-label="角色图"><img alt="" src="%BASE_URL%ui/loading-hero.png" /></div>
     <div id="loadingLogo" class="artSlot empty" data-label="Logo"><img alt="" src="%BASE_URL%ui/logo.png" /></div>
     <div class="title">我要下班！</div>

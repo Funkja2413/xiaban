@@ -1,4 +1,5 @@
 import { Game } from './game/game';
+import { bindBootProgress } from './boot-progress';
 import { homeBackdropDay, loadPlayerSlot, rememberLastPlayed, rememberPlayerSlot } from './progress';
 import { isPlayerSlotId } from './roster';
 import { bindAvatar, bindHome, bindPlay, initShell, playUrl, setMode, showResult, wantsAutoPlay } from './shell';
@@ -6,6 +7,7 @@ import { bgm } from './audio';
 
 initShell();
 setMode('loading');
+const bootProgress = bindBootProgress();
 
 const auto = wantsAutoPlay();
 const bootDay = auto?.day ?? homeBackdropDay();
@@ -37,7 +39,7 @@ const loadingSub = document.querySelector('#loading .sub') as HTMLElement | null
 if (loadingSub) loadingSub.textContent = auto ? '正在进入办公室…' : '正在准备场景…';
 
 game
-  .start(document.getElementById('app')!, bootDay, { menu: !auto, playerSlot: bootPlayer })
+  .start(document.getElementById('app')!, bootDay, { menu: !auto, playerSlot: bootPlayer, onProgress: bootProgress })
   .then(() => {
     if (auto) {
       rememberPlayerSlot(auto.player);

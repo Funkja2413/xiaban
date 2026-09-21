@@ -163,6 +163,10 @@ function bindArtSlots() {
     const ok = () => slot?.classList.remove('empty');
     img.addEventListener('error', mark);
     img.addEventListener('load', ok);
+    if (slot?.id === 'loadingBg') {
+      ok();
+      continue;
+    }
     if (img.complete) {
       if (!img.naturalWidth) mark();
       else ok();
