@@ -97,11 +97,17 @@ export class Input {
     return s;
   }
 
+  /** 只有对局里才抢触摸。首页 / 菜单按钮都靠 click，这里 preventDefault 会把它们掐死。 */
+  private playTouches(): boolean {
+    return document.getElementById('stage')?.dataset.mode === 'play';
+  }
+
   private onTouchStart(e: TouchEvent) {
+    if (!this.playTouches()) return;
+    // 冲刺 / 技能 / 返回仍走自己的按钮，不要连 click 一起吞掉
+    if (Array.from(e.changedTouches).some((t) => (t.target as HTMLElement | null)?.closest?.('button'))) return;
     e.preventDefault();
     for (const t of Array.from(e.changedTouches)) {
-      // 冲刺 / 技能按钮自己处理，别顺手把它当成摇杆起点
-      if ((t.target as HTMLElement | null)?.closest?.('button')) continue;
       const isLeft = isStageLeft(t.clientX);
       if (isLeft && this.moveTouchId === null) {
         this.moveTouchId = t.identifier;
@@ -117,6 +123,7 @@ export class Input {
   }
 
   private onTouchMove(e: TouchEvent) {
+    if (this.moveTouchId === null && this.aimTouchId === null) return;
     e.preventDefault();
     const R = 55;
     for (const t of Array.from(e.changedTouches)) {
@@ -141,6 +148,7 @@ export class Input {
   }
 
   private onTouchEnd(e: TouchEvent) {
+    if (this.moveTouchId === null && this.aimTouchId === null) return;
     e.preventDefault();
     for (const t of Array.from(e.changedTouches)) {
       if (t.identifier === this.moveTouchId) {
