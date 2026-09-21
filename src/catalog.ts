@@ -504,7 +504,7 @@ export async function loadCatalog(): Promise<ColleagueCatalog> {
     return cat;
   };
   try {
-    const res = await fetch(assetUrl('models/colleagues/catalog.json'), { cache: 'no-store' });
+    const res = await fetch(assetUrl('models/colleagues/catalog.json'));
     if (!res.ok) return finish(emptyCatalog());
     const data = (await res.json()) as ColleagueCatalog;
     if (data?.version !== 1) return finish(emptyCatalog());

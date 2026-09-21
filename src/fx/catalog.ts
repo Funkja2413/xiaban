@@ -1538,7 +1538,7 @@ function migrateLegacy(raw: Record<string, unknown>): Partial<FxCatalog> {
 
 export async function loadFxCatalog(url = `${import.meta.env.BASE_URL}fx/catalog.json`) {
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url);
     if (!res.ok) return current;
     const data = (await res.json()) as { version?: number };
     if (data?.version === 3) replaceFx(data as FxCatalog);

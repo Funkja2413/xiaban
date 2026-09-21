@@ -2311,7 +2311,7 @@ export async function loadLevelCatalog(): Promise<LevelCatalog> {
   const rel = 'levels/catalog.json';
   const url = `${import.meta.env.BASE_URL}${rel}`;
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url);
     if (!res.ok) {
       const fallback = emptyCatalog();
       ensureWeekdays(fallback);

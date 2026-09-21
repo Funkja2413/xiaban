@@ -243,9 +243,12 @@ export class Level {
       : tex.plaster();
     this.wallMap = wallMap;
     this.faceMaps.clear();
-    for (const p of collectFaceMaps(this.def)) {
-      this.faceMaps.set(p, prepareFacePosterMap(await loadColorMap(assetUrl(p))));
-    }
+    const facePaths = collectFaceMaps(this.def);
+    const faceLoaded = await Promise.all(facePaths.map(async (p) => {
+      const map = prepareFacePosterMap(await loadColorMap(assetUrl(p)));
+      return [p, map] as const;
+    }));
+    for (const [p, map] of faceLoaded) this.faceMaps.set(p, map);
     this.woodMat = mats.wood();
 
     this.buildPerimeter();

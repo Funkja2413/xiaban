@@ -369,8 +369,7 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
   const playerCat = (id: PlayerSlotId) => catalogForPlayerSlot(catalog, id);
   const maleSkin = skinForSlot(catalog, 'colleague-a-m');
   const femaleSkin = skinForSlot(catalog, 'colleague-a-f');
-  const playerSkin = skinForSlot(playerCat('player'), 'player');
-  const playerFSkin = skinForSlot(playerCat('player-f'), 'player-f');
+  const playerSkin = skinForSlot(playerCat(activePlayer), activePlayer);
   const heavySkin = skinForSlot(catalog, 'heavy');
   const interceptorSkin = skinForSlot(catalog, 'interceptor');
   const slotIds = [...BATTLE_SLOT_IDS];
@@ -433,17 +432,16 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
 
   const hairFileOf = (id: string) => kitHairMapForSlot(catalogForPlayerSlot(catalog, id), id) || KIT_HAIR_ALBEDO;
   const skirtFileOf = (id: string) => kitSkirtMapForSlot(catalogForPlayerSlot(catalog, id), id) || KIT_SKIRT_ALBEDO;
-  const kitLookIds = [...PLAYER_SLOT_IDS, ...slotIds];
+  const kitLookIds = [activePlayer, ...slotIds];
   const hairMapFiles = [...new Set(kitLookIds.map(hairFileOf))];
   const skirtMapFiles = [...new Set(kitLookIds.map(skirtFileOf))];
 
-  const [gltf, maleMap, femaleMap, playerMap, playerFMap, heavyMap, interceptorMap, idleRoot, runRoot, hairTexList, skirtTexList] =
+  const [gltf, maleMap, femaleMap, playerMap, heavyMap, interceptorMap, idleRoot, runRoot, hairTexList, skirtTexList] =
     await Promise.all([
       gltfLoader.loadAsync(assetUrl(catalog.base.mesh)),
       loadMap(maleSkin),
       loadMap(femaleSkin),
       loadMap(playerSkin),
-      loadMap(playerFSkin),
       loadMap(heavySkin),
       loadMap(interceptorSkin),
       fbxLoader.loadAsync(assetUrl(catalog.base.idle)).catch(() => null),
@@ -458,10 +456,8 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
   const root = gltf.scene;
   const maleMat = toPhong(maleMap);
   const femaleMat = toPhong(femaleMap);
-  const playerMatM = toPhong(playerMap);
-  const playerMatF = toPhong(playerFMap);
-  const playerMats: Record<PlayerSlotId, THREE.MeshPhongMaterial> = { player: playerMatM, 'player-f': playerMatF };
-  const playerMat = playerMats[activePlayer];
+  const playerMat = toPhong(playerMap);
+  const playerMats: Record<PlayerSlotId, THREE.MeshPhongMaterial> = { player: playerMat, 'player-f': playerMat };
   const heavyMat = toPhong(heavyMap);
   const interceptorMat = toPhong(interceptorMap);
   const skinned = findKitBody(root);
@@ -721,7 +717,7 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
     playerSlot: activePlayer,
     playerLooks: {
       player: {
-        mat: playerMatM,
+        mat: playerMat,
         morph: bodyMorphForSlot(playerCat('player'), 'player'),
         scale: bodyScaleForSlot(playerCat('player'), 'player'),
         kitHair: kitHairForSlot(playerCat('player'), 'player'),
@@ -734,7 +730,7 @@ export async function loadHumanoidKit(playerSlot: PlayerSlotId = 'player', day?:
         back: packProp('player', 'back'),
       },
       'player-f': {
-        mat: playerMatF,
+        mat: playerMat,
         morph: bodyMorphForSlot(playerCat('player-f'), 'player-f'),
         scale: bodyScaleForSlot(playerCat('player-f'), 'player-f'),
         kitHair: kitHairForSlot(playerCat('player-f'), 'player-f'),

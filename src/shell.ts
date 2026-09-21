@@ -514,21 +514,6 @@ function resultArtFile(kind: 'won' | 'lost' | 'finale', player: PlayerSlotId) {
   return female ? 'result-lose-f.png' : 'result-lose.png';
 }
 
-function preloadResultArt() {
-  for (const file of [
-    'result-win.png',
-    'result-win-f.png',
-    'result-finale.png',
-    'result-finale-f.png',
-    'result-lose.png',
-    'result-lose-f.png',
-  ]) {
-    const img = new Image();
-    img.decoding = 'async';
-    img.src = assetUrl(`ui/${file}`);
-  }
-}
-
 export function showResult(
   kind: 'won' | 'lost',
   day: WeekdayId,
@@ -624,7 +609,6 @@ export function initShell() {
   renderLevels();
   bindSettings();
   bindUiClicks();
-  preloadResultArt();
 
   document.getElementById('btnStart')!.addEventListener('click', () => askAvatar(continueDay(), 'home'));
   document.getElementById('btnLevels')!.addEventListener('click', () => openLevels());
