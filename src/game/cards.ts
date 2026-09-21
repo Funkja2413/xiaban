@@ -6,7 +6,9 @@ import { sfx } from '../audio';
 /**
  * 不暂停抽卡：一套三选一同时混入冲撞属性和主动技能。
  * 卡片出现在顶部「预计下班」正下方；倒计时为预计下班面板描边环（真实 8 秒墙钟），
- * 从 12 点逆时针收完一圈只停表，不代选。
+ * 从 12 点逆时针收完一圈就替玩家随机一张（toast 带「随机 ·」前缀），牌面必须能自己关掉，
+ * 否则它会一直挂着，工牌在背后越攒越多，玩家点一下就连着弹好几轮。
+ * 被塞任务会冲掉一张候选，保底留一张，两次之间隔 KNOCK_CD，并在原卡位飘字说明。
  * 游戏不暂停，卡片带就压在操作区上，所以选卡判定要严：只有卡片本身吃输入，
  * 且必须按下和抬手落在同一张卡、位移不超过 TAP_SLOP 才算选中。
  * 不用浏览器补发的 click——摇杆 preventDefault 之后触屏根本不会补。
@@ -78,6 +80,10 @@ const QUOTA_STEP = 3;
 const PICK_KEYS: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2 };
 /** 按下到抬手的位移上限（px）：超过就当成推摇杆划过去的，不算选卡 */
 const TAP_SLOP = 12;
+/** 两次「任务冲掉一张」之间的最短间隔（ms）。被围时任务会连着落地，不挡就会瞬间只剩一张 */
+const KNOCK_CD = 1500;
+/** 只剩一张时的缓冲（ms）：让玩家看清是哪张，然后直接替他装上 */
+const LAST_CARD_MS = 1200;
 
 export class Cards {
   line: LineId | null = null;
@@ -95,6 +101,10 @@ export class Cards {
   private cardEls: HTMLElement[] = [];
   /** 抽卡截止墙钟时间（ms）；≤0 表示尚未开始计时 */
   private pickUntil = 0;
+  /** 本段计时的总长度（ms），描边环按它换算比例 */
+  private pickSpan = PICK_TIME * 1000;
+  /** 上次被任务冲掉卡的时刻，用来隔开连续销毁 */
+  private lastKnockAt = 0;
   /** 发牌序号，过期点击不算 */
   private offerGen = 0;
   /** 发牌时已经按下的指针 / 数字键：松开前不算选卡 */
@@ -228,11 +238,27 @@ export class Cards {
     }
     // 用墙钟对齐真实秒数：不受 fixedUpdate 掉帧/限步影响
     if (this.pickUntil <= 0) return;
-    const now = performance.now();
-    const left = this.pickUntil - now;
-    const ratio = Math.max(0, Math.min(1, left / (PICK_TIME * 1000)));
-    this.setRing(ratio);
-    // 超时只停表，不代选
+    const left = this.pickUntil - performance.now();
+    if (left <= 0) {
+      // 收完一圈就替玩家随机一张。牌面必须能自己关掉，
+      // 否则它会一直挂着，工牌在后面越攒越多，等玩家点一下就连着弹好几轮。
+      this.autoPick();
+      return;
+    }
+    this.setRing(Math.max(0, Math.min(1, left / this.pickSpan)));
+  }
+
+  private autoPick() {
+    if (!this.open || !this.offered.length) return;
+    this.select((Math.random() * this.offered.length) | 0, true);
+  }
+
+  /** 把剩下的唯一一张改成短计时，到点直接装上，不让玩家对着单选项干等 */
+  private armLastCard() {
+    if (this.pickUntil <= 0) return;
+    this.pickSpan = LAST_CARD_MS;
+    this.pickUntil = Math.min(this.pickUntil, performance.now() + LAST_CARD_MS);
+    this.setRing(1);
   }
 
   /** 抽卡中：显示预计下班描边环 */
@@ -282,9 +308,13 @@ export class Cards {
   /** 被塞任务时随机打掉一张候选卡；返回是否打掉 */
   knockOneOut(): boolean {
     if (!this.open || this.offered.length <= 1) return false;
+    const now = performance.now();
+    if (now - this.lastKnockAt < KNOCK_CD) return false;
+    this.lastKnockAt = now;
     const i = (Math.random() * this.offered.length) | 0;
     this.offered.splice(i, 1);
     const el = this.cardEls.splice(i, 1)[0];
+    this.burnNote(el);
     el.style.pointerEvents = 'none';
     el.style.transition = 'transform 0.3s ease-in, opacity 0.3s';
     el.style.transform = 'translateY(30px) rotate(14deg)';
@@ -295,7 +325,20 @@ export class Cards {
       const k = c.querySelector('.ckey');
       if (k) k.textContent = String(j + 1);
     });
+    if (this.offered.length === 1) this.armLastCard();
     return true;
+  }
+
+  /** 在被冲掉那张卡的位置飘一句，区分「被任务打掉」和「自己选中」 */
+  private burnNote(el: HTMLElement) {
+    const r = el.getBoundingClientRect();
+    const note = document.createElement('div');
+    note.className = 'cardBurn';
+    note.textContent = '任务冲掉一张！';
+    note.style.left = `${r.left + r.width / 2}px`;
+    note.style.top = `${r.top + r.height / 2}px`;
+    document.body.appendChild(note);
+    setTimeout(() => note.remove(), 900);
   }
 
   private tryOffer() {
@@ -357,6 +400,8 @@ export class Cards {
     this.offered = picks;
     this.open = true;
     this.pickUntil = 0;
+    // 每次发牌重置销毁冷却，保证新的三张至少能完整看 KNOCK_CD 这么久
+    this.lastKnockAt = performance.now();
     this.staleIds = new Set(this.downIds);
     this.staleKeys = new Set(this.downKeys);
     this.press = null;
@@ -417,12 +462,14 @@ export class Cards {
     requestAnimationFrame(() => {
       if (this.offerGen !== gen || !this.open) return;
       this.layoutRing();
-      this.pickUntil = performance.now() + PICK_TIME * 1000;
+      // 只发出一张时没什么可挑的，短暂亮一下就替玩家装上
+      this.pickSpan = this.offered.length === 1 ? LAST_CARD_MS : PICK_TIME * 1000;
+      this.pickUntil = performance.now() + this.pickSpan;
       this.setRing(1);
     });
   }
 
-  private select(i: number) {
+  private select(i: number, auto = false) {
     if (!this.open) return;
     if (i < 0 || i >= this.offered.length) {
       // 牌面和数据对不上时收掉这一轮，别让 open 永远为真把后面的发牌全挡住
@@ -442,7 +489,7 @@ export class Cards {
     });
     this.fly(el, c);
     this.dismiss();
-    this.apply(c);
+    this.apply(c, auto);
   }
 
   /** 收起牌面并停表，不改卡组 */
@@ -460,7 +507,7 @@ export class Cards {
     this.renderBadge();
   }
 
-  private apply(c: Card) {
+  private apply(c: Card, auto = false) {
     if (c.track === 'dash') {
       const id = c.id as LineId;
       if (id === this.line) this.lineLv = Math.max(this.lineLv, c.toLevel);
@@ -481,7 +528,7 @@ export class Cards {
     this.renderButtons();
     const m = this.metaOf(c);
     const lv = c.track === 'dash' ? this.lineLv : this.skillLv;
-    this.onApplied?.(`${m.glyph}${m.name} LV${lv}`);
+    this.onApplied?.(`${auto ? '随机 · ' : ''}${m.glyph}${m.name} LV${lv}`);
   }
 
   /** 选中卡片飞入右下角按钮的动画 */

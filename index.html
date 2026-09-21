@@ -166,6 +166,18 @@
       transition: transform 0.45s cubic-bezier(0.5, 0, 0.6, 1), opacity 0.45s;
       box-shadow: 0 4px 14px rgba(0,0,0,0.4);
     }
+    /* 候选卡被任务冲掉时在原卡位飘一下，别让玩家以为是自己选中了 */
+    .cardBurn {
+      position: fixed; z-index: 61; pointer-events: none; white-space: nowrap;
+      font-size: 12px; font-weight: 800; color: #ffd873;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.75);
+      animation: cardBurnUp 0.9s ease-out forwards;
+    }
+    @keyframes cardBurnUp {
+      0% { opacity: 0; transform: translate(-50%, -40%) scale(0.85); }
+      18% { opacity: 1; transform: translate(-50%, -60%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+    }
 
     #stats {
       position: absolute; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 10px;
