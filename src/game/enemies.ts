@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { FlowField } from '../sim/flowfield';
-import { ENEMY_CUT_GROUPS } from '../sim/physics';
+import { ENEMY_CUT_GROUPS, G_ENEMY, G_PLAYER, G_RAGDOLL } from '../sim/physics';
 import { RagdollFactory, type RagdollHandle } from './ragdoll';
 import type { HumanoidKit } from './humanoid';
 import { enemySkillFx, type CrowdActorId, type EnemySkillId } from '../fx/catalog';
@@ -32,6 +32,8 @@ const RAGDOLL_IMPULSE = 400;
 const STAGGER_TO_RAGDOLL = 3;
 /** 主管追人时略快于普通同事，仍慢于冲刺玩家 */
 const HEAVY_CHASE = 2.55;
+/** 绕行探测：只打家具、墙和陷阱，不打玩家和同事 */
+const SOLID_RAY_GROUPS = (0xffff << 16) | (0xffff & ~(G_ENEMY | G_PLAYER | G_RAGDOLL));
 /** 前台拦路虎：玩家进自己卡口这么近才离开岗位去堵 */
 const INTERCEPT_ZONE = 4.2;
 /** 玩家离开自己卡口这么远就回家 */
@@ -95,6 +97,17 @@ export class Enemies {
   private aggro: Uint8Array;
   /** 卡住计时：速度过低且离目标还远就侧步解卡 */
   private stuckT: Float32Array;
+  /** 绕行承诺剩余时间；>0 时朝选定一侧的可走点走，不再顶着障碍 */
+  private detourT: Float32Array;
+  /** 绕行侧：1 左，-1 右 */
+  private detourS: Int8Array;
+  /** 开始这次绕行时的流场代价，降下来就交回流场 */
+  private detourCost: Float32Array;
+  /** 上次确实挪动过的位置，用来认“在推桌子”而不是在走 */
+  private progX: Float32Array;
+  private progZ: Float32Array;
+  private flankPt = { x: 0, z: 0 };
+  private solidRay = new RAPIER.Ray({ x: 0, y: 0.45, z: 0 }, { x: 0, y: 0, z: 1 });
   private aimPX = 0;
   private aimPZ = 0;
   /** 平滑后的水平速度，主管转向只看这个，不跟物理抖动 */
@@ -201,6 +214,11 @@ export class Enemies {
     this.rushing = new Uint8Array(capacity);
     this.aggro = new Uint8Array(capacity);
     this.stuckT = new Float32Array(capacity);
+    this.detourT = new Float32Array(capacity);
+    this.detourS = new Int8Array(capacity);
+    this.detourCost = new Float32Array(capacity);
+    this.progX = new Float32Array(capacity);
+    this.progZ = new Float32Array(capacity);
     this.faceX = new Float32Array(capacity);
     this.faceZ = new Float32Array(capacity);
     this.anchorX = new Float32Array(capacity);
@@ -362,6 +380,9 @@ export class Enemies {
       this.rushing[i] = 0;
       this.aggro[i] = 0;
       this.stuckT[i] = 0;
+      this.detourT[i] = 0;
+      this.detourS[i] = 0;
+      this.detourCost[i] = -1;
       this.faceX[i] = 0;
       this.faceZ[i] = 0;
       this.stagger[i] = 0;
@@ -406,6 +427,8 @@ export class Enemies {
     this.bodies[i] = body;
     this.posX[i] = x;
     this.posZ[i] = z;
+    this.progX[i] = x;
+    this.progZ[i] = z;
   }
 
   hit(i: number, dirX: number, dirZ: number, impulse: number, opts: HitOpts = {}) {
@@ -717,6 +740,11 @@ export class Enemies {
       this.rushing[i] = 0;
       this.aggro[i] = 0;
       this.stuckT[i] = 0;
+      this.detourT[i] = 0;
+      this.detourS[i] = 0;
+      this.detourCost[i] = -1;
+      this.progX[i] = this.anchorX[i];
+      this.progZ[i] = this.anchorZ[i];
       this.clearChannel(i);
       this.faceX[i] = 0;
       this.faceZ[i] = 0;
@@ -837,7 +865,7 @@ export class Enemies {
 
     this.posting[i] = 0;
     this.rushing[i] = 0;
-    this.goTo(px, pz, x, z, outDir);
+    this.goTo(px, pz, x, z, outDir, type === EType.C ? 0.5 : 0.32);
   }
 
   private toward(tx: number, tz: number, x: number, z: number, outDir: { x: number; z: number }) {
@@ -848,7 +876,7 @@ export class Enemies {
     outDir.z = dz / d;
   }
 
-  private goTo(tx: number, tz: number, x: number, z: number, outDir: { x: number; z: number }) {
+  private goTo(tx: number, tz: number, x: number, z: number, outDir: { x: number; z: number }, radius = 0.32) {
     if (this.flow.isBlockedAt(x, z)) {
       const safe = this.flow.nearestWalkable(x, z);
       if (safe) {
@@ -863,14 +891,140 @@ export class Enemies {
       }
     }
     const dSq = (tx - x) * (tx - x) + (tz - z) * (tz - z);
-    if (dSq < 2.8 * 2.8 && this.flow.clearShot(x, z, tx, tz)) {
+    if (dSq < 2.8 * 2.8 && this.flow.clearShot(x, z, tx, tz, radius)) {
       this.toward(tx, tz, x, z, outDir);
       return;
     }
     this.flow.sample(x, z, outDir);
-    if (outDir.x === 0 && outDir.z === 0 && this.flow.clearShot(x, z, tx, tz)) {
+    if (outDir.x === 0 && outDir.z === 0 && this.flow.clearShot(x, z, tx, tz, radius)) {
       this.toward(tx, tz, x, z, outDir);
     }
+  }
+
+  /**
+   * 人没挪动就说明顶在桌子或陷阱上。选流场代价更低的一侧，朝旁边的可走点走一段，
+   * 代价降下来再交回流场，避免左右来回转。
+   */
+  private resolveStuck(i: number, dt: number, x: number, z: number, dxp: number, dzp: number, distSq: number) {
+    if (this.posting[i] || this.skillWind[i] > 0 || this.shoutT[i] > 0) return;
+    if (distSq <= 0.75 * 0.75) {
+      this.detourT[i] = 0;
+      this.stuckT[i] = 0;
+      return;
+    }
+
+    let bx = this.flowDir.x;
+    let bz = this.flowDir.z;
+    if (bx === 0 && bz === 0) {
+      const d = Math.hypot(dxp, dzp) || 1;
+      bx = dxp / d;
+      bz = dzp / d;
+    }
+
+    if (this.detourT[i] > 0) {
+      this.detourT[i] -= dt;
+      const stepX = x - this.progX[i];
+      const stepZ = z - this.progZ[i];
+      const c = this.flow.costAt(x, z);
+      const escaped =
+        c >= 0 && this.detourCost[i] >= 0 && c + 3 <= this.detourCost[i] && stepX * stepX + stepZ * stepZ > 0.35 * 0.35;
+      if (!escaped && this.detourT[i] > 0) {
+        this.steerFlank(i, x, z, bx, bz, this.detourS[i] || 1);
+        return;
+      }
+      this.detourT[i] = 0;
+      this.stuckT[i] = 0;
+      this.progX[i] = x;
+      this.progZ[i] = z;
+      return;
+    }
+
+    const movedX = x - this.progX[i];
+    const movedZ = z - this.progZ[i];
+    if (movedX * movedX + movedZ * movedZ > 0.16 * 0.16) {
+      this.progX[i] = x;
+      this.progZ[i] = z;
+      this.stuckT[i] = 0;
+      return;
+    }
+    this.stuckT[i] += dt;
+    if (this.stuckT[i] < 0.28) {
+      if (this.stuckT[i] > 0.1) {
+        this.flowDir.x = 0;
+        this.flowDir.z = 0;
+      }
+      return;
+    }
+
+    const left = this.flankCost(x, z, bx, bz, 1);
+    const right = this.flankCost(x, z, bx, bz, -1);
+    const side: 1 | -1 = left <= right ? 1 : -1;
+    this.detourS[i] = side;
+    this.detourT[i] = 1.15;
+    this.detourCost[i] = this.flow.costAt(x, z);
+    this.stuckT[i] = 0;
+    this.progX[i] = x;
+    this.progZ[i] = z;
+    this.steerFlank(i, x, z, bx, bz, side);
+  }
+
+  private flankCost(x: number, z: number, dx: number, dz: number, side: number) {
+    return this.bestFlank(x, z, dx, dz, side, this.flankPt) ? this.flow.costAt(this.flankPt.x, this.flankPt.z) : 1e9;
+  }
+
+  /** 沿前进方向的一侧，挑一个可走且更接近目标的点。无则返回 false */
+  private bestFlank(x: number, z: number, dx: number, dz: number, side: number, out: { x: number; z: number }) {
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-4) return false;
+    dx /= len;
+    dz /= len;
+    const here = this.flow.costAt(x, z);
+    for (let n = 0; n < 3; n++) {
+      const dist = 0.9 + n * 0.7;
+      const sx = x + dx * 0.65 - dz * side * dist;
+      const sz = z + dz * 0.65 + dx * side * dist;
+      if (this.flow.isBlockedAt(sx, sz)) continue;
+      const c = this.flow.costAt(sx, sz);
+      if (c < 0) continue;
+      if (here >= 0 && c > here + 6) continue;
+      if (!this.segmentOpen(x, z, sx, sz)) continue;
+      out.x = sx;
+      out.z = sz;
+      return true;
+    }
+    return false;
+  }
+
+  /** 这段路上有没有桌子、墙或陷阱挡着 */
+  private segmentOpen(x: number, z: number, tx: number, tz: number) {
+    const dx = tx - x;
+    const dz = tz - z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.25) return true;
+    const ray = this.solidRay;
+    ray.origin.x = x;
+    ray.origin.y = 0.45;
+    ray.origin.z = z;
+    ray.dir.x = dx / d;
+    ray.dir.y = 0;
+    ray.dir.z = dz / d;
+    return this.world.castRay(ray, d, true, undefined, SOLID_RAY_GROUPS) == null;
+  }
+
+  private steerFlank(i: number, x: number, z: number, dx: number, dz: number, side: number) {
+    const s = side >= 0 ? 1 : -1;
+    if (this.bestFlank(x, z, dx, dz, s, this.flankPt)) {
+      this.toward(this.flankPt.x, this.flankPt.z, x, z, this.flowDir);
+      return;
+    }
+    if (this.bestFlank(x, z, dx, dz, -s, this.flankPt)) {
+      this.detourS[i] = -s;
+      this.toward(this.flankPt.x, this.flankPt.z, x, z, this.flowDir);
+      return;
+    }
+    const len = Math.hypot(dx, dz) || 1;
+    this.flowDir.x = (-dz / len) * s;
+    this.flowDir.z = (dx / len) * s;
   }
 
   private steerInterceptor(i: number, px: number, pz: number, _distSq: number, outDir: { x: number; z: number }) {
@@ -1025,6 +1179,7 @@ export class Enemies {
       this.flowDir.x = 0;
       this.flowDir.z = 0;
     }
+    this.resolveStuck(i, dt, x, z, dxp, dzp, distSq);
     const dirX = this.flowDir.x;
     const dirZ = this.flowDir.z;
     const ti0 = this.types[i];
@@ -1093,20 +1248,6 @@ export class Enemies {
     if (vLen > vMax) {
       vx = (vx / vLen) * vMax;
       vz = (vz / vLen) * vMax;
-    }
-    if (!this.posting[i] && distSq > 2.2 * 2.2 && vLen < sp * 0.18) {
-      this.stuckT[i] += dt;
-      if (this.stuckT[i] > 0.4) {
-        const side = this.stuckT[i] * 7.1;
-        const nx = -dirZ;
-        const nz = dirX;
-        const nLen = Math.hypot(nx, nz) || 1;
-        vx += (nx / nLen) * sp * (Math.sin(side) >= 0 ? 1 : -1);
-        vz += (nz / nLen) * sp * (Math.sin(side) >= 0 ? 1 : -1);
-        if (this.stuckT[i] > 1.1) this.stuckT[i] = 0;
-      }
-    } else {
-      this.stuckT[i] = 0;
     }
     const body = this.bodies[i]!;
     const cur = body.linvel();
@@ -1324,7 +1465,7 @@ export class Enemies {
         }
         this.faceX[i] = fx;
         this.faceZ[i] = fz;
-      } else {
+      } else if (hSpeed > 0.45) {
         const blend = heavy ? 0.07 : 0.2;
         this.faceX[i] += (v.x - this.faceX[i]) * blend;
         this.faceZ[i] += (v.z - this.faceZ[i]) * blend;

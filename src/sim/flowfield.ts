@@ -339,8 +339,9 @@ export class FlowField {
           }
         }
         if (bx === 0 && bz === 0) {
-          bx = Math.sign(gx);
-          bz = Math.sign(gz);
+          dirX[i] = 0;
+          dirZ[i] = 0;
+          continue;
         }
         const len = Math.hypot(bx, bz) || 1;
         dirX[i] = bx / len;
@@ -447,8 +448,19 @@ export class FlowField {
     return fallback;
   }
 
-  /** 两点之间格子都可走：开阔地直奔，不要绕流场 */
-  clearShot(x: number, z: number, tx: number, tz: number): boolean {
+  /** 两点之间格子都可走。radius > 0 时身体两侧也要通，窄缝不算能直奔 */
+  clearShot(x: number, z: number, tx: number, tz: number, radius = 0): boolean {
+    if (!this.lineClear(x, z, tx, tz)) return false;
+    if (radius <= 0.05) return true;
+    const dx = tx - x;
+    const dz = tz - z;
+    const d = Math.hypot(dx, dz) || 1;
+    const px = (-dz / d) * radius;
+    const pz = (dx / d) * radius;
+    return this.lineClear(x + px, z + pz, tx + px, tz + pz) && this.lineClear(x - px, z - pz, tx - px, tz - pz);
+  }
+
+  private lineClear(x: number, z: number, tx: number, tz: number): boolean {
     const dx = tx - x;
     const dz = tz - z;
     const d = Math.hypot(dx, dz);

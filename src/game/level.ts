@@ -587,9 +587,9 @@ export class Level {
     for (const o of this.obstacles) {
       if (o.nav === false) continue;
       if (o.yaw != null && o.hx != null && o.hz != null) {
-        flow.blockYawed((o.minX + o.maxX) / 2, (o.minZ + o.maxZ) / 2, o.hx, o.hz, o.yaw, 0.1);
+        flow.blockYawed((o.minX + o.maxX) / 2, (o.minZ + o.maxZ) / 2, o.hx, o.hz, o.yaw, 0.28);
       } else {
-        flow.blockRect(o.minX, o.minZ, o.maxX, o.maxZ, 0.1);
+        flow.blockRect(o.minX, o.minZ, o.maxX, o.maxZ, 0.28);
       }
     }
     const shaped = (this.def.voids ?? []).filter((v) => !isRectVoid(v));
