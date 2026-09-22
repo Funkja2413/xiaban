@@ -3,7 +3,7 @@ import { bindBootProgress } from './boot-progress';
 import { homeBackdropDay, loadPlayerSlot, rememberLastPlayed, rememberPlayerSlot } from './progress';
 import { isPlayerSlotId } from './roster';
 import { bindAvatar, bindHome, bindPlay, initShell, playUrl, setMode, showResult, wantsAutoPlay } from './shell';
-import { bgm } from './audio';
+import { bgm, sfx } from './audio';
 
 initShell();
 setMode('loading');
@@ -11,6 +11,8 @@ const bootProgress = bindBootProgress();
 
 const auto = wantsAutoPlay();
 const bootDay = auto?.day ?? homeBackdropDay();
+bgm.play(auto?.day ?? 'home');
+sfx.unlock();
 const qPlayer = new URLSearchParams(location.search).get('player');
 const bootPlayer = auto?.player ?? (isPlayerSlotId(qPlayer) ? qPlayer : loadPlayerSlot());
 const game = new Game();

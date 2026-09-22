@@ -8,6 +8,7 @@ import {
   clipVoidToMap,
   collectFaceMaps,
   deskBox,
+  deskYaw,
   containFaceSize,
   hexToInt,
   isInVoid,
@@ -38,6 +39,11 @@ import { layoutSpawns } from './spawns';
 export type { MapBounds };
 
 const POSTER_LIFT = 0.012;
+
+/** 只要不是正对坐标轴，就用转向后的盒子。差一点也会把外接矩形撑出空气墙。 */
+function offAxis(yaw: number) {
+  return Math.abs(Math.sin(yaw * 2)) > 0.02;
+}
 
 function placeFacePoster(plane: THREE.Mesh, face: WallFace, sx: number, sy: number, sz: number) {
   const e = POSTER_LIFT;
@@ -193,7 +199,12 @@ export class Level {
   readonly elevatorPoint: { x: number; z: number };
   elevator!: ElevatorRig;
 
-  private obstacles: { minX: number; minZ: number; maxX: number; maxZ: number; h: number; tall?: boolean; nav?: boolean }[] = [];
+  private obstacles: {
+    minX: number; minZ: number; maxX: number; maxZ: number;
+    h: number; tall?: boolean; nav?: boolean;
+    /** 斜放时物理和寻路用这块本地盒；min/max 只是外接矩形，给刷怪用 */
+    yaw?: number; hx?: number; hz?: number;
+  }[] = [];
   private deskRects: { minX: number; minZ: number; maxX: number; maxZ: number }[] = [];
   private woodMat!: THREE.Material;
   private wallMap!: THREE.Texture;
@@ -327,9 +338,17 @@ export class Level {
 
   private addObstacle(
     minX: number, minZ: number, maxX: number, maxZ: number,
-    h: number, opts: { tall?: boolean; nav?: boolean } = {}
+    h: number, opts: { tall?: boolean; nav?: boolean; yaw?: number; hx?: number; hz?: number } = {}
   ) {
-    this.obstacles.push({ minX, minZ, maxX, maxZ, h, tall: opts.tall, nav: opts.nav });
+    const turned = opts.yaw != null && opts.hx != null && opts.hz != null && offAxis(opts.yaw);
+    this.obstacles.push({
+      minX, minZ, maxX, maxZ, h,
+      tall: opts.tall,
+      nav: opts.nav,
+      yaw: turned ? opts.yaw : undefined,
+      hx: turned ? opts.hx : undefined,
+      hz: turned ? opts.hz : undefined,
+    });
   }
 
   private wallMaterial(hex: string, mapPath?: string) {
@@ -423,7 +442,12 @@ export class Level {
 
   private addDesk(d: DeskDef) {
     const box = deskBox(d);
-    this.addObstacle(box.minX, box.minZ, box.maxX, box.maxZ, 0.78);
+    const yaw = deskYaw(d);
+    this.addObstacle(box.minX, box.minZ, box.maxX, box.maxZ, 0.78, {
+      yaw,
+      hx: (d.maxX - d.minX) / 2,
+      hz: (d.maxZ - d.minZ) / 2,
+    });
     this.deskRects.push(box);
     const g = new THREE.Group();
     this.tag(g, d.id, 'desk');
@@ -515,6 +539,9 @@ export class Level {
           // 危险物可被清掉：只留物理，不挖寻路洞，避免空气墙
           this.addObstacle(box.minX, box.minZ, box.maxX, box.maxZ, spec.block.h, {
             nav: spec.move !== 'hazard',
+            yaw,
+            hx: spec.block.hx,
+            hz: spec.block.hz,
           });
         }
       }
@@ -531,10 +558,16 @@ export class Level {
     for (const o of this.obstacles) {
       const cx = (o.minX + o.maxX) / 2;
       const cz = (o.minZ + o.maxZ) / 2;
-      const hx = (o.maxX - o.minX) / 2;
-      const hz = (o.maxZ - o.minZ) / 2;
       const collH = (o.tall ? 4 : o.h) / 2;
-      const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(cx, collH, cz));
+      let hx = (o.maxX - o.minX) / 2;
+      let hz = (o.maxZ - o.minZ) / 2;
+      const desc = RAPIER.RigidBodyDesc.fixed().setTranslation(cx, collH, cz);
+      if (o.yaw != null && o.hx != null && o.hz != null) {
+        hx = o.hx;
+        hz = o.hz;
+        desc.setRotation({ x: 0, y: Math.sin(o.yaw / 2), z: 0, w: Math.cos(o.yaw / 2) });
+      }
+      const body = world.createRigidBody(desc);
       world.createCollider(RAPIER.ColliderDesc.cuboid(hx, collH, hz).setFriction(0.2), body);
     }
     for (const raw of this.def.voids ?? []) {
@@ -553,7 +586,11 @@ export class Level {
     // 寻路 = 地图 − 不可移动实体。可推/椅子/危险区不挖洞。
     for (const o of this.obstacles) {
       if (o.nav === false) continue;
-      flow.blockRect(o.minX, o.minZ, o.maxX, o.maxZ, 0.1);
+      if (o.yaw != null && o.hx != null && o.hz != null) {
+        flow.blockYawed((o.minX + o.maxX) / 2, (o.minZ + o.maxZ) / 2, o.hx, o.hz, o.yaw, 0.1);
+      } else {
+        flow.blockRect(o.minX, o.minZ, o.maxX, o.maxZ, 0.1);
+      }
     }
     const shaped = (this.def.voids ?? []).filter((v) => !isRectVoid(v));
     if (shaped.length) flow.blockIf((x, z) => shaped.some((v) => pointInVoid(x, z, v, 0.1)));

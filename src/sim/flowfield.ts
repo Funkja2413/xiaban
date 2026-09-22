@@ -62,6 +62,30 @@ export class FlowField {
     }
   }
 
+  /**
+   * 斜放矩形挡路。hx/hz 是没转时的半宽，yaw 和桌子视觉同一套绕 Y 旋转。
+   * 只挡住真正压到桌面的格子，外接矩形的四个角仍可走。
+   */
+  blockYawed(cx: number, cz: number, hx: number, hz: number, yaw: number, margin = 0.18) {
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    const ax = hx * Math.abs(cos) + hz * Math.abs(sin) + margin;
+    const az = hx * Math.abs(sin) + hz * Math.abs(cos) + margin;
+    const [aCx, aCz] = this.cellOf(cx - ax, cz - az);
+    const [bCx, bCz] = this.cellOf(cx + ax, cz + az);
+    const limX = hx + margin;
+    const limZ = hz + margin;
+    for (let gz = aCz; gz <= bCz; gz++) {
+      for (let gx = aCx; gx <= bCx; gx++) {
+        const wx = this.ox + (gx + 0.5) * this.cell - cx;
+        const wz = this.oz + (gz + 0.5) * this.cell - cz;
+        const lx = wx * cos - wz * sin;
+        const lz = wx * sin + wz * cos;
+        if (Math.abs(lx) <= limX && Math.abs(lz) <= limZ) this.blocked[this.idx(gx, gz)] = 1;
+      }
+    }
+  }
+
   blockIf(test: (x: number, z: number) => boolean) {
     for (let cz = 0; cz < this.nz; cz++) {
       for (let cx = 0; cx < this.nx; cx++) {

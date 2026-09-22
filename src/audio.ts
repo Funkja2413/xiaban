@@ -133,6 +133,7 @@ class BgmPlayer {
   private on = loadSettings().music;
   private volume = 0.336;
   private homeVolume = 0.266;
+  private playKicks = 0;
 
   constructor() {
     const resume = () => {
@@ -179,11 +180,13 @@ class BgmPlayer {
     const el = new Audio(srcOf(id));
     el.loop = true;
     el.preload = 'auto';
+    el.autoplay = true;
     el.volume = id === 'home' ? this.homeVolume : this.volume;
     el.setAttribute('playsinline', '');
     el.addEventListener('canplay', () => {
       if (this.el === el) this.tryPlay();
     });
+    if (document.body) document.body.appendChild(el);
     this.el = el;
     this.id = id;
     this.tryPlay();
@@ -207,13 +210,24 @@ class BgmPlayer {
     // wanted 被 stop() 清掉后不要因 pointerdown / 回前台误把旧轨续上
     if (!this.on || !this.el || !this.wanted) return;
     if (document.visibilityState !== 'visible') return;
-    const p = this.el.play();
-    if (p) void p.catch(() => {});
+    const el = this.el;
+    const p = el.play();
+    if (!p) return;
+    void p.then(() => {
+      this.playKicks = 0;
+    }).catch(() => {
+      if (this.el !== el || !this.wanted || this.playKicks >= 6) return;
+      this.playKicks += 1;
+      window.setTimeout(() => {
+        if (this.el === el) this.tryPlay();
+      }, 500);
+    });
   }
 
   private dispose() {
     if (!this.el) return;
     this.el.pause();
+    this.el.remove();
     this.el.removeAttribute('src');
     this.el.load();
     this.el = null;
