@@ -1,9 +1,9 @@
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { commonFx, crowdFx, dashFx, dashImpulseOf, dashReactOf, enemySkillFx, overtimePopText, overtimePreviewMin, skillFx, type ActorId, type CrowdActorId, type DashKey, type SkillKey } from '../../../src/fx/catalog';
+import { LINE_IDS, coffeeColorOnDay, commonFx, crowdFx, dashFx, dashImpulseOf, dashReactOf, enemySkillFx, mergeHitFx, overtimePopText, overtimePreviewMin, skillFx, type ActorId, type CrowdActorId, type DashKey, type HitFx, type SkillKey } from '../../../src/fx/catalog';
 import type { EnemySkillId } from '../../../src/catalog';
-import { BATTLE_SLOT_IDS, ENEMY_SKILL_META } from '../../../src/catalog';
+import { BATTLE_SLOT_IDS, ENEMY_SKILL_META, loadCatalog, type ColleagueCatalog } from '../../../src/catalog';
 import { rosterSlot } from '../../../src/roster';
 import {
   cloneBattleFigure,
@@ -12,13 +12,24 @@ import {
   type HumanoidFigure,
   type HumanoidKit,
 } from '../../../src/game/humanoid';
-import { coffeeTintOnDay, skillNameOnDay } from '../../../src/fx/days';
+import { coffeePropOnDay, decoyCountOnDay, decoyRunDirs, decoyRunOnDay, skillNameOnDay } from '../../../src/fx/days';
 import type { WeekdayId } from '../../../src/levels';
+import {
+  decoyLookOf,
+  decoySkinOnDay,
+  disposeDecoyGhost,
+  disposeDecoyRunner,
+  makeDecoy,
+  makeDecoyRunner,
+  tickDecoyRunner,
+} from '../../../src/game/decoyGhost';
 import { applyThrowLook, makeThrowProjectile, throwLookOf, throwSkinOnDay } from '../../../src/game/skillProjectiles';
 import { ChannelMarks, DashTrail, ImpactMist, OvertimePop, PaperBurst, SlowPulse, StatusMarks, spawnHitFx } from '../../../src/game/look';
 import { SkillChains, SkillShout, SHOUT_Y, figureChest, figureHand, figureHandL, figureNeck, setFigureGlow } from '../../../src/game/skillVfx';
 import { RagdollFactory, type RagdollHandle } from '../../../src/game/ragdoll';
 import { Slicks } from '../../../src/game/slicks';
+import { DashMountKit, mountDashProp } from '../../../src/game/dashMounts';
+import { BONE_HAND, BONE_HEAD } from '../../../src/game/hair';
 
 export type PlayKind = 'common' | 'dash' | 'decoy' | 'keyboard' | 'coffee' | 'actor';
 export type CastState = 'idle' | 'run';
@@ -115,6 +126,15 @@ function crowdSpots(n: number): { slot: number; x: number; z: number }[] {
 const PLAYER_START_Z = 2.35;
 const HOLD_AFTER_DASH = 2.15;
 const FIXED_DT = 1 / 60;
+const MOVE_SPEED = 3.4;
+const MOVE_SPEED_RUN = 4.6;
+const ARENA = 7.2;
+
+function typingTarget(el: EventTarget | null) {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+}
 
 export class FxPreview {
   readonly renderer: THREE.WebGPURenderer;
@@ -145,11 +165,31 @@ export class FxPreview {
   private status: StatusMarks;
   private channel: ChannelMarks;
   private slicks: Slicks;
+  private dashKit: DashMountKit | null = null;
+  private handPot: THREE.Group | null = null;
+  private handPotLine: DashKey | null = null;
+  private headPots: {
+    root: THREE.Group;
+    t: number;
+    fig: HumanoidFigure;
+    /** 场景浮空跟随（补卡闹钟）；骨头挂件则为 null */
+    dummy: Dummy | null;
+    blastR: number;
+    blastImpulse: number;
+    bob: number;
+  }[] = [];
   private kit: HumanoidKit;
   private playerFig: HumanoidFigure;
   private radiusRing: THREE.Mesh;
   private dummies: Dummy[] = [];
-  private decoy: THREE.Group | null = null;
+  private decoys: {
+    group: THREE.Group;
+    fig: HumanoidFigure | null;
+    dirX: number;
+    dirZ: number;
+    speed: number;
+    runLeft: number;
+  }[] = [];
   private keyboard: THREE.Object3D | null = null;
   private crate: THREE.Mesh | null = null;
   private play: PlayKind | null = null;
@@ -161,6 +201,10 @@ export class FxPreview {
   private physAcc = 0;
   private decoyBlasted = false;
   private slumpPulsed = false;
+  private reclockMarked = false;
+  private reclockBait: Dummy | null = null;
+  private blamePotCount = 0;
+  private blameBlasts: { d: Dummy; wait: number; r: number; impulse: number }[] = [];
   private commonFired = false;
   private actorFired = false;
   private actorPhase: 'windup' | 'cast' | 'hold' = 'windup';
@@ -179,6 +223,13 @@ export class FxPreview {
   private chainHandL = new THREE.Vector3();
   private chainNeck = new THREE.Vector3();
   private glowFig: HumanoidFigure | null = null;
+  private keys = new Set<string>();
+  private roaming = false;
+  private faceX = 0;
+  private faceZ = -1;
+  private moveFwd = new THREE.Vector3();
+  private moveRight = new THREE.Vector3();
+  private moveWish = new THREE.Vector3();
 
   constructor(host: HTMLElement, renderer: THREE.WebGPURenderer, kit: HumanoidKit, world: RAPIER.World) {
     this.renderer = renderer;
@@ -236,6 +287,41 @@ export class FxPreview {
     this.channel = new ChannelMarks(this.scene, 16);
     this.slicks = new Slicks(this.scene);
     this.resetPose();
+    this.bindMoveKeys();
+    void this.bootDashMounts();
+  }
+
+  private async bootDashMounts() {
+    try {
+      this.dashKit = await DashMountKit.from(await loadCatalog());
+    } catch (err) {
+      console.warn('冲刺挂件未加载', err);
+    }
+  }
+
+  async reloadDashMounts(cat: ColleagueCatalog) {
+    this.clearDashProps();
+    try {
+      this.dashKit = await DashMountKit.from(cat);
+    } catch (err) {
+      console.warn('冲刺挂件未加载', err);
+    }
+  }
+
+  private bindMoveKeys() {
+    window.addEventListener('keydown', (e) => {
+      if (typingTarget(e.target)) return;
+      if (e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD') {
+        this.keys.add(e.code);
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD') {
+        this.keys.delete(e.code);
+      }
+    });
+    window.addEventListener('blur', () => this.keys.clear());
   }
 
   /** 角色清单变了：换人，不整页重载。 */
@@ -250,6 +336,7 @@ export class FxPreview {
     this.clearGlow();
     this.clearRags();
     this.clearSkillProps();
+    this.clearDashProps();
     this.scene.remove(this.playerFig.group);
     for (const d of this.dummies) this.scene.remove(d.fig.group);
     this.dummies.length = 0;
@@ -272,14 +359,12 @@ export class FxPreview {
     this.clearGlow();
     this.clearRags();
     this.clearSkillProps();
+    this.clearDashProps();
     if (this.keyboard) {
       this.scene.remove(this.keyboard);
       this.keyboard = null;
     }
-    if (this.decoy) {
-      this.scene.remove(this.decoy);
-      this.decoy = null;
-    }
+    if (this.decoys.length) this.clearDecoys();
     if (this.crate) {
       this.scene.remove(this.crate);
       this.crate = null;
@@ -299,6 +384,7 @@ export class FxPreview {
       this.stagedSkill = null;
     }
     if (this.track === 'keyboard') this.placeKeyboard();
+    if (this.track === 'decoy') this.placeDecoy();
     this.onStatus?.(`演示人数 ${next}`);
   }
 
@@ -377,13 +463,18 @@ export class FxPreview {
     this.clearGlow();
     this.clearActors();
     this.resetDummies();
-    this.resetPose();
+    // 保留玩家当前位置朝向，方便连着测冲刺/技能
+    this.syncPlayerFromFig();
     this.rebuildFx();
     this.play = kind;
     this.t = 0;
-    this.kb = { x: 0, z: 2.2, phase: 0, traveled: 0, hit: new Set() };
+    this.kb = { x: this.px, z: this.pz, phase: 0, traveled: 0, hit: new Set() };
     this.decoyBlasted = false;
     this.slumpPulsed = false;
+    this.reclockMarked = false;
+    this.reclockBait = null;
+    this.blamePotCount = 0;
+    this.blameBlasts = [];
     this.commonFired = false;
     this.actorFired = false;
     this.actorPhase = 'windup';
@@ -394,7 +485,17 @@ export class FxPreview {
     this.skillStaged = false;
     this.skillShout.clear();
     this.trail.setStyle(dashFx(this.dashKey(), this.skillLv).trail);
-    if (kind === 'decoy') this.placeDecoy();
+    if (kind === 'decoy') {
+      this.placeDecoy();
+      const run = decoyRunOnDay(this.day);
+      const n = decoyCountOnDay(this.day, this.skillLv);
+      this.onStatus?.(
+        run.time > 0
+          ? `播放 ${skillNameOnDay(this.day, 'decoy')} · ${n} 个假人分向跑动 ${run.time}s`
+          : `播放 ${skillNameOnDay(this.day, 'decoy')} · 分身定格，WASD 走开`
+      );
+      return;
+    }
     if (kind === 'keyboard') this.placeKeyboard();
     if (kind === 'coffee') this.pourCoffee();
     if (kind === 'common') this.placeCrate();
@@ -406,14 +507,18 @@ export class FxPreview {
       this.onStatus?.(`播放 ${ENEMY_SKILL_META[this.actorSkill].name} · 同事打在玩家身上`);
       return;
     }
-    this.onStatus?.(`播放 ${labelOf(kind, this.day)}`);
+    this.onStatus?.(`播放 ${labelOf(kind, this.day)} · WASD 移动`);
   }
 
   tick(now: number) {
     const dt = Math.min((now - this.last) / 1000, 0.05);
     this.last = now;
     this.orbit.update();
+    this.stepFreeMove(dt);
     this.step(dt);
+    this.syncDashHand();
+    this.tickHeadPots(dt);
+    this.tickBlameBlasts(dt);
     this.stepPhysics(dt);
     this.stepRags(dt);
     this.updateGaits(dt);
@@ -487,11 +592,26 @@ export class FxPreview {
   }
 
   private dashKey(): DashKey {
-    return this.track === 'brute' || this.track === 'slump' || this.track === 'phantom' || this.track === 'none' ? this.track : 'none';
+    if (this.track === 'none') return 'none';
+    if ((LINE_IDS as readonly string[]).includes(this.track)) return this.track as DashKey;
+    return 'none';
   }
 
-  private knockLook(d: Dummy) {
-    return crowdFx(BATTLE_SLOT_IDS[d.slot] as CrowdActorId).hit;
+  private knockLook(d: Dummy, over?: Partial<HitFx> | null) {
+    return mergeHitFx(crowdFx(BATTLE_SLOT_IDS[d.slot] as CrowdActorId).hit, over);
+  }
+
+  private knockDummy(d: Dummy, dirX: number, dirZ: number, impulse: number, hitOver?: Partial<HitFx> | null) {
+    if (d.hit) return;
+    d.hit = true;
+    d.fig.group.visible = false;
+    const len = Math.hypot(dirX, dirZ) || 1;
+    const power = Math.min(Math.max(impulse * 0.85, 200), 500);
+    d.rag = this.rags.spawn(d.x, d.z, d.shirt, dirX / len, dirZ / len, power, d.slot === 2 ? 1.38 : 1, false, {
+      kit: this.kit,
+      slot: d.slot,
+    });
+    spawnHitFx(this.papers, this.mist, d.x, d.z, this.knockLook(d, hitOver));
   }
 
   private stepOvertimePreview(dt: number) {
@@ -537,7 +657,7 @@ export class FxPreview {
     const pack = dashFx(this.dashKey(), this.skillLv);
     const dashing = this.play === 'dash';
     const playerMove = dashing && this.t <= pack.hit.time + 0.02;
-    const playerRun = !this.playerLocked && (this.castState === 'run' || playerMove);
+    const playerRun = !this.playerLocked && (this.castState === 'run' || playerMove || this.roaming);
     setFigureGait(this.playerFig, playerRun, dt);
     const caster = this.casterDummy();
     for (const d of this.dummies) {
@@ -560,7 +680,7 @@ export class FxPreview {
     if (this.play === 'dash') this.stepDash(dt);
     else if (this.play === 'common') this.stepCommon();
     else if (this.play === 'actor') this.stepActor(dt);
-    else if (this.play === 'decoy') this.stepDecoy();
+    else if (this.play === 'decoy') this.stepDecoy(dt);
     else if (this.play === 'keyboard') this.stepKeyboard(dt);
     else if (this.play === 'coffee') this.stepCoffee();
   }
@@ -722,14 +842,16 @@ export class FxPreview {
     const hit = pack.hit;
     const dur = hit.time;
     if (this.t > dur + HOLD_AFTER_DASH) {
-      this.finishPlay('冲撞结束 · 已复位');
+      this.finishPlay('冲撞结束 · 可继续 WASD');
       return;
     }
     if (this.t <= dur) {
-      this.pz -= hit.speed * dt;
+      this.px += this.faceX * hit.speed * dt;
+      this.pz += this.faceZ * hit.speed * dt;
+      this.clampArena();
       this.playerFig.group.position.set(this.px, 0, this.pz);
-      this.playerFig.group.rotation.y = Math.PI;
-      this.trail.emit(this.px, this.pz, Math.PI, dt);
+      this.playerFig.group.rotation.y = Math.atan2(this.faceX, this.faceZ);
+      this.trail.emit(this.px, this.pz, this.playerFig.group.rotation.y, dt);
       this.tryHits();
     }
   }
@@ -739,6 +861,24 @@ export class FxPreview {
     const hit = pack.hit;
     const r = hit.radius;
     let n = this.dummies.filter((d) => d.hit).length;
+
+    if (pack.reclock && !this.reclockMarked) {
+      const pool = this.dummies.filter((d) => {
+        if (d.hit) return false;
+        const dx = d.x - this.px;
+        const dz = d.z - this.pz;
+        if (dx * dx + dz * dz > r * r) return false;
+        const id = BATTLE_SLOT_IDS[d.slot] as CrowdActorId;
+        return dashReactOf(pack, id).kind !== 'none';
+      });
+      if (pool.length) {
+        this.reclockMarked = true;
+        this.reclockBait = pool[(Math.random() * pool.length) | 0]!;
+        this.potReclockHead(this.reclockBait);
+        this.onStatus?.('补卡 · 命中池随机闹钟（不倒地）');
+      }
+    }
+
     for (const d of this.dummies) {
       if (d.hit) continue;
       const dx = d.x - this.px;
@@ -757,9 +897,42 @@ export class FxPreview {
       if (hit.maxHits > 0 && n >= hit.maxHits) break;
       const key = 100 + this.dummies.indexOf(d);
       const look = crowdFx(id);
+
+      // 挂钟目标：标记已处理但不倒地
+      if (pack.reclock && d === this.reclockBait) {
+        d.hit = true;
+        n++;
+        continue;
+      }
+
+      // 甩锅：命中挂锅减速，不倒地；满级排进依次小爆
+      if (pack.blame) {
+        const maxPots = Math.max(1, pack.blame.maxPots | 0);
+        if (this.blamePotCount < maxPots) {
+          const order = this.blamePotCount;
+          this.blamePotCount++;
+          this.potHead(d);
+          this.status.pinSlow(key, d.x, d.z, look.slow);
+          if (pack.blame.blastRadius > 0 && pack.blame.blastImpulse > 0) {
+            const wait =
+              Math.max(0.05, pack.blame.blastDelay) + order * Math.max(0.05, pack.blame.blastGap);
+            this.blameBlasts.push({
+              d,
+              wait,
+              r: pack.blame.blastRadius,
+              impulse: pack.blame.blastImpulse,
+            });
+          }
+          if (order === 0) this.onStatus?.('甩锅 · 命中挂锅减速');
+        }
+        d.hit = true;
+        n++;
+        continue;
+      }
+
       const impulse = dashImpulseOf(pack, react);
       if (react.kind === 'knock' || (react.kind === 'slow' && impulse > 0)) {
-        this.knockDummy(d, 0, -1, impulse);
+        this.knockDummy(d, this.faceX || 0, this.faceZ || -1, impulse);
       } else if (react.kind === 'shove') {
         this.shoveDummy(d);
       } else {
@@ -770,8 +943,172 @@ export class FxPreview {
         this.pulseSlow(d.x, d.z, react.radius);
         this.status.pinSlow(key, d.x, d.z, look.slow);
       }
+      this.potHead(d);
       n++;
     }
+  }
+
+  private syncDashHand() {
+    const key = this.dashKey();
+    const pack = dashFx(key, this.skillLv);
+    const show = this.play === 'dash' && key !== 'none' && this.t <= pack.hit.time;
+    const slot = show ? this.dashKit?.slot(key, 'hand') : null;
+    const template = slot ? this.dashKit?.visual(slot.propId) : null;
+    if (!slot || !template) {
+      if (this.handPot) this.handPot.visible = false;
+      return;
+    }
+    if (this.handPotLine !== key || !this.handPot?.parent) {
+      this.handPot?.removeFromParent();
+      this.handPot = mountDashProp(this.playerFig.group, BONE_HAND, template, slot);
+      this.handPotLine = key;
+    }
+    if (this.handPot) this.handPot.visible = true;
+  }
+
+  private potHead(d: Dummy) {
+    const key = this.dashKey();
+    if (key === 'none' || !this.dashKit) {
+      if (key === 'blame') this.onStatus?.('甩锅：挂件包未就绪');
+      return;
+    }
+    if (this.headPots.some((p) => p.fig === d.fig)) return;
+    const slot = this.dashKit.slot(key, 'head');
+    const template = slot ? this.dashKit.visual(slot.propId) : null;
+    if (!slot || !template) {
+      if (key === 'blame') this.onStatus?.(`甩锅：头顶锅未加载（${slot?.propId ?? '无 head 槽'}）`);
+      return;
+    }
+    const root = mountDashProp(d.fig.group, BONE_HEAD, template, slot);
+    if (!root) {
+      if (key === 'blame') this.onStatus?.('甩锅：找不到头骨');
+      return;
+    }
+    root.userData.baseY = root.position.y;
+    const pack = dashFx(key, this.skillLv);
+    this.headPots.push({
+      root,
+      fig: d.fig,
+      dummy: key === 'blame' ? d : null,
+      t: pack.reclock?.duration ?? pack.blame?.duration ?? 1.5,
+      blastR: 0,
+      blastImpulse: 0,
+      bob: Math.random() * Math.PI * 2,
+    });
+  }
+
+  /** 补卡闹钟：挂在不倒地的命中目标头骨上 */
+  private potReclockHead(d: Dummy) {
+    if (!this.dashKit) {
+      this.onStatus?.('补卡闹钟：挂件包未就绪');
+      return;
+    }
+    if (this.headPots.some((p) => p.fig === d.fig)) return;
+    const slot = this.dashKit.slot('reclock', 'head');
+    const template = slot ? this.dashKit.visual(slot.propId) : null;
+    if (!slot || !template) {
+      this.onStatus?.('补卡闹钟未加载（检查 prop-clock / dashMounts）');
+      return;
+    }
+    const root = mountDashProp(d.fig.group, BONE_HEAD, template, slot);
+    if (!root) {
+      this.onStatus?.('补卡闹钟：找不到头骨');
+      return;
+    }
+    root.userData.baseY = root.position.y;
+    const cfg = dashFx('reclock', this.skillLv).reclock;
+    this.headPots.push({
+      root,
+      fig: d.fig,
+      dummy: d,
+      t: cfg?.duration ?? 1,
+      blastR: cfg?.blastRadius ?? 0,
+      blastImpulse: cfg?.blastImpulse ?? 0,
+      bob: Math.random() * Math.PI * 2,
+    });
+  }
+
+  private tickHeadPots(dt: number) {
+    const keep: typeof this.headPots = [];
+    for (const pot of this.headPots) {
+      pot.t -= dt;
+      pot.bob += dt * 6;
+      // 只在存档高度上轻微晃，别把 slot.y 盖掉（否则放大闹钟会埋进头里）
+      if (pot.dummy && pot.root.parent) {
+        const baseY = typeof pot.root.userData.baseY === 'number' ? pot.root.userData.baseY : pot.root.position.y;
+        pot.root.position.y = baseY + Math.sin(pot.bob) * 0.03;
+      }
+      if (pot.t <= 0 || !pot.root.parent) {
+        if (pot.t <= 0 && pot.blastR > 0 && pot.dummy) this.blastReclock(pot.dummy, pot.blastR, pot.blastImpulse);
+        pot.root.removeFromParent();
+        continue;
+      }
+      keep.push(pot);
+    }
+    this.headPots = keep;
+  }
+
+  private blastReclock(d: Dummy, radius: number, impulse: number) {
+    const r2 = radius * radius;
+    // 挂钟本人之前被标成 hit 但不倒；爆炸时清掉好一并炸飞
+    d.hit = false;
+    for (const o of this.dummies) {
+      if (o.hit) continue;
+      const dx = o.x - d.x;
+      const dz = o.z - d.z;
+      if (dx * dx + dz * dz > r2) continue;
+      this.knockDummy(o, dx || 1, dz, impulse);
+    }
+    spawnHitFx(this.papers, this.mist, d.x, d.z, crowdFx('colleague-a-m').hit);
+    this.onStatus?.('补卡 · 闹钟爆炸');
+  }
+
+  private tickBlameBlasts(dt: number) {
+    if (!this.blameBlasts.length) return;
+    const keep: typeof this.blameBlasts = [];
+    for (const pot of this.blameBlasts) {
+      pot.wait -= dt;
+      if (pot.wait > 0) {
+        keep.push(pot);
+        continue;
+      }
+      this.detonateBlamePot(pot.d, pot.r, pot.impulse);
+    }
+    this.blameBlasts = keep;
+  }
+
+  private detonateBlamePot(d: Dummy, radius: number, impulse: number) {
+    // 清头上的锅
+    this.headPots = this.headPots.filter((p) => {
+      if (p.fig !== d.fig) return true;
+      p.root.removeFromParent();
+      return false;
+    });
+    d.hit = false;
+    this.knockDummy(d, 1, 0, impulse);
+    const r2 = radius * radius;
+    const near = this.dummies
+      .filter((o) => o !== d && !o.hit)
+      .map((o) => ({ o, d: (o.x - d.x) ** 2 + (o.z - d.z) ** 2 }))
+      .filter((x) => x.d <= r2)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 2);
+    for (const { o } of near) {
+      this.knockDummy(o, o.x - d.x || 1, o.z - d.z, impulse);
+    }
+    spawnHitFx(this.papers, this.mist, d.x, d.z, crowdFx('colleague-a-m').hit);
+    this.onStatus?.('甩锅 · 锅爆');
+  }
+
+  private clearDashProps() {
+    this.handPot?.removeFromParent();
+    this.handPot = null;
+    this.handPotLine = null;
+    for (const pot of this.headPots) pot.root.removeFromParent();
+    this.headPots = [];
+    this.reclockBait = null;
+    this.blamePotCount = 0;
+    this.blameBlasts = [];
   }
 
   private pulseSlow(x: number, z: number, radius: number) {
@@ -783,21 +1120,9 @@ export class FxPreview {
   private shoveDummy(d: Dummy) {
     if (d.hit) return;
     d.hit = true;
-    d.z -= 0.45;
+    d.x += this.faceX * 0.45;
+    d.z += this.faceZ * 0.45;
     d.fig.group.position.set(d.x, 0, d.z);
-  }
-
-  private knockDummy(d: Dummy, dirX: number, dirZ: number, impulse: number) {
-    if (d.hit) return;
-    d.hit = true;
-    d.fig.group.visible = false;
-    const len = Math.hypot(dirX, dirZ) || 1;
-    const power = Math.min(Math.max(impulse * 0.85, 200), 500);
-    d.rag = this.rags.spawn(d.x, d.z, d.shirt, dirX / len, dirZ / len, power, d.slot === 2 ? 1.38 : 1, false, {
-      kit: this.kit,
-      slot: d.slot,
-    });
-    spawnHitFx(this.papers, this.mist, d.x, d.z, this.knockLook(d));
   }
 
   private stepPhysics(dt: number) {
@@ -834,6 +1159,7 @@ export class FxPreview {
     this.playerLocked = false;
     this.clearGlow();
     this.clearRags();
+    this.clearDashProps();
     this.clearActors();
     this.rebuildFx();
     if (this.actorEdit && this.actorSkill && this.actorId !== 'player') {
@@ -842,74 +1168,176 @@ export class FxPreview {
       this.stagedActor = this.actorId;
       this.stagedSkill = this.actorSkill;
     } else {
-      this.restoreCrowdLayout();
+      this.restoreCrowdLayout(false);
       this.skillStaged = false;
       this.stagedActor = null;
       this.stagedSkill = null;
     }
     if (this.track === 'keyboard') this.placeKeyboard();
+    if (this.track === 'decoy') this.placeDecoy();
     this.onStatus?.(msg);
   }
 
-  private stepDecoy() {
+  private stepDecoy(dt: number) {
     const d = skillFx('decoy', this.skillLv).decoy;
     if (!d) return;
     const life = d.duration;
-    if (this.decoy) this.decoy.rotation.z = Math.sin(this.t * 7) * 0.06;
+    for (const slot of this.decoys) {
+      const running = slot.runLeft > 0 && slot.speed > 0;
+      if (running) {
+        const step = Math.min(slot.runLeft, dt);
+        slot.group.position.x += slot.dirX * slot.speed * step;
+        slot.group.position.z += slot.dirZ * slot.speed * step;
+        slot.group.rotation.y = Math.atan2(slot.dirX, slot.dirZ);
+        slot.runLeft -= step;
+      }
+      if (slot.fig) tickDecoyRunner(slot.fig, running, dt);
+    }
     if (this.t < life) return;
     if (d.blastRadius > 0.05 && !this.decoyBlasted) {
       this.decoyBlasted = true;
-      spawnHitFx(this.papers, this.mist, 0, 0, crowdFx('colleague-a-m').hit);
-      for (const dummy of this.dummies) {
-        if (Math.hypot(dummy.x, dummy.z) < d.blastRadius) this.knockDummy(dummy, dummy.x, dummy.z, d.blastImpulse);
+      for (const slot of this.decoys) {
+        const gx = slot.group.position.x;
+        const gz = slot.group.position.z;
+        spawnHitFx(this.papers, this.mist, gx, gz, mergeHitFx(crowdFx('colleague-a-m').hit, { burst: d.hitBurst }));
+        for (const dummy of this.dummies) {
+          if (Math.hypot(dummy.x - gx, dummy.z - gz) < d.blastRadius) {
+            this.knockDummy(dummy, dummy.x - gx, dummy.z - gz, d.blastImpulse, { burst: d.hitBurst });
+          }
+        }
       }
     }
     if (this.t > life + (this.decoyBlasted ? HOLD_AFTER_DASH : 0.12)) {
-      this.finishPlay(`${skillNameOnDay(this.day, 'decoy')} · 已复位`);
+      this.finishPlay(`${skillNameOnDay(this.day, 'decoy')} · 可继续 WASD`);
+    }
+  }
+
+  private clearDecoys() {
+    for (const slot of this.decoys) {
+      this.scene.remove(slot.group);
+      if (slot.fig) disposeDecoyRunner(slot.fig);
+      else disposeDecoyGhost(slot.group);
+    }
+    this.decoys.length = 0;
+  }
+
+  private placeDecoy() {
+    this.clearDecoys();
+    this.bakePlayerPose();
+    const look = decoyLookOf(skillFx('decoy', this.skillLv).decoy);
+    const skin = decoySkinOnDay(this.day);
+    const count = decoyCountOnDay(this.day, this.skillLv);
+    const run = decoyRunOnDay(this.day);
+    const dirs = run.time > 0 ? decoyRunDirs(this.faceX, this.faceZ, count) : [{ x: this.faceX, z: this.faceZ }];
+    const playing = this.play === 'decoy';
+    for (let i = 0; i < count; i++) {
+      const dir = dirs[i] ?? dirs[0]!;
+      const len = Math.hypot(dir.x, dir.z) || 1;
+      const rx = dir.x / len;
+      const rz = dir.z / len;
+      let group: THREE.Group;
+      let fig: HumanoidFigure | null = null;
+      if (run.time > 0 && playing) {
+        fig = makeDecoyRunner(this.kit, look);
+        group = fig.group;
+      } else {
+        group = makeDecoy(this.playerFig, look, skin);
+      }
+      if (playing) {
+        group.position.set(this.px, 0, this.pz);
+        group.rotation.y = Math.atan2(rx, rz);
+      } else {
+        const yaw = this.playerFig.group.rotation.y;
+        const sideX = -Math.sin(yaw);
+        const sideZ = -Math.cos(yaw);
+        const spread = count === 1 ? 0 : (i - (count - 1) / 2) * 0.55;
+        group.position.set(
+          this.px - Math.cos(yaw) * 1.25 + sideX * spread,
+          0,
+          this.pz + Math.sin(yaw) * 1.25 + sideZ * spread
+        );
+        group.rotation.y = yaw;
+      }
+      this.scene.add(group);
+      this.decoys.push({
+        group,
+        fig,
+        dirX: rx,
+        dirZ: rz,
+        speed: run.speed,
+        runLeft: playing && run.time > 0 ? run.time : 0,
+      });
     }
   }
 
   private stepKeyboard(dt: number) {
     const kb = skillFx('keyboard', this.skillLv).keyboard;
     if (!this.keyboard || !kb) return;
+    const skin = throwSkinOnDay(this.day);
+    const flat = skin === 'boomerang' || !!this.keyboard.userData.throwFlat;
     if (this.kb.phase === 0) {
-      this.kb.z -= kb.speed * dt;
+      this.kb.x += this.faceX * kb.speed * dt;
+      this.kb.z += this.faceZ * kb.speed * dt;
       this.kb.traveled += kb.speed * dt;
       if (this.kb.traveled >= kb.range) this.kb.phase = 1;
     } else {
-      this.kb.z += kb.speed * dt;
-      if (this.kb.z > 2.4) {
-        this.finishPlay(`${skillNameOnDay(this.day, 'keyboard')} · 已复位`);
+      this.kb.x -= this.faceX * kb.speed * dt;
+      this.kb.z -= this.faceZ * kb.speed * dt;
+      this.kb.traveled -= kb.speed * dt;
+      if (this.kb.traveled <= 0) {
+        this.finishPlay(`${skillNameOnDay(this.day, 'keyboard')} · 可继续 WASD`);
         return;
       }
     }
-    this.keyboard.position.set(this.kb.x, 1, this.kb.z);
-    const skin = throwSkinOnDay(this.day);
-    const spin = skin === 'boomerang' ? 28 : skin === 'mouse' ? 14 : 18;
+    let y = 1;
+    if (flat) {
+      const u = Math.min(1, Math.max(0, this.kb.traveled / Math.max(0.01, kb.range)));
+      y = 0.7 + 0.9 * Math.sin(Math.PI * u);
+    }
+    this.keyboard.position.set(this.kb.x, y, this.kb.z);
+    const spin = flat ? 22 : skin === 'mouse' ? 14 : 18;
     this.keyboard.rotation.y += dt * spin;
-    if (skin === 'boomerang') this.keyboard.rotation.z = Math.sin(this.kb.traveled * 2.2) * 0.35;
+    if (flat) {
+      this.keyboard.rotation.x = 0;
+      this.keyboard.rotation.z = 0;
+    }
     const width = kb.width;
     for (const [i, d] of this.dummies.entries()) {
       if (this.kb.hit.has(i) || d.hit) continue;
       if (Math.hypot(d.x - this.kb.x, d.z - this.kb.z) > width) continue;
       this.kb.hit.add(i);
       if (this.skillLv >= 3 || this.kb.phase === 0) {
-        this.knockDummy(d, 0, this.kb.phase === 0 ? -1 : 1, kb.knockImpulse);
+        this.knockDummy(d, this.faceX, this.faceZ, kb.knockImpulse, { burst: kb.hitBurst });
       }
     }
   }
 
-  private placeDecoy() {
-    this.decoy = makeStandee();
-    this.decoy.position.set(0, 0, 0);
-    this.scene.add(this.decoy);
+  private bakePlayerPose() {
+    const running = this.castState === 'run' || this.roaming;
+    for (let i = 0; i < 10; i++) setFigureGait(this.playerFig, running, 1 / 30);
+  }
+
+  /** 拖滑条 / 切待机跑步时立刻改分身样子。 */
+  refreshDecoyLook() {
+    if (this.track !== 'decoy') return;
+    // 换姿态要重建定格，不能只改材质
+    this.placeDecoy();
   }
 
   private placeKeyboard() {
     const look = throwLookOf(skillFx('keyboard', this.skillLv).keyboard);
     this.keyboard = makeThrowProjectile(throwSkinOnDay(this.day), look);
-    this.keyboard.position.set(0, 1, 2.2);
+    const ox = this.px + this.faceX * 0.55;
+    const oz = this.pz + this.faceZ * 0.55;
+    this.keyboard.position.set(ox, 1, oz);
     this.scene.add(this.keyboard);
+    if (this.play === 'keyboard') {
+      this.kb.x = ox;
+      this.kb.z = oz;
+      this.kb.phase = 0;
+      this.kb.traveled = 0;
+      this.kb.hit = new Set();
+    }
   }
 
   /** 拖滑条时立刻改飞出物样子，不用重播。 */
@@ -920,6 +1348,13 @@ export class FxPreview {
       return;
     }
     applyThrowLook(this.keyboard, throwLookOf(skillFx('keyboard', this.skillLv).keyboard));
+  }
+
+  /** 拖污渍颜色/透明度时立刻改场上渍。 */
+  refreshCoffeeLook() {
+    const c = skillFx('coffee', this.skillLv).coffee;
+    if (!c) return;
+    this.slicks.recolorVisible({ color: coffeeColorOnDay(this.day, this.skillLv), opacity: c.opacity });
   }
 
   private placeCrate() {
@@ -934,17 +1369,31 @@ export class FxPreview {
   private pourCoffee() {
     const c = skillFx('coffee', this.skillLv).coffee;
     if (!c) return;
-    const tint = coffeeTintOnDay(this.day);
-    const look = { color: tint ?? c.color, opacity: c.opacity };
+    const look = { color: coffeeColorOnDay(this.day, this.skillLv), opacity: c.opacity, prop: coffeePropOnDay(this.day) };
     const n = Math.max(1, c.count | 0);
+    const sideX = -this.faceZ;
+    const sideZ = this.faceX;
     for (let k = 0; k < n; k++) {
       const dist = c.range + k * c.spacing + (Math.random() - 0.5) * 0.16;
-      const jx = (Math.random() - 0.5) * 0.34;
-      this.slicks.spawn(this.px + jx, this.pz - dist, c.radius * (0.84 + Math.random() * 0.3), c.life, look);
+      const j = (Math.random() - 0.5) * 0.34;
+      this.slicks.spawn(
+        this.px + this.faceX * dist + sideX * j,
+        this.pz + this.faceZ * dist + sideZ * j,
+        c.radius * (0.84 + Math.random() * 0.3),
+        c.life,
+        look
+      );
     }
     if (c.splashRadius > 0.05) {
       const dist = c.range + Math.max(0, n - 1) * c.spacing + 0.45;
-      this.slicks.spawn(this.px + (Math.random() - 0.5) * 0.28, this.pz - dist, c.splashRadius, c.splashLife || c.life, look);
+      const j = (Math.random() - 0.5) * 0.28;
+      this.slicks.spawn(
+        this.px + this.faceX * dist + sideX * j,
+        this.pz + this.faceZ * dist + sideZ * j,
+        c.splashRadius,
+        c.splashLife || c.life,
+        look
+      );
     }
   }
 
@@ -959,7 +1408,7 @@ export class FxPreview {
     this.radiusRing.position.set(this.playerFig.group.position.x, 0.04, this.playerFig.group.position.z);
     const dash =
       !this.actorEdit &&
-      (this.track === 'none' || this.track === 'brute' || this.track === 'slump' || this.track === 'phantom');
+      (this.track === 'none' || (LINE_IDS as readonly string[]).includes(this.track));
     this.radiusRing.visible = dash;
   }
 
@@ -1006,10 +1455,10 @@ export class FxPreview {
     d.fig.group.rotation.y = Math.atan2(x - d.x, z - d.z);
   }
 
-  private restoreCrowdLayout() {
+  private restoreCrowdLayout(resetPlayer = true) {
     this.clearSkillProps();
     this.resetDummies();
-    this.resetPose();
+    if (resetPlayer) this.resetPose();
     this.orbit.target.set(0, 0.55, 0.15);
   }
 
@@ -1018,6 +1467,8 @@ export class FxPreview {
     const pack = skill ? enemySkillFx(skill) : null;
     this.px = 0;
     this.pz = 1.45;
+    this.faceX = 0;
+    this.faceZ = -1;
     this.playerFig.group.position.set(0, 0, this.pz);
     this.playerFig.group.rotation.y = Math.PI;
 
@@ -1113,8 +1564,66 @@ export class FxPreview {
   private resetPose() {
     this.px = 0;
     this.pz = PLAYER_START_Z;
+    this.faceX = 0;
+    this.faceZ = -1;
     this.playerFig.group.position.set(0, 0, PLAYER_START_Z);
     this.playerFig.group.rotation.y = Math.PI;
+  }
+
+  private syncPlayerFromFig() {
+    this.px = this.playerFig.group.position.x;
+    this.pz = this.playerFig.group.position.z;
+    const yaw = this.playerFig.group.rotation.y;
+    this.faceX = Math.sin(yaw);
+    this.faceZ = Math.cos(yaw);
+    const len = Math.hypot(this.faceX, this.faceZ) || 1;
+    this.faceX /= len;
+    this.faceZ /= len;
+  }
+
+  private clampArena() {
+    this.px = Math.max(-ARENA, Math.min(ARENA, this.px));
+    this.pz = Math.max(-ARENA, Math.min(ARENA, this.pz));
+  }
+
+  private stepFreeMove(dt: number) {
+    const dashing = this.play === 'dash' && this.t <= dashFx(this.dashKey(), this.skillLv).hit.time + 0.02;
+    if (dashing || this.playerLocked) {
+      this.roaming = false;
+      return;
+    }
+    let ix = 0;
+    let iz = 0;
+    if (this.keys.has('KeyW')) iz -= 1;
+    if (this.keys.has('KeyS')) iz += 1;
+    if (this.keys.has('KeyA')) ix -= 1;
+    if (this.keys.has('KeyD')) ix += 1;
+    if (!ix && !iz) {
+      this.roaming = false;
+      return;
+    }
+    this.camera.getWorldDirection(this.moveFwd);
+    this.moveFwd.y = 0;
+    if (this.moveFwd.lengthSq() < 1e-6) this.moveFwd.set(0, 0, -1);
+    else this.moveFwd.normalize();
+    this.moveRight.set(-this.moveFwd.z, 0, this.moveFwd.x);
+    this.moveWish.set(0, 0, 0);
+    this.moveWish.addScaledVector(this.moveFwd, -iz);
+    this.moveWish.addScaledVector(this.moveRight, ix);
+    if (this.moveWish.lengthSq() < 1e-8) {
+      this.roaming = false;
+      return;
+    }
+    this.moveWish.normalize();
+    const sp = this.castState === 'run' ? MOVE_SPEED_RUN : MOVE_SPEED;
+    this.px += this.moveWish.x * sp * dt;
+    this.pz += this.moveWish.z * sp * dt;
+    this.clampArena();
+    this.faceX = this.moveWish.x;
+    this.faceZ = this.moveWish.z;
+    this.playerFig.group.position.set(this.px, 0, this.pz);
+    this.playerFig.group.rotation.y = Math.atan2(this.faceX, this.faceZ);
+    this.roaming = true;
   }
 
   private clearGlow() {
@@ -1127,10 +1636,7 @@ export class FxPreview {
     this.status.clearAll();
     this.channel.clearAll();
     this.clearSkillProps();
-    if (this.decoy) {
-      this.scene.remove(this.decoy);
-      this.decoy = null;
-    }
+    if (this.decoys.length) this.clearDecoys();
     if (this.keyboard) {
       this.scene.remove(this.keyboard);
       this.keyboard = null;
@@ -1162,21 +1668,6 @@ function makeChair() {
     leg.position.set(x, 0.2, z);
     g.add(leg);
   }
-  return g;
-}
-
-function makeStandee() {
-  const g = new THREE.Group();
-  const board = new THREE.Mesh(new THREE.BoxGeometry(0.68, 1.46, 0.05), new THREE.MeshLambertMaterial({ color: 0xd9c9a3 }));
-  board.position.y = 0.75;
-  g.add(board);
-  const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.68, 0.03), new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
-  shirt.position.set(0, 0.82, 0.035);
-  g.add(shirt);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), new THREE.MeshLambertMaterial({ color: 0xf0c8a0 }));
-  head.scale.z = 0.25;
-  head.position.set(0, 1.34, 0.035);
-  g.add(head);
   return g;
 }
 

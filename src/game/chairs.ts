@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Enemies, EState } from './enemies';
 import type { ChairStyle, FurnitureTone } from '../levels';
 import { addOfficeChair } from './look';
+import { commonFx } from '../fx/catalog';
 import { sfx } from '../audio';
 
 export interface LoosePropBody {
@@ -82,7 +83,11 @@ export class Chairs {
         const dx = enemies.posX[i] - t.x;
         const dz = enemies.posZ[i] - t.z;
         if (dx * dx + dz * dz < hitR * hitR) {
-          enemies.hit(i, dirX, dirZ, force, { force: ragdoll, heavyOk });
+          enemies.hit(i, dirX, dirZ, force, {
+            force: ragdoll,
+            heavyOk,
+            hitFx: ragdoll ? { burst: commonFx().hitObject.burst } : undefined,
+          });
         }
       }
     }

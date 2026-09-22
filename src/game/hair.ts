@@ -121,6 +121,7 @@ function toPropMaterial(src: THREE.Material, hasVertexColors: boolean): THREE.Me
     transparent: !!('transparent' in src && src.transparent),
     opacity: 'opacity' in src ? (src as THREE.MeshPhongMaterial).opacity : 1,
   });
+  if (src.name) mat.name = src.name;
   if (readyMap) readyMap.colorSpace = THREE.SRGBColorSpace;
   return mat;
 }

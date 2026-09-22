@@ -14,6 +14,8 @@ export const ENEMY_CUT_GROUPS = (G_ENEMY << 16) | (0xffff & ~G_ENEMY);
 export const PLAYER_GROUPS = (G_PLAYER << 16) | 0xffff;
 /** 玩家虚化（幻影冲刺/分身相位）：穿过敌人与布娃娃，仍被墙挡 */
 export const PLAYER_PHASED_GROUPS = (G_PLAYER << 16) | (0xffff & ~(G_ENEMY | G_RAGDOLL));
+/** 探路射线：只撞墙/家具/地面，忽略人与布娃娃 */
+export const SOLID_RAY_GROUPS = (0xffff << 16) | (0xffff & ~(G_ENEMY | G_PLAYER | G_RAGDOLL));
 
 let initialized = false;
 

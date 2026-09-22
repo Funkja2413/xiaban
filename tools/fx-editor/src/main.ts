@@ -1,13 +1,13 @@
 import * as THREE from 'three/webgpu';
 import {
   applyHaloStyle,
-  CROWD_ACTOR_IDS,
   DEFAULT_FX,
   dashReactDefaults,
   dashReactOf,
   fx,
   getPath,
   HALO_STYLE_META,
+  HIT_BURST_META,
   hexColor,
   loadFxCatalog,
   normalizeThrowGlowStyle,
@@ -17,21 +17,25 @@ import {
   resetFx,
   setPath,
   THROW_GLOW_STYLE_META,
+  type ActorId,
   type CrowdActorId,
   type DashKey,
   type DashReactKind,
   type HaloStyle,
   type Lv,
+  type SkillKey,
   type ThrowGlowStyle,
 } from '../../../src/fx/catalog';
 import { bustCatalogAssets, catalogLookStamp, ENEMY_SKILL_META, loadCatalog, lookForSlotOnDay, type ColleagueCatalog, type EnemySkillId } from '../../../src/catalog';
 import { loadLevelCatalog, WEEKDAYS, type LevelCatalog, type WeekdayId } from '../../../src/levels';
 import { dayKitHint, dayKitMeta, dayPlayKit, type DayPlayKit } from '../../../src/fx/days';
 import { loadHumanoidKit } from '../../../src/game/humanoid';
+import { preloadThrowSkins } from '../../../src/game/skillProjectiles';
+import { preloadDecoyScarecrow } from '../../../src/game/decoyGhost';
+import { preloadSlickProps } from '../../../src/game/slicks';
 import { initPhysics } from '../../../src/sim/physics';
 import { FxPreview, type PlayKind } from './preview';
-import { TRACKS, ACTORS, actorSections, dashReactFields, enemySkillSections, fieldSections, tracksForDay, type Field, type TrackDef, type TrackId } from './schema';
-import type { ActorId } from '../../../src/fx/catalog';
+import { TRACKS, ACTORS, actorSections, dashReactFields, enemySkillSections, fieldSections, isCrowdActor, reactLookSections, skillReactLookSections, tracksForDay, type Field, type FieldSection, type TrackDef, type TrackId } from './schema';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -98,6 +102,8 @@ function syncPreview() {
   preview.refreshOvertime();
   preview.applyActorLayout();
   if (selectedActor === null && selected === 'keyboard') preview.refreshThrowLook();
+  if (selectedActor === null && selected === 'coffee') preview.refreshCoffeeLook();
+  if (selectedActor === null && selected === 'decoy') preview.refreshDecoyLook();
 }
 
 function playCurrent() {
@@ -303,8 +309,7 @@ function renderField(f: Field, box: HTMLElement) {
   }
 }
 
-function renderThrowGlowStyles(box: HTMLElement) {
-  const path = `skills.keyboard.${level}.keyboard.glowStyle`;
+function renderThrowGlowStyles(box: HTMLElement, path = `skills.keyboard.${level}.keyboard.glowStyle`) {
   const cur = normalizeThrowGlowStyle(getPath(fx(), path));
   const hint = document.createElement('p');
   hint.className = 'hint';
@@ -354,29 +359,85 @@ function renderHaloStyles(box: HTMLElement) {
   box.appendChild(row);
 }
 
-function renderDashTabs(show: boolean) {
+function crowdActorsForDay() {
+  return actorsForDay().filter((a): a is (typeof a & { id: CrowdActorId }) => isCrowdActor(a.id));
+}
+
+function renderPanelTabs(show: boolean) {
   const tabs = $('panelTabs');
   tabs.style.display = show ? 'flex' : 'none';
   $('tabOverall').classList.toggle('active', panelTab === 'overall');
   $('tabReact').classList.toggle('active', panelTab === 'react');
 }
 
-function renderReactTab(line: DashKey, lv: Lv, box: HTMLElement) {
+function appendSections(secs: FieldSection[], box: HTMLElement) {
+  for (const sec of secs) {
+    const h = document.createElement('h3');
+    h.className = 'sec';
+    h.textContent = sec.title;
+    box.appendChild(h);
+    for (const f of sec.fields) renderField(f, box);
+  }
+}
+
+function renderDashReactTab(line: DashKey, lv: Lv, box: HTMLElement) {
   const hint = document.createElement('p');
   hint.className = 'hint';
-  hint.textContent = '这里只选调用哪种状态、打多狠、持续多久。金星/雾圈/纸雾在左侧点对应角色编。';
+  hint.textContent =
+    '按本关战场角色分类：先选被撞后进入哪种状态、打多狠；下面直接编该状态的样子（纸雾 / 金星 / 雾圈）。角色通用栏只留文件卡和飘字。';
   box.appendChild(hint);
   const pack = fx().lines[line][lv];
-  for (const id of CROWD_ACTOR_IDS) {
-    const def = actorsForDay().find((a) => a.id === id);
+  for (const a of crowdActorsForDay()) {
+    const id = a.id;
     const card = document.createElement('div');
     card.className = 'reactCard';
     const h = document.createElement('h3');
     h.className = 'sec';
-    h.innerHTML = `${def?.name ?? id}<span class="tag">${def?.tag ?? ''}</span>`;
+    h.innerHTML = `${a.name}<span class="tag">${a.tag}</span>`;
     card.appendChild(h);
-    const kind = dashReactOf(pack, id).kind;
-    for (const f of dashReactFields(line, lv, id as CrowdActorId, kind)) renderField(f, card);
+    // 编辑用存档 kind；dashReactOf 会对拦路虎把倒地/推开收成「无+弹开」，不能拿来画表单
+    const kind = (pack.react?.[id]?.kind ?? dashReactOf(pack, id).kind) as DashReactKind;
+    for (const f of dashReactFields(line, lv, id, kind)) renderField(f, card);
+    if (id === 'interceptor' && (kind === 'knock' || kind === 'shove')) {
+      const note = document.createElement('p');
+      note.className = 'hint';
+      note.textContent = '玩法：前台拦路虎撞不开，冲刺到他会当成「无 + 弹开玩家」。减速/眩晕仍按下面生效。';
+      card.appendChild(note);
+    }
+    appendSections(reactLookSections(id, kind), card);
+    box.appendChild(card);
+  }
+}
+
+function skillHitBurstField(skill: 'keyboard' | 'decoy', lv: Lv): Field {
+  return {
+    path: `skills.${skill}.${lv}.${skill}.hitBurst`,
+    label: `LV${lv} 倒地爆开`,
+    kind: 'select',
+    options: HIT_BURST_META.map((m) => ({ id: m.id, name: `${m.name} · ${m.blurb}` })),
+    hint: `只影响本技能 LV${lv}。切上方 LV1/2/3 可分别设；游戏放倒时用当前技能等级这份，盖过角色默认爆开样式。下面各角色卡只编粒子颜色/数量/气雾。`,
+  };
+}
+
+function renderSkillReactTab(skill: SkillKey, lv: Lv, box: HTMLElement) {
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent =
+    skill === 'coffee'
+      ? '按本关角色编踩上污渍后的减速雾圈样子。判定半径/时长在「整体」。'
+      : '上方按技能等级选倒地爆开样式（LV1/2/3 各自一份）。下面各角色只调粒子颜色、数量和气雾，不改爆开种类。';
+  box.appendChild(hint);
+  if (skill === 'keyboard' || skill === 'decoy') {
+    renderField(skillHitBurstField(skill, lv), box);
+  }
+  for (const a of crowdActorsForDay()) {
+    const card = document.createElement('div');
+    card.className = 'reactCard';
+    const h = document.createElement('h3');
+    h.className = 'sec';
+    h.innerHTML = `${a.name}<span class="tag">${a.tag}</span>`;
+    card.appendChild(h);
+    appendSections(skillReactLookSections(skill, a.id), card);
     box.appendChild(card);
   }
 }
@@ -385,12 +446,12 @@ function renderFields() {
   const box = $('fields');
   box.innerHTML = '';
   if (selectedActor) {
-    renderDashTabs(false);
+    renderPanelTabs(false);
     const def = actorsForDay().find((a) => a.id === selectedActor) ?? ACTORS.find((a) => a.id === selectedActor)!;
     const skill = actorSkillOf(selectedActor);
     $('fxTitle').textContent = skill ? `${def.name} · ${ENEMY_SKILL_META[skill].name}` : def.name;
     $('fxBlurb').textContent = skill
-      ? `先调这一关挂上的主动技能，下面才是倒地/眩晕/减速。点「播放当前」看他对着玩家放技能：前摇下蹲，再打在玩家身上。`
+      ? `这一关挂上的主动技能在下面。再往下是通用：头顶文件、交任务飘字。倒地/眩晕/减速改到左侧对应冲刺或技能的「角色反馈」。`
       : def.blurb;
     if (selectedActor === 'player') renderHaloStyles(box);
     if (skill) {
@@ -413,7 +474,7 @@ function renderFields() {
     if (skill && selectedActor !== 'player') {
       const pass = document.createElement('h3');
       pass.className = 'sec';
-      pass.textContent = '被动状态';
+      pass.textContent = '通用效果';
       box.appendChild(pass);
     }
     for (const sec of actorSections(selectedActor)) {
@@ -429,10 +490,11 @@ function renderFields() {
   const lv = def.hasLevel ? level : 1;
   $('fxTitle').textContent = def.hasLevel ? `${def.name} · LV${lv}` : def.name;
   $('fxBlurb').textContent = def.blurb;
-  const isDash = def.group === 'dash';
-  renderDashTabs(isDash);
-  if (isDash && panelTab === 'react') {
-    renderReactTab(def.id as DashKey, lv, box);
+  const showReact = def.group === 'dash' || def.group === 'skill';
+  renderPanelTabs(showReact);
+  if (showReact && panelTab === 'react') {
+    if (def.group === 'dash') renderDashReactTab(def.id as DashKey, lv, box);
+    else renderSkillReactTab(def.id as SkillKey, lv, box);
     return;
   }
   for (const sec of fieldSections(def, lv, kitOf())) {
@@ -441,6 +503,9 @@ function renderFields() {
     h.textContent = sec.title;
     box.appendChild(h);
     if (def.id === 'keyboard' && sec.title.startsWith('飞出物样子')) renderThrowGlowStyles(box);
+    if (def.id === 'decoy' && sec.title.startsWith('分身样子')) {
+      renderThrowGlowStyles(box, `skills.decoy.${lv}.decoy.glowStyle`);
+    }
     for (const f of sec.fields) renderField(f, box);
   }
 }
@@ -455,6 +520,8 @@ let pushing = false;
 function schedulePush() {
   preview.refreshOvertime();
   if (selected === 'keyboard') preview.refreshThrowLook();
+  if (selected === 'coffee') preview.refreshCoffeeLook();
+  if (selected === 'decoy') preview.refreshDecoyLook();
   window.clearTimeout(pushTimer);
   pushTimer = window.setTimeout(() => {
     void pushToBattle(true);
@@ -521,11 +588,13 @@ function bindPose() {
     preview.castState = 'idle';
     $('btnIdle').classList.add('active');
     $('btnRunPose').classList.remove('active');
+    if (selected === 'decoy') preview.refreshDecoyLook();
   });
   $('btnRunPose').addEventListener('click', () => {
     preview.castState = 'run';
     $('btnRunPose').classList.add('active');
     $('btnIdle').classList.remove('active');
+    if (selected === 'decoy') preview.refreshDecoyLook();
   });
   const crowd = $('crowdCount') as HTMLInputElement;
   const crowdV = $('crowdCountV');
@@ -573,6 +642,12 @@ async function boot() {
   ensureSelection();
   setLoading('加载战场角色…', 'kit / 皮肤 / idle·run 与游戏同一套，不进对外包体');
   const kit = await loadHumanoidKit('player', currentDay);
+  if (!alive()) return;
+  await preloadThrowSkins();
+  if (!alive()) return;
+  await preloadSlickProps();
+  if (!alive()) return;
+  await preloadDecoyScarecrow();
   if (!alive()) return;
   setLoading('初始化物理…');
   const world = await initPhysics();
@@ -704,6 +779,7 @@ async function reloadRoster(force = false) {
     bustCatalogAssets();
     const kit = await loadHumanoidKit('player', currentDay);
     preview.adoptKit(kit);
+    await preview.reloadDashMounts(cat);
     bakedDay = currentDay;
     renderDays();
     renderCast();

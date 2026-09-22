@@ -30,6 +30,46 @@
       "fit": 0.1
     },
     {
+      "id": "prop-mouse",
+      "file": "/models/colleagues/props/presets/prop-mouse.glb",
+      "preRotation": [
+        0,
+        0,
+        0
+      ],
+      "fit": 0.52
+    },
+    {
+      "id": "prop-bucket",
+      "file": "/models/colleagues/props/presets/prop-bucket.glb",
+      "preRotation": [
+        0,
+        0,
+        0
+      ],
+      "fit": 0.3
+    },
+    {
+      "id": "prop-bento",
+      "file": "/models/colleagues/props/presets/prop-bento.glb",
+      "preRotation": [
+        0,
+        0,
+        0
+      ],
+      "fit": 0.34
+    },
+    {
+      "id": "prop-poop",
+      "file": "/models/colleagues/props/presets/prop-poop.glb",
+      "preRotation": [
+        0,
+        0,
+        0
+      ],
+      "fit": 0.2
+    },
+    {
       "id": "prop-cap",
       "file": "/models/colleagues/props/prop-cap.glb",
       "preRotation": [
@@ -56,7 +96,17 @@
         -1.66,
         -0.64
       ],
-      "fit": 0.18
+      "fit": 0.22
+    },
+    {
+      "id": "prop-clock",
+      "file": "/models/colleagues/props/presets/prop-clock.glb",
+      "preRotation": [
+        0,
+        0,
+        0
+      ],
+      "fit": 0.24
     },
     {
       "id": "prop-keys",
@@ -2132,5 +2182,86 @@
         }
       ]
     }
-  ]
+  ],
+  "dashMounts": {
+    "reclock": {
+      "head": {
+        "propId": "prop-clock",
+        "transform": {
+          "position": [
+            0,
+            0.48,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.05,
+            2.05,
+            2.05
+          ]
+        },
+        "preRotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "blame": {
+      "hand": {
+        "propId": "prop-pot",
+        "transform": {
+          "position": [
+            -0.2255,
+            0.2582,
+            -0.0624
+          ],
+          "rotation": [
+            0.6,
+            0,
+            0
+          ],
+          "scale": [
+            2.55,
+            2.1,
+            2.29
+          ]
+        },
+        "preRotation": [
+          3.14,
+          1.77,
+          -0.64
+        ]
+      },
+      "head": {
+        "propId": "prop-pot",
+        "transform": {
+          "position": [
+            0,
+            0.78,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.2,
+            2.2,
+            2.2
+          ]
+        },
+        "preRotation": [
+          3.1416,
+          0,
+          0
+        ]
+      }
+    }
+  }
 }

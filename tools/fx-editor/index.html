@@ -134,7 +134,7 @@
   <div id="app">
     <header id="top">
       <h1>特效编辑器</h1>
-      <span class="sub">构筑编冲刺/技能 · 战场角色编被动（光环 / 加时 / 状态样子）</span>
+      <span class="sub">左侧选冲刺/技能编效果 · 右侧「角色反馈」按本关角色改状态样子 · 角色栏只编文件卡和飘字</span>
       <span style="margin-left:auto">
         <a href="http://localhost:5173/">游戏 :5173</a>
         &nbsp;·&nbsp;
@@ -150,10 +150,10 @@
         <div class="list" id="dayList"></div>
         <p class="hint" id="dayKitHint"></p>
         <h2>构筑</h2>
-        <p class="hint">冲刺和技能的群体反馈。各角色被撞后的状态在冲刺右侧「角色反应」。</p>
+        <p class="hint">冲刺和技能的判定/样子在右侧「整体」；被撞角色的状态与样子在「角色反馈」。</p>
         <div class="list" id="fxList"></div>
         <h2>战场角色</h2>
-        <p class="hint">点角色编：有主动技能的先出技能配置，下面才是加班飘字和倒地/眩晕/减速。选中带技能的同事后场景收成他对着玩家；点播放看技能打在玩家身上。判定加时会循环飘 +N分钟。</p>
+        <p class="hint">点角色只编通用：头顶文件、交任务飘字。有主动技能的同事仍可在这里调技能本身。倒地/眩晕/减速改到左侧对应冲刺或技能的「角色反馈」。</p>
         <div class="list" id="castList"></div>
         <h2>预览状态</h2>
         <div class="row">
@@ -165,7 +165,7 @@
           <input type="range" id="crowdCount" min="1" max="24" step="1" value="15">
           <span class="v" id="crowdCountV">15</span>
         </label>
-        <p class="hint">只影响编辑器预览，不改战场人数。</p>
+        <p class="hint">WASD 自由移动玩家；待机 / 跑步改定格姿势；点「播放当前」留下透明分身，再走开看效果。空格播放。</p>
         <h2 id="lvHead">等级</h2>
         <div class="row" id="lvRow">
           <button type="button" id="btnLv1" class="active">LV1</button>
@@ -181,7 +181,7 @@
           <button type="button" id="btnSave">送进战场</button>
           <button type="button" id="btnRevert">重载磁盘</button>
           <button type="button" id="btnReset">恢复默认</button>
-          <span id="status">就绪</span>
+          <span id="status">WASD 移动 · 空格播放</span>
         </div>
       </section>
 
@@ -190,7 +190,7 @@
         <p class="hint" id="fxBlurb">冲到家具上的碎片。</p>
         <div id="panelTabs" class="tabs" style="display:none">
           <button type="button" id="tabOverall" class="active">整体</button>
-          <button type="button" id="tabReact">角色反应</button>
+          <button type="button" id="tabReact">角色反馈</button>
         </div>
         <div id="fields"></div>
         <h2>写入</h2>

@@ -37,6 +37,9 @@ import {
 } from '../../../src/catalog';
 import { isPlayerSlotId } from '../../../src/roster';
 import { WEEKDAYS, type WeekdayId } from '../../../src/levels';
+import { LINE_IDS, type LineId } from '../../../src/fx/catalog';
+import { LINE_NAMES } from '../../../src/fx/days';
+import type { DashMountSlot } from '../../../src/catalog';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -121,6 +124,11 @@ async function boot() {
   let heldFileName = '';
   let backBytes: ArrayBuffer | null = null;
   let backFileName = '';
+  let dashLine: LineId | null = null;
+  let dashSlot: 'hand' | 'head' = 'hand';
+  const mountRigs = { hand: new HairRig(), head: new HairRig() };
+  const dashPropIds = { hand: '', head: '' };
+  let dashToken = 0;
   let syncingInputs = false;
   let thumbNonce = 0;
 
@@ -392,10 +400,132 @@ async function boot() {
   }
 
   function activeRig() {
+    if (dashLine) return mountRigs[dashSlot];
     return rigOf(editTarget);
   }
 
+  function paintDash() {
+    for (const id of LINE_IDS) {
+      const btn = document.getElementById(`dashLine-${id}`);
+      btn?.classList.toggle('active', id === dashLine);
+      const mounted = catalog.dashMounts?.[id];
+      const has = !!(mounted?.hand || mounted?.head);
+      if (btn) btn.textContent = has ? `${LINE_NAMES[id]} · 已挂` : LINE_NAMES[id];
+    }
+    $('btnDashHand').classList.toggle('active', !!dashLine && dashSlot === 'hand');
+    $('btnDashHead').classList.toggle('active', !!dashLine && dashSlot === 'head');
+  }
+
+  function dashWhere() {
+    return dashSlot === 'hand' ? '自己手上' : '打中的人头上';
+  }
+
+  function focusDashGizmo() {
+    if (!dashLine) return;
+    paintDash();
+    const rig = mountRigs[dashSlot];
+    const where = dashWhere();
+    $('xformHint').textContent = `正在调${LINE_NAMES[dashLine]} · ${where}。拖滑杆即可。`;
+    if (rig.visual) {
+      preview.attachGizmo(rig.root);
+      writeTransform(rig.getTransform());
+      writePre(rig.preRotation);
+      const preset = PROP_PRESETS.find((p) => p.id === dashPropIds[dashSlot]);
+      $('dashMountInfo').textContent = `${LINE_NAMES[dashLine]} · ${where} · ${preset?.label ?? dashPropIds[dashSlot]}`;
+    } else {
+      preview.attachGizmo(null);
+      writeTransform(IDENTITY_TRANSFORM);
+      writePre([0, 0, 0]);
+      $('dashMountInfo').textContent = `${LINE_NAMES[dashLine]} · ${where} · 还没挂。点上面的物品。`;
+    }
+  }
+
+  function captureDashSlot(slot: 'hand' | 'head'): DashMountSlot | null {
+    const rig = mountRigs[slot];
+    const propId = dashPropIds[slot];
+    if (!rig.visual || !propId) return null;
+    return {
+      propId,
+      transform: rig.getTransform(),
+      preRotation: [rig.preRotation[0], rig.preRotation[1], rig.preRotation[2]],
+    };
+  }
+
+  async function restoreDashSlot(slot: 'hand' | 'head', token: number) {
+    const saved = dashLine ? catalog.dashMounts?.[dashLine]?.[slot] ?? null : null;
+    const rig = mountRigs[slot];
+    if (!saved) {
+      rig.unmount();
+      dashPropIds[slot] = '';
+      return;
+    }
+    if (dashPropIds[slot] === saved.propId && rig.visual) {
+      rig.setPreRotation(saved.preRotation);
+      rig.setTransform(saved.transform);
+      return;
+    }
+    const bone = slot === 'hand' ? preview.hand : preview.head;
+    const prop = catalog.props.find((p) => p.id === saved.propId);
+    if (!bone || !prop) {
+      rig.unmount();
+      dashPropIds[slot] = '';
+      return;
+    }
+    const preset = PROP_PRESETS.find((p) => p.id === saved.propId);
+    const visual = await loadPropFile(preset?.file ?? prop.file, preset?.fit ?? propFitOf(saved.propId, prop.fit));
+    if (token !== dashToken || dashLine == null) return;
+    rig.mount(bone, visual);
+    rig.source = prop.file;
+    rig.setPreRotation(saved.preRotation);
+    rig.setTransform(saved.transform);
+    dashPropIds[slot] = saved.propId;
+  }
+
+  async function selectDash(line: LineId) {
+    const token = ++dashToken;
+    dashLine = line;
+    $('btnEditHat').classList.remove('active');
+    $('btnEditHeld').classList.remove('active');
+    $('btnEditBack').classList.remove('active');
+    paintDash();
+    await restoreDashSlot('hand', token);
+    await restoreDashSlot('head', token);
+    if (token !== dashToken) return;
+    focusDashGizmo();
+  }
+
+  async function mountDashPreset(preset: (typeof PROP_PRESETS)[number]) {
+    if (!dashLine) return;
+    const bone = dashSlot === 'hand' ? preview.hand : preview.head;
+    if (!bone) {
+      toast(dashSlot === 'hand' ? '没有右手骨' : '没有头骨');
+      return;
+    }
+    const rig = mountRigs[dashSlot];
+    rig.resetTransform();
+    const existing = catalog.props.find((p) => p.id === preset.id);
+    rig.setPreRotation(existing?.preRotation ?? [0, 0, 0]);
+    const visual = preset.file
+      ? await loadPropFile(preset.file, preset.fit ?? propFitOf(preset.id))
+      : preset.make
+        ? preset.make()
+        : null;
+    if (!visual) {
+      toast(`${preset.label} 没有模型`);
+      return;
+    }
+    if (!dashLine) return;
+    rig.mount(bone, visual);
+    rig.source = preset.file ?? preset.label;
+    dashPropIds[dashSlot] = preset.id;
+    rig.snapToAttach('bottom');
+    focusDashGizmo();
+  }
+
   function setEditTarget(next: EditTarget) {
+    dashLine = null;
+    paintDash();
+    $('dashMountInfo').textContent = '先点一条冲刺。摆好的挂件还在这条冲刺上，点名字可以再调。';
     editTarget = next;
     $('btnEditHat').classList.toggle('active', next === 'hat');
     $('btnEditHeld').classList.toggle('active', next === 'held');
@@ -745,6 +875,10 @@ async function boot() {
   });
 
   bindDrop($('propDrop'), $('propFile') as HTMLInputElement, async (file) => {
+    if (dashLine) {
+      toast('冲刺挂件先点上面已有的物品');
+      return;
+    }
     try {
       const bytes = await file.arrayBuffer();
       const kind = SLOT_OF[propAnchor];
@@ -762,6 +896,14 @@ async function boot() {
   for (const preset of PROP_PRESETS) {
     const btn = $(preset.btn);
     btn.addEventListener('click', async () => {
+      if (dashLine) {
+        try {
+          await mountDashPreset(preset);
+        } catch (err) {
+          toast(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
       const kind = SLOT_OF[propAnchor];
       idInput(kind).value = preset.id;
       setSlotBytes(kind, null, `${preset.id}.glb`);
@@ -783,7 +925,72 @@ async function boot() {
     });
   }
 
+  const dashList = $('dashMountList');
+  for (const id of LINE_IDS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = `dashLine-${id}`;
+    btn.textContent = LINE_NAMES[id];
+    btn.addEventListener('click', () => {
+      void selectDash(id);
+    });
+    dashList.appendChild(btn);
+  }
+  paintDash();
+  $('btnDashHand').addEventListener('click', () => {
+    if (!dashLine) {
+      toast('先点一条冲刺');
+      return;
+    }
+    dashSlot = 'hand';
+    focusDashGizmo();
+  });
+  $('btnDashHead').addEventListener('click', () => {
+    if (!dashLine) {
+      toast('先点一条冲刺');
+      return;
+    }
+    dashSlot = 'head';
+    focusDashGizmo();
+  });
+  $('btnSaveDashMount').addEventListener('click', async () => {
+    if (!dashLine) {
+      toast('先点一条冲刺');
+      return;
+    }
+    const line = dashLine;
+    const hand = captureDashSlot('hand');
+    const head = captureDashSlot('head');
+    catalog.dashMounts ??= {};
+    if (!hand && !head) delete catalog.dashMounts[line];
+    else catalog.dashMounts[line] = { hand, head };
+    paintDash();
+    focusDashGizmo();
+    await persist(`${LINE_NAMES[line]} 挂件已保存`);
+  });
+  $('btnClearDashMount').addEventListener('click', async () => {
+    if (!dashLine) {
+      toast('先点一条冲刺');
+      return;
+    }
+    mountRigs[dashSlot].unmount();
+    dashPropIds[dashSlot] = '';
+    const line = dashLine;
+    const hand = captureDashSlot('hand');
+    const head = captureDashSlot('head');
+    catalog.dashMounts ??= {};
+    if (!hand && !head) delete catalog.dashMounts[line];
+    else catalog.dashMounts[line] = { hand, head };
+    paintDash();
+    focusDashGizmo();
+    await persist(`已卸下${LINE_NAMES[line]}的${dashWhere()}`);
+  });
+
   $('btnClearProp').addEventListener('click', () => {
+    if (dashLine) {
+      toast('冲刺挂件用下面的「卸下这一处」');
+      return;
+    }
     const kind = SLOT_OF[propAnchor];
     rigOf(kind).unmount();
     setSlotBytes(kind, null);
@@ -837,7 +1044,7 @@ async function boot() {
   });
   $('btnSnap').addEventListener('click', () => {
     const rig = activeRig();
-    rig.snapToAttach(editTarget === 'back' ? 'back' : 'bottom');
+    rig.snapToAttach(!dashLine && editTarget === 'back' ? 'back' : 'bottom');
     writeTransform(rig.getTransform());
   });
   $('btnResetXform').addEventListener('click', () => {

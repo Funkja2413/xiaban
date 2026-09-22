@@ -1,6 +1,14 @@
 import { BATTLE_SLOT_IDS, type EnemySkillId } from '../../../src/catalog';
 import type { ActorId, CrowdActorId, DashKey, DashReactKind, LineId, SkillKey, Lv } from '../../../src/fx/catalog';
-import { CHAIN_STYLE_META, CHANNEL_STAMP_META, CROWD_ACTOR_IDS, DASH_REACT_META, STUN_ELEM_META, type ThrowGlowStyle } from '../../../src/fx/catalog';
+import {
+  CHAIN_STYLE_META,
+  CHANNEL_STAMP_META,
+  CROWD_ACTOR_IDS,
+  DASH_REACT_META,
+  HIT_BURST_META,
+  STUN_ELEM_META,
+  type ThrowGlowStyle,
+} from '../../../src/fx/catalog';
 import { fx } from '../../../src/fx/catalog';
 import { lineName, skillNameOnDay, type DayPlayKit } from '../../../src/fx/days';
 import type { HazardKind } from '../../../src/levels';
@@ -37,7 +45,7 @@ export const TRACKS: TrackDef[] = [
     tag: '场景',
     group: 'common',
     hasLevel: false,
-    blurb: '冲到家具/箱子上的碎片。人被撞后的倒地/减速/眩晕在对应冲刺的「角色反应」。',
+    blurb: '冲到家具/箱子上的碎片。人被撞后的倒地/减速/眩晕在对应冲刺的「角色反馈」。',
   },
   {
     id: 'none',
@@ -45,7 +53,7 @@ export const TRACKS: TrackDef[] = [
     tag: '默认',
     group: 'dash',
     hasLevel: false,
-    blurb: '没抽到属性时的冲刺判定和残影。各角色被撞后的状态在右侧「角色反应」。',
+    blurb: '没抽到属性时的冲刺判定和残影。各角色被撞后的状态在右侧「角色反馈」。',
   },
   {
     id: 'brute',
@@ -53,7 +61,7 @@ export const TRACKS: TrackDef[] = [
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: '撞开清路。LV 抬冲量/半径；主管推开在「角色反应」。',
+    blurb: '撞开清路。LV 抬冲量/半径；各角色被撞反馈在「角色反馈」。',
   },
   {
     id: 'slump',
@@ -61,7 +69,7 @@ export const TRACKS: TrackDef[] = [
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: '撞人后困意圈。谁减速、持续多久在「角色反应」。',
+    blurb: '撞人后困意圈。谁减速、持续多久、雾圈样子在「角色反馈」。',
   },
   {
     id: 'phantom',
@@ -69,7 +77,7 @@ export const TRACKS: TrackDef[] = [
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: '穿人晕 · 回充 · 虚化。各角色眩晕时长在「角色反应」。',
+    blurb: '穿人晕 · 回充 · 虚化。各角色眩晕时长与金星样子在「角色反馈」。',
   },
   {
     id: 'rebound',
@@ -77,7 +85,7 @@ export const TRACKS: TrackDef[] = [
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: '玩家撞墙折向续冲（不是把人弹飞）。满级可碰主管折向。',
+    blurb: '玩家撞墙折向续冲（不是把人弹飞）。满级可碰主管折向。角色反馈在「角色反馈」。',
   },
   {
     id: 'reclock',
@@ -85,7 +93,7 @@ export const TRACKS: TrackDef[] = [
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: '一段结束后窗口内再按第二段，可拐弯。',
+    blurb: '撞到后随机一人头顶闹钟，全场改追；满级闹钟到期小范围炸飞。角色反馈在「角色反馈」。',
   },
   {
     id: 'blame',
@@ -93,7 +101,7 @@ export const TRACKS: TrackDef[] = [
     tag: '属性',
     group: 'dash',
     hasLevel: true,
-    blurb: '撞到的人背锅，周围同事改追他。',
+    blurb: '命中挂锅减速；满级挂锅者依次小范围爆炸。角色反馈在「角色反馈」。',
   },
   {
     id: 'decoy',
@@ -101,7 +109,7 @@ export const TRACKS: TrackDef[] = [
     tag: '技能',
     group: 'skill',
     hasLevel: true,
-    blurb: 'LV1 吸仇恨 · LV2 更久 · LV3 到期爆炸。按关换皮名。',
+    blurb: '定格玩家诱饵。周四「我是NPC」换稻草人；周五「假人下班」1–3 个反方向跑 2 秒。爆炸反馈在「角色反馈」。',
   },
   {
     id: 'keyboard',
@@ -109,7 +117,7 @@ export const TRACKS: TrackDef[] = [
     tag: '技能',
     group: 'skill',
     hasLevel: true,
-    blurb: '掷出物去程放倒 · LV2 更宽 · LV3 返程也倒。按关换皮。上方切 LV1/2/3 可各自调大小、染色、光晕样式。',
+    blurb: '掷出物去程放倒 · LV2 更宽 · LV3 返程也倒。按关换皮。命中放倒反馈在「角色反馈」。',
   },
   {
     id: 'coffee',
@@ -117,7 +125,7 @@ export const TRACKS: TrackDef[] = [
     tag: '技能',
     group: 'skill',
     hasLevel: true,
-    blurb: '朝前泼一滩 · LV2 更大更久 · LV3 连泼再溅。按关换皮名和渍色。',
+    blurb: '朝前泼一滩 · LV2 更大更久 · LV3 连泼再溅。踩上减速的雾圈样子在「角色反馈」。',
   },
   {
     id: 'hazards',
@@ -174,7 +182,7 @@ export const ACTORS: ActorDef[] = ACTOR_IDS.map((id) => {
     blurb:
       s.kind === 'player'
         ? '先选圆环样式，再分别改内环和外环。冲刺残影仍在左侧构筑。男女主角共用这一套。'
-        : `${s.blurb} 判定加时改为头顶飘 +N分钟（数字跟数值）。选中角色就会循环预览，不用贴近。读条文件夹仍在游戏里。`,
+        : `${s.blurb} 这里只编通用：头顶文件卡、交任务飘字。倒地/眩晕/减速样子改到对应冲刺或技能右侧的「角色反馈」。`,
   };
 });
 
@@ -201,13 +209,120 @@ function mistFields(p: string): Field[] {
 
 function paperFields(p: string, object: boolean): Field[] {
   return [
-    { path: `${p}.color`, label: object ? '碎片颜色' : '纸颜色', kind: 'color' },
-    { path: `${p}.count`, label: object ? '碎片数量' : '纸片数量', kind: 'int', min: 0, max: 24, step: 1 },
+    {
+      path: p.replace(/\.paper$/, '.burst'),
+      label: object ? '碎片样式' : '倒地爆开',
+      kind: 'select',
+      options: HIT_BURST_META.map((m) => ({ id: m.id, name: `${m.name} · ${m.blurb}` })),
+      hint: object
+        ? '撞家具/箱子、以及椅子高速砸人时的飞散样式。'
+        : '该角色被放倒时的爆开样式与粒子。技能「统一倒地爆开」会批量改这里；改单卡只影响这个角色。',
+    },
+    { path: `${p}.color`, label: object ? '碎片颜色' : '粒子颜色', kind: 'color' },
+    { path: `${p}.count`, label: object ? '碎片数量' : '粒子数量', kind: 'int', min: 0, max: 24, step: 1 },
     { path: `${p}.spawnY`, label: '爆开高度', kind: 'range', min: 0.3, max: 2.2, step: 0.05 },
     { path: `${p}.speed`, label: '横飞', kind: 'range', min: 0.5, max: 12, step: 0.2 },
     { path: `${p}.upMin`, label: '上抛最小', kind: 'range', min: 0.5, max: 8, step: 0.1 },
     { path: `${p}.upMax`, label: '上抛最大', kind: 'range', min: 1, max: 12, step: 0.1 },
   ];
+}
+
+/** 角色倒地/眩晕/减速样子：挂在冲刺·技能「角色反馈」卡里编，不进角色通用栏 */
+export function actorHitLookSections(id: CrowdActorId, opts?: { omitBurst?: boolean }): FieldSection[] {
+  const p = `actors.${id}`;
+  const paper = paperFields(`${p}.hit.paper`, false);
+  return [
+    {
+      title: '倒地 · 爆开',
+      fields: opts?.omitBurst ? paper.filter((f) => !f.path.endsWith('.burst')) : paper,
+    },
+    { title: '倒地 · 气雾', fields: mistFields(`${p}.hit.mist`) },
+  ];
+}
+
+export function actorStunLookSections(id: CrowdActorId): FieldSection[] {
+  const p = `actors.${id}`;
+  return [
+    {
+      title: '眩晕 · 元素',
+      fields: [
+        { path: `${p}.stun.enabled`, label: '启用眩晕样子', kind: 'bool' },
+        {
+          path: `${p}.stun.elem`,
+          label: '元素',
+          kind: 'select',
+          options: STUN_ELEM_META.map((m) => ({ id: m.id, name: `${m.name} · ${m.blurb}` })),
+        },
+        { path: `${p}.stun.starColor`, label: '元素颜色', kind: 'color' },
+        { path: `${p}.stun.starCount`, label: '数量', kind: 'int', min: 1, max: 8, step: 1 },
+        { path: `${p}.stun.starSize`, label: '大小', kind: 'range', min: 0.08, max: 0.55, step: 0.01 },
+        { path: `${p}.stun.starOpacity`, label: '透明度', kind: 'range', min: 0.15, max: 1, step: 0.02 },
+        { path: `${p}.stun.orbit`, label: '绕头半径', kind: 'range', min: 0.12, max: 0.8, step: 0.02 },
+        { path: `${p}.stun.spin`, label: '转速', kind: 'range', min: 0.4, max: 10, step: 0.1 },
+        { path: `${p}.stun.bob`, label: '上下晃', kind: 'range', min: 0, max: 0.18, step: 0.01 },
+        { path: `${p}.stun.tilt`, label: '轨道倾角', kind: 'range', min: 0, max: 1, step: 0.02, hint: '0 = 平躺转，越大越像椭圆' },
+        { path: `${p}.stun.y`, label: '高度', kind: 'range', min: 1.2, max: 2.6, step: 0.05 },
+      ],
+    },
+    {
+      title: '眩晕 · 圆圈',
+      fields: [
+        { path: `${p}.stun.ringOn`, label: '显示圆圈', kind: 'bool' },
+        { path: `${p}.stun.ringColor`, label: '圈颜色', kind: 'color' },
+        { path: `${p}.stun.ringOpacity`, label: '圈透明度', kind: 'range', min: 0.05, max: 1, step: 0.02 },
+        { path: `${p}.stun.ringSize`, label: '圈大小', kind: 'range', min: 0.12, max: 0.9, step: 0.02 },
+        { path: `${p}.stun.ringWidth`, label: '圈粗细', kind: 'range', min: 0.06, max: 0.55, step: 0.02 },
+        { path: `${p}.stun.ringAdditive`, label: '圈加色发光', kind: 'bool' },
+      ],
+    },
+    {
+      title: '眩晕 · 光晕',
+      fields: [
+        { path: `${p}.stun.glowOn`, label: '显示光晕', kind: 'bool' },
+        { path: `${p}.stun.glowColor`, label: '光晕颜色', kind: 'color' },
+        { path: `${p}.stun.glowOpacity`, label: '光晕透明度', kind: 'range', min: 0.05, max: 1, step: 0.02 },
+        { path: `${p}.stun.glowSize`, label: '光晕大小', kind: 'range', min: 0.15, max: 1.2, step: 0.02 },
+      ],
+    },
+  ];
+}
+
+export function actorSlowLookSections(id: CrowdActorId): FieldSection[] {
+  const p = `actors.${id}`;
+  return [
+    {
+      title: '减速 · 脚底圆环',
+      fields: [
+        { path: `${p}.slow.enabled`, label: '启用雾圈', kind: 'bool' },
+        { path: `${p}.slow.color`, label: '颜色', kind: 'color' },
+        { path: `${p}.slow.opacity`, label: '透明度', kind: 'range', min: 0.08, max: 0.9, step: 0.02 },
+        { path: `${p}.slow.additive`, label: '加色发光', kind: 'bool' },
+        { path: `${p}.slow.size`, label: '大小', kind: 'range', min: 0.25, max: 1.4, step: 0.02 },
+        { path: `${p}.slow.inner`, label: '内径', kind: 'range', min: 0, max: 0.82, step: 0.02, hint: '0 = 实心软盘，越大越像圆环' },
+        { path: `${p}.slow.softness`, label: '模糊', kind: 'range', min: 0, max: 1, step: 0.02 },
+        { path: `${p}.slow.fill`, label: '心雾', kind: 'range', min: 0, max: 1, step: 0.02, hint: '圆环中间淡一层' },
+        { path: `${p}.slow.spin`, label: '转速', kind: 'range', min: 0.2, max: 4, step: 0.05 },
+        { path: `${p}.slow.y`, label: '离地', kind: 'range', min: 0.02, max: 0.2, step: 0.005 },
+      ],
+    },
+  ];
+}
+
+/** 按反馈状态附上对应样子栏 */
+export function reactLookSections(id: CrowdActorId, kind: DashReactKind): FieldSection[] {
+  if (kind === 'none') return [];
+  if (kind === 'knock') return actorHitLookSections(id);
+  if (kind === 'stun') return actorStunLookSections(id);
+  if (kind === 'slow') return [...actorSlowLookSections(id), ...actorHitLookSections(id)];
+  // shove
+  return [...actorStunLookSections(id), ...actorHitLookSections(id)];
+}
+
+/** 技能没有逐角色状态时：按技能默认反馈挂样子 */
+export function skillReactLookSections(skill: SkillKey, id: CrowdActorId): FieldSection[] {
+  if (skill === 'coffee') return actorSlowLookSections(id);
+  // 爆开种类由技能 LV 的 hitBurst 决定，角色卡只留粒子/气雾
+  return actorHitLookSections(id, { omitBurst: true });
 }
 
 function dashSections(line: DashKey, lv: Lv): FieldSection[] {
@@ -275,23 +390,25 @@ function dashSections(line: DashKey, lv: Lv): FieldSection[] {
   }
   if (line === 'reclock') {
     out.push({
-      title: '两段补卡',
+      title: '闹钟改追',
       fields: [
-        { path: `${p}.reclock.window`, label: '二段窗口', kind: 'range', min: 0.1, max: 0.9, step: 0.01 },
-        { path: `${p}.reclock.segmentScale`, label: '二段时长倍率', kind: 'range', min: 0.4, max: 1.2, step: 0.05 },
-        { path: `${p}.reclock.hitRefund`, label: '二段命中退 CD', kind: 'range', min: 0, max: 1, step: 0.05 },
-        { path: `${p}.reclock.autoThird`, label: '两段中后自动滑', kind: 'bool' },
+        { path: `${p}.reclock.duration`, label: '闹钟持续', kind: 'range', min: 0.4, max: 4, step: 0.05, hint: '全场同事改追挂闹钟的人' },
+        { path: `${p}.reclock.blastRadius`, label: '爆炸半径', kind: 'range', min: 0, max: 5, step: 0.05, hint: '0 = 到期不炸' },
+        { path: `${p}.reclock.blastImpulse`, label: '爆炸冲量', kind: 'range', min: 0, max: 1200, step: 10 },
       ],
     });
   }
   if (line === 'blame') {
     out.push({
-      title: '甩锅',
+      title: '挂锅减速',
       fields: [
-        { path: `${p}.blame.duration`, label: '背锅秒', kind: 'range', min: 0.4, max: 4, step: 0.05 },
-        { path: `${p}.blame.radius`, label: '改追半径', kind: 'range', min: 1, max: 8, step: 0.1 },
-        { path: `${p}.blame.count`, label: '最多改追人数', kind: 'int', min: 1, max: 8, step: 1 },
-        { path: `${p}.blame.groundRadius`, label: '空挥甩锅半径', kind: 'range', min: 0, max: 5, step: 0.1, hint: '0 = 必须撞到人' },
+        { path: `${p}.blame.duration`, label: '锅/减速持续', kind: 'range', min: 0.4, max: 4, step: 0.05 },
+        { path: `${p}.blame.factor`, label: '速度倍率', kind: 'range', min: 0.15, max: 0.9, step: 0.02, hint: '越小越慢' },
+        { path: `${p}.blame.maxPots`, label: '单次最多挂锅', kind: 'int', min: 1, max: 12, step: 1 },
+        { path: `${p}.blame.blastRadius`, label: '爆炸半径', kind: 'range', min: 0, max: 3, step: 0.05, hint: '0 = 不炸；只炸最近 1–2 人' },
+        { path: `${p}.blame.blastImpulse`, label: '爆炸冲量', kind: 'range', min: 0, max: 1200, step: 10 },
+        { path: `${p}.blame.blastDelay`, label: '首爆延迟', kind: 'range', min: 0.1, max: 2, step: 0.05 },
+        { path: `${p}.blame.blastGap`, label: '连爆间隔', kind: 'range', min: 0.1, max: 1, step: 0.02 },
       ],
     });
   }
@@ -499,7 +616,7 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
       {
         title: '对象池（改完需刷新游戏）',
         fields: [
-          { path: 'common.pools.paper', label: '纸片/碎片池', kind: 'int', min: 8, max: 128, step: 4 },
+          { path: 'common.pools.paper', label: '爆开粒子池', kind: 'int', min: 8, max: 128, step: 4 },
           { path: 'common.pools.mist', label: '气雾池', kind: 'int', min: 8, max: 96, step: 4 },
           { path: 'common.pools.trail', label: '残影池', kind: 'int', min: 4, max: 48, step: 1 },
         ],
@@ -509,6 +626,26 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
   if (track.group === 'dash') return dashSections(track.id as DashKey, track.hasLevel ? lv : 1);
   if (track.id === 'decoy') {
     const p = `skills.decoy.${lv}`;
+    const glowStyle = (fx().skills.decoy[lv]?.decoy?.glowStyle ?? 'soft') as ThrowGlowStyle;
+    const lookFields: Field[] = [
+      {
+        path: `${p}.decoy.opacity`,
+        label: '身体透明',
+        kind: 'range',
+        min: 0.12,
+        max: 0.95,
+        step: 0.02,
+        hint: `只改 LV${lv}。定格玩家当前姿态。`,
+      },
+      { path: `${p}.decoy.color`, label: '染色', kind: 'color', hint: '白 = 不染色。' },
+    ];
+    if (glowStyle !== 'off') {
+      lookFields.push(
+        { path: `${p}.decoy.glowColor`, label: '光晕色', kind: 'color' },
+        { path: `${p}.decoy.glowOpacity`, label: '光晕透明', kind: 'range', min: 0.05, max: 1, step: 0.02 },
+        { path: `${p}.decoy.glowSize`, label: '光晕大小', kind: 'range', min: 0.8, max: 2.8, step: 0.05 }
+      );
+    }
     return [
       {
         title: '技能',
@@ -519,10 +656,15 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
           { path: `${p}.decoy.blastImpulse`, label: '爆炸冲量', kind: 'range', min: 0, max: 800, step: 10 },
         ],
       },
+      {
+        title: `分身样子 · LV${lv}`,
+        fields: lookFields,
+      },
     ];
   }
   if (track.id === 'coffee') {
     const p = `skills.coffee.${lv}`;
+    const day = kit?.day ?? 'monday';
     return [
       {
         title: '泼咖啡',
@@ -531,7 +673,7 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
           { path: `${p}.coffee.range`, label: '泼出距离', kind: 'range', min: 0.6, max: 6, step: 0.1 },
           { path: `${p}.coffee.count`, label: '渍点数', kind: 'int', min: 1, max: 5, step: 1 },
           { path: `${p}.coffee.spacing`, label: '渍点间距', kind: 'range', min: 0.25, max: 1.8, step: 0.05 },
-          { path: `${p}.coffee.color`, label: '颜色', kind: 'color' },
+          { path: `dayLooks.coffee.${day}.${lv}`, label: '颜色', kind: 'color', hint: '只改这一关。喝咖啡、泼脏水、外卖汤、破罐破摔互不影响。' },
           { path: `${p}.coffee.opacity`, label: '透明度', kind: 'range', min: 0.1, max: 0.9, step: 0.02 },
           { path: `${p}.coffee.radius`, label: '半径', kind: 'range', min: 0.3, max: 2.8, step: 0.05 },
           { path: `${p}.coffee.life`, label: '持续', kind: 'range', min: 0.6, max: 8, step: 0.1 },
@@ -648,7 +790,7 @@ export function actorSections(id: ActorId): FieldSection[] {
     {
       title: '判定加时 · 飘字',
       fields: [
-        { path: `${p}.overtime.enabled`, label: '启用飘字', kind: 'bool', hint: '交任务完成时头顶飘 +N分钟。读条转文件在上一栏单独编。' },
+        { path: `${p}.overtime.enabled`, label: '启用飘字', kind: 'bool', hint: '交任务完成时头顶飘 +N分钟。选中角色会循环预览。' },
         { path: `${p}.overtime.color`, label: '字色', kind: 'color' },
         { path: `${p}.overtime.opacity`, label: '透明度', kind: 'range', min: 0.15, max: 1, step: 0.02 },
         { path: `${p}.overtime.outline`, label: '描边', kind: 'bool' },
@@ -657,64 +799,6 @@ export function actorSections(id: ActorId): FieldSection[] {
         { path: `${p}.overtime.size`, label: '字号', kind: 'range', min: 0.18, max: 1.1, step: 0.02 },
         { path: `${p}.overtime.rise`, label: '上飘', kind: 'range', min: 0.15, max: 2.2, step: 0.05 },
         { path: `${p}.overtime.y`, label: '起始高度', kind: 'range', min: 1.4, max: 2.8, step: 0.05 },
-      ],
-    },
-    { title: '倒地 · 纸片', fields: paperFields(`${p}.hit.paper`, false) },
-    { title: '倒地 · 气雾', fields: mistFields(`${p}.hit.mist`) },
-    {
-      title: '眩晕 · 元素',
-      fields: [
-        { path: `${p}.stun.enabled`, label: '启用眩晕样子', kind: 'bool' },
-        {
-          path: `${p}.stun.elem`,
-          label: '元素',
-          kind: 'select',
-          options: STUN_ELEM_META.map((m) => ({ id: m.id, name: `${m.name} · ${m.blurb}` })),
-        },
-        { path: `${p}.stun.starColor`, label: '元素颜色', kind: 'color' },
-        { path: `${p}.stun.starCount`, label: '数量', kind: 'int', min: 1, max: 8, step: 1 },
-        { path: `${p}.stun.starSize`, label: '大小', kind: 'range', min: 0.08, max: 0.55, step: 0.01 },
-        { path: `${p}.stun.starOpacity`, label: '透明度', kind: 'range', min: 0.15, max: 1, step: 0.02 },
-        { path: `${p}.stun.orbit`, label: '绕头半径', kind: 'range', min: 0.12, max: 0.8, step: 0.02 },
-        { path: `${p}.stun.spin`, label: '转速', kind: 'range', min: 0.4, max: 10, step: 0.1 },
-        { path: `${p}.stun.bob`, label: '上下晃', kind: 'range', min: 0, max: 0.18, step: 0.01 },
-        { path: `${p}.stun.tilt`, label: '轨道倾角', kind: 'range', min: 0, max: 1, step: 0.02, hint: '0 = 平躺转，越大越像椭圆' },
-        { path: `${p}.stun.y`, label: '高度', kind: 'range', min: 1.2, max: 2.6, step: 0.05 },
-      ],
-    },
-    {
-      title: '眩晕 · 圆圈',
-      fields: [
-        { path: `${p}.stun.ringOn`, label: '显示圆圈', kind: 'bool' },
-        { path: `${p}.stun.ringColor`, label: '圈颜色', kind: 'color' },
-        { path: `${p}.stun.ringOpacity`, label: '圈透明度', kind: 'range', min: 0.05, max: 1, step: 0.02 },
-        { path: `${p}.stun.ringSize`, label: '圈大小', kind: 'range', min: 0.12, max: 0.9, step: 0.02 },
-        { path: `${p}.stun.ringWidth`, label: '圈粗细', kind: 'range', min: 0.06, max: 0.55, step: 0.02 },
-        { path: `${p}.stun.ringAdditive`, label: '圈加色发光', kind: 'bool' },
-      ],
-    },
-    {
-      title: '眩晕 · 光晕',
-      fields: [
-        { path: `${p}.stun.glowOn`, label: '显示光晕', kind: 'bool' },
-        { path: `${p}.stun.glowColor`, label: '光晕颜色', kind: 'color' },
-        { path: `${p}.stun.glowOpacity`, label: '光晕透明度', kind: 'range', min: 0.05, max: 1, step: 0.02 },
-        { path: `${p}.stun.glowSize`, label: '光晕大小', kind: 'range', min: 0.15, max: 1.2, step: 0.02 },
-      ],
-    },
-    {
-      title: '减速 · 脚底圆环',
-      fields: [
-        { path: `${p}.slow.enabled`, label: '启用雾圈', kind: 'bool' },
-        { path: `${p}.slow.color`, label: '颜色', kind: 'color' },
-        { path: `${p}.slow.opacity`, label: '透明度', kind: 'range', min: 0.08, max: 0.9, step: 0.02 },
-        { path: `${p}.slow.additive`, label: '加色发光', kind: 'bool' },
-        { path: `${p}.slow.size`, label: '大小', kind: 'range', min: 0.25, max: 1.4, step: 0.02 },
-        { path: `${p}.slow.inner`, label: '内径', kind: 'range', min: 0, max: 0.82, step: 0.02, hint: '0 = 实心软盘，越大越像圆环' },
-        { path: `${p}.slow.softness`, label: '模糊', kind: 'range', min: 0, max: 1, step: 0.02 },
-        { path: `${p}.slow.fill`, label: '心雾', kind: 'range', min: 0, max: 1, step: 0.02, hint: '圆环中间淡一层' },
-        { path: `${p}.slow.spin`, label: '转速', kind: 'range', min: 0.2, max: 4, step: 0.05 },
-        { path: `${p}.slow.y`, label: '离地', kind: 'range', min: 0.02, max: 0.2, step: 0.005 },
       ],
     },
   ];

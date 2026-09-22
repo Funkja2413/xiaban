@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import type { KeyboardLevel, ThrowGlowStyle } from '../fx/catalog';
 import { normalizeThrowGlowStyle } from '../fx/catalog';
 import type { WeekdayId } from '../levels';
+import { loadPropVisual } from './hair';
 
 /** keyboard 技能族按关换皮；战斗数值仍共用。 */
 export type ThrowSkin = 'mouse' | 'keyboard' | 'laptop' | 'boomerang';
@@ -15,6 +16,29 @@ export const THROW_SKIN_BY_DAY: Record<WeekdayId, ThrowSkin> = {
   thursday: 'laptop',
   friday: 'boomerang',
 };
+
+/** CreativeTrio · Computer Mouse · CC0（Poly Pizza） */
+const MOUSE_GLB = '/models/colleagues/props/presets/prop-mouse.glb';
+/** 飞出物体感：最长边约半米 */
+const MOUSE_FIT = 0.52;
+
+let mouseTemplate: THREE.Group | null = null;
+let mouseLoad: Promise<void> | null = null;
+
+/** 预载公开低模投掷皮；失败时仍用手搓盒子。 */
+export async function preloadThrowSkins() {
+  if (mouseTemplate || mouseLoad) return mouseLoad ?? Promise.resolve();
+  mouseLoad = (async () => {
+    try {
+      const visual = await loadPropVisual(MOUSE_GLB, MOUSE_FIT);
+      mouseTemplate = visual;
+    } catch (err) {
+      console.warn('[throw] mouse glb failed, keep procedural', err);
+      mouseTemplate = null;
+    }
+  })();
+  return mouseLoad;
+}
 
 export const DEFAULT_THROW_LOOK: ThrowLook = {
   scale: 1,
@@ -164,7 +188,7 @@ export function makeThrowProjectile(skin: ThrowSkin, look: ThrowLook = DEFAULT_T
   return g;
 }
 
-function clearThrowGlow(root: THREE.Object3D) {
+export function clearThrowGlow(root: THREE.Object3D) {
   const old = root.getObjectByName('throwGlow');
   if (!old) return;
   root.remove(old);
@@ -183,7 +207,7 @@ function clearThrowGlow(root: THREE.Object3D) {
   });
 }
 
-function buildThrowGlow(style: ThrowGlowStyle, look: ThrowLook): THREE.Object3D | null {
+export function buildThrowGlow(style: ThrowGlowStyle, look: ThrowLook): THREE.Object3D | null {
   if (style === 'off') return null;
   const g = new THREE.Group();
   g.name = 'throwGlow';
@@ -291,6 +315,21 @@ function makeKeyboard() {
 }
 
 function makeMouse() {
+  if (mouseTemplate) {
+    const g = new THREE.Group();
+    g.userData.skinScale = 1;
+    const body = mouseTemplate.clone(true);
+    body.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (Array.isArray(mesh.material)) mesh.material = mesh.material.map((m) => m.clone());
+      else mesh.material = (mesh.material as THREE.Material).clone();
+      mesh.castShadow = true;
+    });
+    g.add(body);
+    return g;
+  }
+  // 预载前 / 失败兜底：旧盒子鼠标
   const g = new THREE.Group();
   g.userData.skinScale = 1.85;
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.42), lambert(0x3a4048));
@@ -390,10 +429,12 @@ function makeLetterR(mat: THREE.Material) {
   return g;
 }
 
-/** 周五 OKR回旋镖：O K R 三字排成可飞的道具。 */
+/** 周五 OKR回旋镖：O K R 平铺（平行地面），飞出去像回旋镖。 */
 function makeBoomerang() {
   const g = new THREE.Group();
   g.userData.skinScale = 1.05;
+  g.userData.throwFlat = true;
+  const body = new THREE.Group();
   const oMat = lambert(0xff8a4a);
   const kMat = lambert(0xffc14d);
   const rMat = lambert(0xff6b3d);
@@ -405,8 +446,11 @@ function makeBoomerang() {
   const R = makeLetterR(rMat);
   R.position.set(0.4, 0, 0);
   R.rotation.y = -0.28;
-  g.add(O, K, R);
-  const bar = addBox(g, lambert(0xd45c2a), 0.98, 0.045, 0.05, 0, -0.015, -0.03);
+  body.add(O, K, R);
+  const bar = addBox(body, lambert(0xd45c2a), 0.98, 0.045, 0.05, 0, -0.015, -0.03);
   bar.castShadow = false;
+  // 字母原是立着的，整组躺平 → 平行地面
+  body.rotation.x = -Math.PI / 2;
+  g.add(body);
   return g;
 }

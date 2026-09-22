@@ -1,5 +1,5 @@
 import type { LineId, SkillKey } from '../fx/catalog';
-import { lineName, skillGlyphOnDay, skillNameOnDay } from '../fx/days';
+import { lineName, skillDescsOnDay, skillGlyphOnDay, skillNameOnDay } from '../fx/days';
 import type { WeekdayId } from '../levels';
 import { sfx } from '../audio';
 
@@ -44,11 +44,11 @@ export const LINES: Record<LineId, Meta> = {
   },
   reclock: {
     name: '补卡冲', glyph: '🪪', color: '#57d9c4',
-    descs: ['冲完 0.35s 内可再按第二段', '窗口更长，二段命中退冷却', '两段都中再自动滑一步'],
+    descs: ['撞人后随机挂闹钟，全场追 1 秒', '同上，闹钟仍飘 1 秒', '闹钟 2 秒后爆炸，炸飞周围'],
   },
   blame: {
     name: '甩锅冲', glyph: '🍲', color: '#d4a017',
-    descs: ['撞到的人背锅，附近改追他', '背锅更久，更多人上当', '空挥也能脚下甩一口锅'],
+    descs: ['撞到的人挂锅减速', '挂锅更久，减速更深', '挂锅者依次小爆，炸飞邻近 1–2 人'],
   },
 };
 
@@ -363,7 +363,12 @@ export class Cards {
       return { ...LINES[id], name: lineName(this.day, id) };
     }
     const id = c.id as SkillId;
-    return { ...SKILLS[id], name: skillNameOnDay(this.day, id), glyph: skillGlyphOnDay(this.day, id) };
+    return {
+      ...SKILLS[id],
+      name: skillNameOnDay(this.day, id),
+      glyph: skillGlyphOnDay(this.day, id),
+      descs: skillDescsOnDay(this.day, id, SKILLS[id].descs),
+    };
   }
 
   private buildPool() {
@@ -582,7 +587,12 @@ export class Cards {
     }
 
     if (this.skill) {
-      const m = { ...SKILLS[this.skill], name: skillNameOnDay(this.day, this.skill), glyph: skillGlyphOnDay(this.day, this.skill) };
+      const m = {
+        ...SKILLS[this.skill],
+        name: skillNameOnDay(this.day, this.skill),
+        glyph: skillGlyphOnDay(this.day, this.skill),
+        descs: skillDescsOnDay(this.day, this.skill, SKILLS[this.skill].descs),
+      };
       this.skillBtn.classList.remove('empty');
       this.skillBtn.style.borderColor = m.color;
       this.skillBtn.style.background = m.color + '38';

@@ -2080,7 +2080,12 @@ export function seedThursday(): LevelDef {
       spawn('ch4', 9.8, -4.6, 'guest'),
       spawn('ch5', 0, -19.2, 'stool'),
     ],
-    heavyAnchors: [spawn('hv-1', 0, -20.6)],
+    heavyAnchors: [
+      spawn('hv-1', 10.75, 21.75),
+      spawn('hv-2', 13.25, 16.25),
+      spawn('hv-3', 14.25, 8.25),
+      spawn('hv-4', 6.75, 2.25),
+    ],
     interceptorSpawns: [spawn('ic-1', 0.2, -25.4)],
     menuChase: [
       { x: 11.2, z: 22.0 },

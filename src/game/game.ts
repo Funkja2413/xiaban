@@ -9,6 +9,7 @@ import { addLightsToScene, applyAtmosphere, createLights, type SceneLights } fro
 import type { Atmosphere } from '../levels';
 import { Player } from './player';
 import { loadHumanoidKit, type HumanoidKit } from './humanoid';
+import { preloadThrowSkins } from './skillProjectiles';
 import { AvatarStudio } from './avatarStudio';
 import { hideAvatarTune } from './avatarTune';
 import { layoutAvatarNames } from '../shell';
@@ -17,15 +18,17 @@ import { RagdollFactory } from './ragdoll';
 import { Chairs } from './chairs';
 import { Cards } from './cards';
 import { Skills } from './skills';
-import { Slicks } from './slicks';
+import { Slicks, preloadSlickProps } from './slicks';
+import { DashMounts } from './dashMounts';
 import { ChannelMarks, DashTrail, OvertimePop, ImpactMist, PaperBurst, SlowPulse, StatusMarks, spawnHitFx } from './look';
 import { SkillChains, SkillShout, SHOUT_Y } from './skillVfx';
 import { getStageSize, onStageResize } from '../core/stage';
 import { lookForSlot, loadCatalog, setPlayDayHint } from '../catalog';
 import { loadPlayerSlot } from '../progress';
 import type { PlayerSlotId } from '../roster';
-import { commonFx, crowdFx, dashFx, enemySkillFx, loadFxCatalog, overtimeMinutesOf, watchFxCatalog, type CrowdActorId, type DashKey } from '../fx/catalog';
+import { commonFx, crowdFx, dashFx, enemySkillFx, loadFxCatalog, mergeHitFx, overtimeMinutesOf, watchFxCatalog, type CrowdActorId, type DashKey } from '../fx/catalog';
 import { dayPlayerLoadout } from '../fx/days';
+import { preloadDecoyScarecrow } from './decoyGhost';
 import { Hazards } from './hazards';
 import { bgm, sfx } from '../audio';
 import type { BootProgress } from '../boot-progress';
@@ -69,6 +72,7 @@ export class Game {
   private cards!: Cards;
   private skills!: Skills;
   private slicks!: Slicks;
+  private dashMounts!: DashMounts;
   private papers!: PaperBurst;
   private dashTrail!: DashTrail;
   private mist!: ImpactMist;
@@ -181,6 +185,9 @@ export class Game {
     progress?.phase('同事形象', 0.96);
     const humans = await loadHumanoidKit(this.playerSlotId);
     this.kit = humans;
+    await preloadThrowSkins();
+    await preloadSlickProps();
+    await preloadDecoyScarecrow();
     const { map, playerStart, elevatorPoint } = this.level;
 
     this.flow = new FlowField(map.minX, map.minZ, map.maxX, map.maxZ, 0.5);
@@ -236,9 +243,23 @@ export class Game {
     this.cards.setDayKit(day, loadout.dashes, loadout.skills);
     this.cards.onApplied = (label) => this.hud.toast(`${label} 已装备`);
     this.player.cards = this.cards;
-    this.enemies.onKnockdown = (type, x, z, gender) => {
+    this.dashMounts = new DashMounts(this.scene, this.player, this.enemies);
+    await this.dashMounts.load(looks);
+    this.player.onDashHit = (i) => {
+      const line = this.cards.line;
+      if (!line) return;
+      const pack = dashFx(line, this.cards.lineLv || 1);
+      const dur = pack.reclock?.duration ?? pack.blame?.duration ?? 1.5;
+      this.dashMounts.mark(i, line, dur);
+    };
+    this.enemies.onPotBlast = (i, x, z) => {
+      this.dashMounts.clearHead(i);
+      spawnHitFx(this.papers, this.mist, x, z, crowdFx(this.enemies.actorId(i)).hit);
+      sfx.play('knockdown');
+    };
+    this.enemies.onKnockdown = (type, x, z, gender, hitOver) => {
       this.cards.addBadges(type === EType.C ? 3 : 1);
-      spawnHitFx(this.papers, this.mist, x, z, crowdFx(crowdActorOf(type, gender)).hit);
+      spawnHitFx(this.papers, this.mist, x, z, mergeHitFx(crowdFx(crowdActorOf(type, gender)).hit, hitOver));
       sfx.play('knockdown');
     };
     this.slicks = new Slicks(this.scene);
@@ -294,9 +315,9 @@ export class Game {
         this.skillShout.burst(x, SHOUT_Y, z, p.x, SHOUT_Y, p.z, pack.color, pack.opacity, pack.waves ?? 3, pack.waveGap ?? 0.14);
       }
     };
-    this.skills = new Skills(this.scene, (x, z, r, life, look) => {
+    this.skills = new Skills(this.scene, this.world, (x, z, r, life, look) => {
       this.slicks.spawn(x, z, r, life, look);
-    });
+    }, () => this.player.figure, () => this.kit);
     this.skills.setDay(day);
     this.papers = new PaperBurst(this.scene);
     this.dashTrail = new DashTrail(this.scene);
@@ -513,6 +534,7 @@ export class Game {
     this.enemies.syncVisuals(time);
     this.chairs.syncVisuals();
     this.player.syncVisual();
+    this.dashMounts.update(dt);
     if (this.player.dashing) {
       const line = this.cards.line;
       const pack = dashFx((line ?? 'none') as DashKey, this.cards.lineLv || 1);
@@ -758,6 +780,9 @@ export class Game {
     this.enemies.update(h, tx, tz, {
       suppressChannel: !!dp || this.player.phasedT > 0 || this.player.ragdolled,
       bruteChain: this.cards.line === 'brute',
+      baitOf: dp
+        ? (ex, ez) => this.skills.nearestDecoy(ex, ez) ?? { x: tx, z: tz }
+        : undefined,
       skillTarget: {
         applySlow: (d, f) => this.player.applySlow(d, f),
         stun: (d) => this.player.stun(d),

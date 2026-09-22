@@ -34,13 +34,10 @@ export class Player {
   private dashDirZ = -1;
   /** 反弹冲：本段剩余可折次数 */
   private reboundLeft = 0;
-  /** 补卡冲：二段窗口 / 已用段数 / 本段是否命中 */
-  private reclockT = 0;
-  private reclockSeg = 0;
-  private reclockHitSeg = false;
-  private reclockHitAll = false;
-  /** 甩锅：本段是否已甩成功 */
-  private blamedThisDash = false;
+  /** 甩锅：本段已挂几口锅 */
+  private blamePotCount = 0;
+  /** 补卡：本段是否已挂闹钟 */
+  private reclockedThisDash = false;
   /** 撞上重量级同事后的硬直 / 布娃娃落地后的起身 */
   stunT = 0;
   /** 湿地面 / 拍桌 */
@@ -57,6 +54,12 @@ export class Player {
   cards: Cards | null = null;
   /** 倦怠圈回调 */
   onSlowPulse: ((x: number, z: number, r: number, color: number, opacity: number, life: number) => void) | null = null;
+  /** 这次冲刺打中一个人（含空挥甩锅选中的最近同事） */
+  onDashHit: ((i: number) => void) | null = null;
+
+  get figure() {
+    return this.fig;
+  }
 
   private phasedNow = false;
   private passed = new Set<number>();
@@ -119,11 +122,8 @@ export class Player {
     this.dashT = 0;
     this.dashCd = 0;
     this.reboundLeft = 0;
-    this.reclockT = 0;
-    this.reclockSeg = 0;
-    this.reclockHitSeg = false;
-    this.reclockHitAll = false;
-    this.blamedThisDash = false;
+    this.blamePotCount = 0;
+    this.reclockedThisDash = false;
     this.stunT = 0;
     this.slowT = 0;
     this.slowMul = 1;
@@ -232,9 +232,8 @@ export class Player {
 
   requestDash(moveX: number, moveZ: number): boolean {
     if (this.rag || this.dashT > 0 || this.stunT > 0) return false;
+    if (this.dashCd > 0) return false;
     const pack = dashFx((this.cards?.line ?? 'none') as DashKey, this.cards?.lineLv || 1);
-    const follow = this.reclockT > 0 && !!pack.reclock && this.reclockSeg >= 1 && this.reclockSeg < 2;
-    if (!follow && this.dashCd > 0) return false;
 
     const len = Math.hypot(moveX, moveZ);
     if (len > 0.15) {
@@ -245,19 +244,11 @@ export class Player {
       this.dashDirZ = Math.cos(this.yaw);
     }
 
-    const scale = follow ? pack.reclock!.segmentScale : 1;
-    this.dashT = pack.hit.time * scale;
-    if (!follow) {
-      this.dashCd = pack.hit.cooldown;
-      this.reclockSeg = 0;
-      this.reclockHitAll = false;
-      this.reboundLeft = pack.rebound?.maxBounces ?? 0;
-    } else {
-      this.reclockSeg = 2;
-      this.reclockT = 0;
-    }
-    this.reclockHitSeg = false;
-    this.blamedThisDash = false;
+    this.dashT = pack.hit.time;
+    this.dashCd = pack.hit.cooldown;
+    this.reboundLeft = pack.rebound?.maxBounces ?? 0;
+    this.blamePotCount = 0;
+    this.reclockedThisDash = false;
     this.passed.clear();
     this.dashed.clear();
     sfx.play('dash');
@@ -266,7 +257,6 @@ export class Player {
 
   update(dt: number, moveX: number, moveZ: number, aiming: boolean, enemies: Enemies) {
     this.dashCd = Math.max(0, this.dashCd - dt);
-    this.reclockT = Math.max(0, this.reclockT - dt);
     this.bouncedByHeavy = false;
 
     if (this.slowT > 0) {
@@ -308,7 +298,8 @@ export class Player {
         if (dx * dx + dz * dz >= rr * rr) continue;
         const react = dashReactOf(pack, id);
         if (phase) {
-          this.applyDashReact(enemies, i, pack, react, true);
+          const outcome = this.applyDashReact(enemies, i, pack, react, true);
+          if (outcome === 'hit') this.onDashHit?.(i);
           if (!this.passed.has(i)) {
             this.passed.add(i);
             const refund = pack.phantom?.cdRefund ?? 0;
@@ -319,15 +310,53 @@ export class Player {
         const first = !this.dashed.has(i);
         if (!first) continue;
         if (hit.maxHits > 0 && this.dashed.size >= hit.maxHits) continue;
+
+        // 补卡：本帧命中池里先随机挂闹钟，挂钟的人不倒地（方便展示 + 被追）
+        if (pack.reclock && !this.reclockedThisDash) {
+          const pool: number[] = [];
+          for (let j = 0; j < enemies.cap; j++) {
+            if (this.dashed.has(j)) continue;
+            const sj = enemies.state[j];
+            if (sj !== EState.Chase && sj !== EState.Knock && sj !== EState.Getup) continue;
+            const jx = enemies.posX[j] - p.x;
+            const jz = enemies.posZ[j] - p.z;
+            const jid = enemies.actorId(j);
+            const jrr = jid === 'heavy' || jid === 'interceptor' ? Math.max(hit.radius, 1.4) : hit.radius;
+            if (jx * jx + jz * jz >= jrr * jrr) continue;
+            const jr = dashReactOf(pack, jid);
+            if (jr.kind === 'none') continue;
+            pool.push(j);
+          }
+          const bait = enemies.reclockAlarm(pack.reclock, pool);
+          this.reclockedThisDash = true;
+          if (bait >= 0) this.onDashHit?.(bait);
+        }
+
+        if (pack.reclock && enemies.isReclockBait(i)) {
+          this.dashed.add(i);
+          continue;
+        }
+
+        // 甩锅：命中挂锅减速，不倒地；满级进依次小爆队列
+        if (pack.blame) {
+          const maxPots = Math.max(1, pack.blame.maxPots | 0);
+          if (this.blamePotCount < maxPots) {
+            const order = this.blamePotCount;
+            if (enemies.blamePot(i, pack.blame, order)) {
+              this.blamePotCount++;
+              this.onDashHit?.(i);
+            }
+          }
+          this.dashed.add(i);
+          if (this.blamePotCount === 1) sfx.play('dash_hit');
+          continue;
+        }
+
         const outcome = this.applyDashReact(enemies, i, pack, react, first);
         if (outcome === 'bounce') break;
         if (outcome === 'hit' && first) {
           this.dashed.add(i);
-          this.reclockHitSeg = true;
-          if (pack.blame && !this.blamedThisDash) {
-            enemies.blame(i, pack.blame.duration, pack.blame.radius, pack.blame.count);
-            this.blamedThisDash = true;
-          }
+          if (!pack.reclock) this.onDashHit?.(i);
         }
       }
       this.jamT = 0;
@@ -352,32 +381,6 @@ export class Player {
       const pack = dashFx((line ?? 'none') as DashKey, lv || 1);
       if (pack.phantom && pack.phantom.phaseTime > 0) {
         this.phasedT = Math.max(this.phasedT, pack.phantom.phaseTime);
-      }
-      if (pack.blame && !this.blamedThisDash && pack.blame.groundRadius > 0) {
-        const p = this.pos;
-        enemies.blameNearest(p.x, p.z, pack.blame.duration, pack.blame.groundRadius, pack.blame.count);
-        this.blamedThisDash = true;
-      }
-      if (pack.reclock) {
-        if (this.reclockSeg === 0) {
-          this.reclockSeg = 1;
-          this.reclockT = pack.reclock.window;
-          if (this.reclockHitSeg) this.reclockHitAll = true;
-        } else if (this.reclockSeg === 2) {
-          if (this.reclockHitSeg && pack.reclock.hitRefund > 0) {
-            this.dashCd = Math.max(0.15, this.dashCd - pack.reclock.hitRefund);
-          }
-          if (pack.reclock.autoThird && this.reclockHitAll && this.reclockHitSeg) {
-            this.dashT = pack.hit.time * 0.45;
-            this.reclockSeg = 3;
-          } else {
-            this.reclockSeg = 0;
-            this.reclockT = 0;
-          }
-        } else {
-          this.reclockSeg = 0;
-          this.reclockT = 0;
-        }
       }
     }
 

@@ -36,6 +36,8 @@
     label.field { display: flex; flex-direction: column; gap: 3px; color: var(--muted); margin-bottom: 8px; }
     .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
     .row > button, .row > label { flex: 1; }
+    .dash-list { display: flex; flex-direction: column; gap: 4px; }
+    .dash-list button { text-align: left; }
     h1 { font-size: 13px; font-weight: 700; margin: 0; letter-spacing: 0.04em; }
     h2 { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
       letter-spacing: 0.08em; margin: 14px 0 8px; }
@@ -329,6 +331,19 @@
 原点在头皮 / 手心 / 后背贴合处，+Y 向上，+Z 向前（包体在 −Z）。
 刚体配件，不要自带骨骼。
 CC0 或自有版权。</p>
+
+        <h2>冲刺挂件</h2>
+        <p class="hint">按冲刺名字记。点一条，再点「自己手上」或「打中的人头上」，然后点上面的物品摆姿势。保存写在这条冲刺上，不进角色常服。特效编辑器播放同一条冲刺时会用这份姿势。</p>
+        <div id="dashMountList" class="dash-list"></div>
+        <div class="row" style="margin-top:6px">
+          <button type="button" id="btnDashHand">自己手上</button>
+          <button type="button" id="btnDashHead">打中的人头上</button>
+        </div>
+        <p class="hint" id="dashMountInfo">先点一条冲刺。</p>
+        <div class="row">
+          <button type="button" id="btnSaveDashMount" class="primary">保存这个挂件</button>
+          <button type="button" id="btnClearDashMount">卸下这一处</button>
+        </div>
       </aside>
 
       <section id="center">

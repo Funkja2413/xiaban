@@ -46,6 +46,10 @@ export interface PropDef {
 /** 与编辑器 PROP_PRESETS 一致。catalog 未写 fit 时也按 id 回退，避免旧档读爆。 */
 export const PROP_PRESET_FIT: Record<string, number> = {
   'prop-cup': 0.1,
+  'prop-mouse': 0.52,
+  'prop-bucket': 0.16,
+  'prop-bento': 0.18,
+  'prop-poop': 0.12,
   'prop-laptop': 0.22,
   'prop-mic': 0.26,
   'prop-lens': 0.2,
@@ -135,6 +139,19 @@ export interface ColleagueDay {
   variants: VariantDef[];
 }
 
+/** 一条冲刺上的一处挂件。姿态记在冲刺上，不进角色常服。 */
+export interface DashMountSlot {
+  propId: string;
+  transform: HairTransform;
+  preRotation: [number, number, number];
+}
+
+/** hand：冲刺时自己右手。head：打中的人头顶，人保持站立。 */
+export interface DashMountDef {
+  hand: DashMountSlot | null;
+  head: DashMountSlot | null;
+}
+
 export interface ColleagueCatalog {
   version: 1;
   active: WeekdayId;
@@ -150,6 +167,8 @@ export interface ColleagueCatalog {
   days: ColleagueDay[];
   /** 当前选中关的形象；与 days[n].variants 同一份引用 */
   variants: VariantDef[];
+  /** 按冲刺 id（blame、brute…）记挂件。空着的冲刺不出现。 */
+  dashMounts: Partial<Record<string, DashMountDef>>;
 }
 
 export const BUDGET = { skins: 16, props: 6 };
@@ -363,6 +382,7 @@ export function catalogLookStamp(cat: ColleagueCatalog): string {
     hairs: cat.hairs.map((h) => [h.id, h.file]),
     variants: cat.variants.map(variant),
     days: cat.days.map((d) => ({ id: d.id, variants: d.variants.map(variant) })),
+    dashMounts: cat.dashMounts,
   });
 }
 
@@ -387,7 +407,47 @@ export function emptyCatalog(): ColleagueCatalog {
     skins: [],
     days,
     variants: days[0].variants,
+    dashMounts: {},
   };
+}
+
+function num3(v: unknown, fallback: [number, number, number]): [number, number, number] {
+  if (!Array.isArray(v) || v.length < 3) return fallback;
+  const a = Number(v[0]);
+  const b = Number(v[1]);
+  const c = Number(v[2]);
+  if (![a, b, c].every(Number.isFinite)) return fallback;
+  return [a, b, c];
+}
+
+function normalizeMountSlot(raw: unknown): DashMountSlot | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const s = raw as DashMountSlot;
+  if (!s.propId || typeof s.propId !== 'string') return null;
+  const t = s.transform;
+  if (!t) return null;
+  return {
+    propId: s.propId,
+    transform: {
+      position: num3(t.position, [0, 0, 0]),
+      rotation: num3(t.rotation, [0, 0, 0]),
+      scale: num3(t.scale, [1, 1, 1]),
+    },
+    preRotation: num3(s.preRotation, [0, 0, 0]),
+  };
+}
+
+function normalizeDashMounts(raw: unknown): ColleagueCatalog['dashMounts'] {
+  const out: ColleagueCatalog['dashMounts'] = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [key, def] of Object.entries(raw as Record<string, DashMountDef>)) {
+    if (!def || typeof def !== 'object') continue;
+    const hand = normalizeMountSlot(def.hand);
+    const head = normalizeMountSlot(def.head);
+    if (!hand && !head) continue;
+    out[key] = { hand, head };
+  }
+  return out;
 }
 
 function stripOverlayHair(v: VariantDef) {
@@ -450,6 +510,7 @@ export function serializeCatalog(cat: ColleagueCatalog) {
     props: cat.props,
     skins: cat.skins,
     days: cat.days,
+    dashMounts: cat.dashMounts ?? {},
   };
 }
 
@@ -475,6 +536,7 @@ export async function loadCatalog(): Promise<ColleagueCatalog> {
     cat.skins ??= [];
     cat.variants ??= [];
     cat.days ??= [];
+    cat.dashMounts = normalizeDashMounts(cat.dashMounts);
     cat.base ??= emptyCatalog().base;
     cat.base.mesh = KIT_URL;
     cat.active ??= 'monday';

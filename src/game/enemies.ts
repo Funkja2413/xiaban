@@ -1,10 +1,10 @@
 import * as THREE from 'three/webgpu';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { FlowField } from '../sim/flowfield';
-import { ENEMY_CUT_GROUPS, G_ENEMY, G_PLAYER, G_RAGDOLL } from '../sim/physics';
+import { ENEMY_CUT_GROUPS, SOLID_RAY_GROUPS } from '../sim/physics';
 import { RagdollFactory, type RagdollHandle } from './ragdoll';
 import type { HumanoidKit } from './humanoid';
-import { enemySkillFx, type CrowdActorId, type EnemySkillId } from '../fx/catalog';
+import { enemySkillFx, type BlameLevel, type CrowdActorId, type EnemySkillId, type HitFx, type ReclockLevel } from '../fx/catalog';
 import { sfx } from '../audio';
 
 export interface SkillTarget {
@@ -32,8 +32,6 @@ const RAGDOLL_IMPULSE = 400;
 const STAGGER_TO_RAGDOLL = 3;
 /** 主管追人时略快于普通同事，仍慢于冲刺玩家 */
 const HEAVY_CHASE = 2.55;
-/** 绕行探测：只打家具、墙和陷阱，不打玩家和同事 */
-const SOLID_RAY_GROUPS = (0xffff << 16) | (0xffff & ~(G_ENEMY | G_PLAYER | G_RAGDOLL));
 /** 前台拦路虎：玩家进自己卡口这么近才离开岗位去堵 */
 const INTERCEPT_ZONE = 4.2;
 /** 玩家离开自己卡口这么远就回家 */
@@ -64,6 +62,8 @@ export interface HitOpts {
   heavyOk?: boolean;
   /** 这次倒地是玩家冲刺打出的，蛮力可当炮弹 */
   cannon?: boolean;
+  /** 覆盖倒地爆开样式（投掷/分身等道具） */
+  hitFx?: Partial<HitFx>;
 }
 
 export class Enemies {
@@ -133,11 +133,20 @@ export class Enemies {
   private hasteT: Float32Array;
   private hasteMul: Float32Array;
   private rallyLeft = 2;
-  /** 甩锅：被背锅的同事下标，周围人改追他 */
+  /** 甩锅：被背锅的同事下标，周围人改追他（旧逻辑保留字段，新甩锅改用挂锅队列） */
   private blameI = -1;
   private blameT = 0;
   private blameR = 0;
   private blameN = 0;
+  /** 甩锅挂锅：依次小爆 */
+  private potBlasts: { i: number; wait: number; r: number; impulse: number }[] = [];
+  /** 锅爆时回调（清挂件 / 碎纸） */
+  onPotBlast: ((i: number, x: number, z: number) => void) | null = null;
+  /** 补卡闹钟：全场改追挂钟的人，到期可炸 */
+  private alarmI = -1;
+  private alarmT = 0;
+  private alarmBlastR = 0;
+  private alarmBlastImpulse = 0;
   skillOf: ((id: CrowdActorId) => EnemySkillId | null) | null = null;
   onSkill: ((id: EnemySkillId, phase: 'windup' | 'fire', x: number, z: number, i: number) => void) | null = null;
   private ragCount = 0;
@@ -183,7 +192,7 @@ export class Enemies {
 
   onTaskDelivered: ((type: EType, x: number, z: number, gender: number) => void) | null = null;
   /** 每次同事被放倒（进入布娃娃）时回调，用于掉落工牌 */
-  onKnockdown: ((type: EType, x: number, z: number, gender: number) => void) | null = null;
+  onKnockdown: ((type: EType, x: number, z: number, gender: number, hitFx?: Partial<HitFx> | null) => void) | null = null;
 
   constructor(
     private scene: THREE.Scene,
@@ -444,7 +453,7 @@ export class Enemies {
     if (heavy) {
       // 重量级：只有高速椅子 / 蛮力冲能砸翻；冲刺和道具只能微推 + 打断读条
       if (opts.force && opts.heavyOk) {
-        this.toRagdoll(i, dirX, dirZ, Math.min(impulse, 900), opts.cannon === true);
+        this.toRagdoll(i, dirX, dirZ, Math.min(impulse, 900), opts.cannon === true, opts.hitFx);
         return;
       }
       this.clearChannel(i);
@@ -457,7 +466,7 @@ export class Enemies {
     this.clearChannel(i);
 
     if (opts.force || impulse >= RAGDOLL_IMPULSE || this.stagger[i] >= STAGGER_TO_RAGDOLL) {
-      this.toRagdoll(i, dirX, dirZ, Math.min(Math.max(impulse * 0.85, 200), 500), opts.cannon === true);
+      this.toRagdoll(i, dirX, dirZ, Math.min(Math.max(impulse * 0.85, 200), 500), opts.cannon === true, opts.hitFx);
       return;
     }
     const body = this.bodies[i]!;
@@ -466,7 +475,7 @@ export class Enemies {
     this.knockT[i] = Math.max(this.knockT[i], 0.35);
   }
 
-  toRagdoll(i: number, dirX: number, dirZ: number, power: number, cannon = false) {
+  toRagdoll(i: number, dirX: number, dirZ: number, power: number, cannon = false, hitFx?: Partial<HitFx> | null) {
     const body = this.bodies[i];
     if (!body) return;
     if (this.ragCount >= Enemies.MAX_RAG) this.recycleOldestRagdoll();
@@ -487,7 +496,7 @@ export class Enemies {
     this.state[i] = EState.Ragdoll;
     this.stagger[i] = 0;
     this.ragCount++;
-    this.onKnockdown?.(this.types[i] as EType, t.x, t.z, this.gender[i]);
+    this.onKnockdown?.(this.types[i] as EType, t.x, t.z, this.gender[i], hitFx);
   }
 
   private finishRagdoll(i: number) {
@@ -643,6 +652,18 @@ export class Enemies {
     return out.setFromMatrixPosition(this.tmpGlow);
   }
 
+  /** 头骨世界矩阵。实例同事没有真实骨头，挂件跟着这份矩阵。 */
+  headMatrix(i: number, out: THREE.Matrix4) {
+    const pose = this.lastPose[i] ?? 0;
+    const bone = this.kit.headLocals[pose] ?? this.kit.headLocals[0];
+    if (!bone) {
+      out.identity();
+      out.setPosition(this.posX[i], 1.55, this.posZ[i]);
+      return out;
+    }
+    return out.copy(this.lastBody[i]!).multiply(bone);
+  }
+
   actorId(i: number): CrowdActorId {
     const t = this.types[i];
     if (t === EType.C) return 'heavy';
@@ -755,7 +776,14 @@ export class Enemies {
     dt: number,
     playerX: number,
     playerZ: number,
-    opts?: { suppressChannel?: boolean; bruteChain?: boolean; forceChase?: boolean; skillTarget?: SkillTarget }
+    opts?: {
+      suppressChannel?: boolean;
+      bruteChain?: boolean;
+      forceChase?: boolean;
+      skillTarget?: SkillTarget;
+      /** 分身等多诱饵：每人追各自最近目标 */
+      baitOf?: (ex: number, ez: number) => { x: number; z: number };
+    }
   ) {
     this.forceChase = opts?.forceChase === true;
     this.aimPX = playerX;
@@ -765,6 +793,24 @@ export class Enemies {
       if (this.blameT <= 0 || this.blameI < 0 || this.state[this.blameI] === EState.Inactive) {
         this.blameI = -1;
         this.blameT = 0;
+      }
+    }
+    this.tickPotBlasts(dt);
+    if (this.alarmT > 0) {
+      this.alarmT -= dt;
+      const dead = this.alarmI < 0 || this.state[this.alarmI] === EState.Inactive;
+      if (this.alarmT <= 0 || dead) {
+        if (!dead && this.alarmBlastR > 0 && this.alarmBlastImpulse > 0) {
+          const body = this.bodies[this.alarmI];
+          const t = body?.translation();
+          const x = t?.x ?? this.posX[this.alarmI];
+          const z = t?.z ?? this.posZ[this.alarmI];
+          this.flingAround(x, z, this.alarmBlastR, this.alarmBlastImpulse, this.alarmBlastImpulse * 0.08);
+        }
+        this.alarmI = -1;
+        this.alarmT = 0;
+        this.alarmBlastR = 0;
+        this.alarmBlastImpulse = 0;
       }
     }
     this.hash.clear();
@@ -786,9 +832,17 @@ export class Enemies {
 
     for (let i = 0; i < this.cap; i++) {
       switch (this.state[i]) {
-        case EState.Chase:
-          this.updateChase(i, dt, playerX, playerZ, opts?.suppressChannel === true, opts?.skillTarget);
+        case EState.Chase: {
+          let ax = playerX;
+          let az = playerZ;
+          if (opts?.baitOf) {
+            const bait = opts.baitOf(this.posX[i], this.posZ[i]);
+            ax = bait.x;
+            az = bait.z;
+          }
+          this.updateChase(i, dt, ax, az, opts?.suppressChannel === true, opts?.skillTarget);
           break;
+        }
         case EState.Knock:
           this.knockT[i] -= dt;
           if (this.knockT[i] <= 0) this.state[i] = EState.Chase;
@@ -1109,7 +1163,7 @@ export class Enemies {
     }
   }
 
-  /** 甩锅：附近最多 n 人改追被撞的人 */
+  /** 甩锅：附近最多 n 人改追被撞的人（旧） */
   blame(i: number, duration: number, radius: number, count: number) {
     if (i < 0 || i >= this.cap || this.state[i] === EState.Inactive) return;
     this.blameI = i;
@@ -1118,7 +1172,97 @@ export class Enemies {
     this.blameN = Math.max(1, count | 0);
   }
 
-  /** 空挥甩锅：半径内随机一个 Chase 同事背锅 */
+  /**
+   * 甩锅新效果：挂锅目标减速；满级按顺序排进小爆队列。
+   * order = 本趟第几口锅（0 起），用于错开第一爆。
+   */
+  blamePot(i: number, cfg: BlameLevel, order: number) {
+    if (i < 0 || i >= this.cap || this.state[i] === EState.Inactive) return false;
+    this.slow(i, cfg.duration, cfg.factor, true);
+    if (cfg.blastRadius > 0 && cfg.blastImpulse > 0) {
+      const wait = Math.max(0.05, cfg.blastDelay) + Math.max(0, order) * Math.max(0.05, cfg.blastGap);
+      // 同一人只保留更早的一爆
+      const exist = this.potBlasts.find((p) => p.i === i);
+      if (exist) exist.wait = Math.min(exist.wait, wait);
+      else this.potBlasts.push({ i, wait, r: cfg.blastRadius, impulse: cfg.blastImpulse });
+    }
+    return true;
+  }
+
+  private tickPotBlasts(dt: number) {
+    if (!this.potBlasts.length) return;
+    const keep: typeof this.potBlasts = [];
+    for (const pot of this.potBlasts) {
+      pot.wait -= dt;
+      if (pot.wait > 0) {
+        keep.push(pot);
+        continue;
+      }
+      this.detonatePot(pot.i, pot.r, pot.impulse);
+    }
+    this.potBlasts = keep;
+  }
+
+  /** 锅主倒地 + 半径内最近最多 2 个邻居炸飞 */
+  private detonatePot(i: number, radius: number, impulse: number) {
+    if (i < 0 || i >= this.cap || this.state[i] === EState.Inactive) return;
+    const body = this.bodies[i];
+    const t = body?.translation();
+    const x = t?.x ?? this.posX[i];
+    const z = t?.z ?? this.posZ[i];
+    this.onPotBlast?.(i, x, z);
+
+    // 锅主自己炸飞
+    if (this.state[i] !== EState.Ragdoll) {
+      this.hit(i, 1, 0, impulse, { force: true, heavyOk: true });
+    }
+
+    const r2 = radius * radius;
+    const near: { j: number; d: number }[] = [];
+    for (let j = 0; j < this.cap; j++) {
+      if (j === i) continue;
+      const s = this.state[j];
+      if (s === EState.Inactive || s === EState.Ragdoll) continue;
+      const dx = this.posX[j] - x;
+      const dz = this.posZ[j] - z;
+      const d = dx * dx + dz * dz;
+      if (d > r2) continue;
+      near.push({ j, d });
+    }
+    near.sort((a, b) => a.d - b.d);
+    const n = Math.min(2, near.length);
+    for (let k = 0; k < n; k++) {
+      const j = near[k]!.j;
+      const dx = this.posX[j] - x;
+      const dz = this.posZ[j] - z;
+      const len = Math.hypot(dx, dz) || 1;
+      this.hit(j, dx / len, dz / len, impulse, { force: true, heavyOk: true });
+    }
+  }
+
+  /** 补卡：在命中池里随机挂闹钟，全场改追；返回被选中的下标 */
+  reclockAlarm(cfg: ReclockLevel, pool?: number[]): number {
+    const candidates =
+      pool?.filter((i) => i >= 0 && i < this.cap && this.state[i] === EState.Chase) ??
+      (() => {
+        const all: number[] = [];
+        for (let i = 0; i < this.cap; i++) if (this.state[i] === EState.Chase) all.push(i);
+        return all;
+      })();
+    if (!candidates.length) return -1;
+    const i = candidates[(Math.random() * candidates.length) | 0]!;
+    this.alarmI = i;
+    this.alarmT = Math.max(0.05, cfg.duration);
+    this.alarmBlastR = Math.max(0, cfg.blastRadius);
+    this.alarmBlastImpulse = Math.max(0, cfg.blastImpulse);
+    return i;
+  }
+
+  isReclockBait(i: number) {
+    return this.alarmT > 0 && this.alarmI === i;
+  }
+
+  /** 空挥甩锅：半径内最近一个 Chase 同事背锅。返回被选中的下标。 */
   blameNearest(x: number, z: number, duration: number, radius: number, count: number) {
     let best = -1;
     let bestD = radius * radius;
@@ -1133,9 +1277,13 @@ export class Enemies {
       }
     }
     if (best >= 0) this.blame(best, duration, radius, count);
+    return best;
   }
 
   private blameChaseOf(i: number, px: number, pz: number): { x: number; z: number } {
+    if (this.alarmT > 0 && this.alarmI >= 0 && i !== this.alarmI) {
+      return { x: this.posX[this.alarmI], z: this.posZ[this.alarmI] };
+    }
     if (this.blameT <= 0 || this.blameI < 0 || i === this.blameI) return { x: px, z: pz };
     const bx = this.posX[this.blameI];
     const bz = this.posZ[this.blameI];

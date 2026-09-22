@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { commonFx, crowdFx, dashFx, mergeHazardFx, overtimePopText, playerRingFx, type ChannelLookFx, type HaloBandFx, type HitFx, type ImpactMistFx, type OvertimeFx, type PaperBurstFx, type SlowLookFx, type StunElem, type StunLookFx, type TrailFx } from '../fx/catalog';
+import { commonFx, crowdFx, dashFx, mergeHazardFx, overtimePopText, playerRingFx, type ChannelLookFx, type HaloBandFx, type HitBurstKind, type HitFx, type ImpactMistFx, type OvertimeFx, type PaperBurstFx, type SlowLookFx, type StunElem, type StunLookFx, type TrailFx } from '../fx/catalog';
 import type { ChairStyle, DeskDef, DeskKit, DeskTop, FurnitureTone, PlantKit, PropDef, PropKind, SkyKind } from '../levels';
 import { deskYaw, ELEVATOR_PAD_ALONG, ELEVATOR_PAD_FAR, ELEVATOR_PAD_NEAR, hexToInt, migrateHexColor } from '../levels';
 import { channelStampMap } from './channelStamp';
@@ -2127,9 +2127,83 @@ export function addWindow(
 }
 
 /**
- * 纸片特效池：倒地时爆出一叠 A4。
- * 纯视觉，不进物理。
+ * 倒地爆开粒子池。
+ * 同一对象池；曳光/裂光/闪签用柔光贴图 + 形变，不加物理、不扩池。
  */
+const NOTE_PALETTE = [0xfff59a, 0xffb3c9, 0xa8e0ff, 0xc5f5a8, 0xffd4a8, 0xe0c4ff, 0xffcc80];
+const POOF_PALETTE = [0xe8eef5, 0xd0d8e4, 0xc4cdd8, 0xf2f5f8, 0xb8c4d4];
+const SPARK_PALETTE = [0xfff6c8, 0xffe080, 0xffb24a, 0xff7a3c, 0xffffff];
+const SHARD_PALETTE = [0xe8f4ff, 0xb8d8ff, 0xffffff, 0x9ad0ff, 0xd0e8ff];
+const BADGE_PALETTE = [0xfff2a8, 0xffe070, 0xffffff, 0xa8e8ff, 0xffd4a0];
+
+let softGlowTex: THREE.CanvasTexture | null = null;
+let streakGlowTex: THREE.CanvasTexture | null = null;
+
+function softGlowMap() {
+  if (softGlowTex) return softGlowTex;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.7, 'rgba(255,255,255,0.12)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  softGlowTex = new THREE.CanvasTexture(c);
+  softGlowTex.colorSpace = THREE.SRGBColorSpace;
+  softGlowTex.needsUpdate = true;
+  return softGlowTex;
+}
+
+function streakGlowMap() {
+  if (streakGlowTex) return streakGlowTex;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 32;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(32, 16, 1, 32, 16, 28);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,255,255,0.75)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.2)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 32);
+  ctx.globalCompositeOperation = 'destination-in';
+  const lg = ctx.createLinearGradient(0, 16, 64, 16);
+  lg.addColorStop(0, 'rgba(0,0,0,0)');
+  lg.addColorStop(0.35, 'rgba(0,0,0,1)');
+  lg.addColorStop(0.65, 'rgba(0,0,0,1)');
+  lg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = lg;
+  ctx.fillRect(0, 0, 64, 32);
+  streakGlowTex = new THREE.CanvasTexture(c);
+  streakGlowTex.colorSpace = THREE.SRGBColorSpace;
+  streakGlowTex.needsUpdate = true;
+  return streakGlowTex;
+}
+
+function makeBurstGeo(_kind: HitBurstKind): THREE.BufferGeometry {
+  return new THREE.PlaneGeometry(1, 1);
+}
+
+function burstTint(kind: HitBurstKind, base: number): number {
+  if (kind === 'spark') return SPARK_PALETTE[(Math.random() * SPARK_PALETTE.length) | 0]!;
+  if (kind === 'shard') return SHARD_PALETTE[(Math.random() * SHARD_PALETTE.length) | 0]!;
+  if (kind === 'badge') return BADGE_PALETTE[(Math.random() * BADGE_PALETTE.length) | 0]!;
+  if (kind === 'note') return NOTE_PALETTE[(Math.random() * NOTE_PALETTE.length) | 0]!;
+  if (kind === 'poof') return POOF_PALETTE[(Math.random() * POOF_PALETTE.length) | 0]!;
+  return base;
+}
+
+/** 0 纸片便签 1 曳光 2 烟散 3 裂光片 4 闪签片 5 冲击环 */
+const BURST_MODE = { normal: 0, spark: 1, poof: 2, shard: 3, badge: 4, ring: 5 } as const;
+
+const _burstAim = new THREE.Vector3();
+const _burstUp = new THREE.Vector3(0, 1, 0);
+
 export class PaperBurst {
   private meshes: THREE.Mesh[] = [];
   private vx: Float32Array;
@@ -2137,61 +2211,356 @@ export class PaperBurst {
   private vz: Float32Array;
   private spin: Float32Array;
   private life: Float32Array;
+  private maxLife: Float32Array;
+  private gravity: Float32Array;
+  private mode: Uint8Array;
+  private grow0: Float32Array;
+  private stretch: Float32Array;
   private cursor = 0;
-  private geo: THREE.BufferGeometry;
+  private geos: Record<HitBurstKind, THREE.BufferGeometry>;
+  private glow = softGlowMap();
+  private streak = streakGlowMap();
 
   constructor(private scene: THREE.Scene) {
     const cfg = crowdFx('colleague-a-m').hit.paper;
     const n = Math.max(1, commonFx().pools.paper | 0);
-    this.geo = new THREE.PlaneGeometry(cfg.width, cfg.height);
+    this.geos = {
+      paper: makeBurstGeo('paper'),
+      shard: makeBurstGeo('shard'),
+      spark: makeBurstGeo('spark'),
+      note: makeBurstGeo('note'),
+      badge: makeBurstGeo('badge'),
+      poof: makeBurstGeo('poof'),
+    };
     this.vx = new Float32Array(n);
     this.vy = new Float32Array(n);
     this.vz = new Float32Array(n);
     this.spin = new Float32Array(n);
     this.life = new Float32Array(n);
+    this.maxLife = new Float32Array(n);
+    this.gravity = new Float32Array(n);
+    this.mode = new Uint8Array(n);
+    this.grow0 = new Float32Array(n);
+    this.stretch = new Float32Array(n);
     for (let i = 0; i < n; i++) {
-      const mat = new THREE.MeshBasicMaterial({ color: cfg.color, side: THREE.DoubleSide, transparent: true });
-      const m = new THREE.Mesh(this.geo, mat);
+      const mat = new THREE.MeshBasicMaterial({
+        color: cfg.color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        depthWrite: false,
+      });
+      const m = new THREE.Mesh(this.geos.paper, mat);
       m.visible = false;
+      m.frustumCulled = false;
       scene.add(m);
       this.meshes.push(m);
     }
   }
 
-  spawn(x: number, y: number, z: number, n?: number, look?: PaperBurstFx) {
+  private takeSlot() {
+    const i = this.cursor;
+    this.cursor = (this.cursor + 1) % this.meshes.length;
+    return i;
+  }
+
+  private paint(i: number, color: number, additive: boolean, map: THREE.Texture | null, opacity: number) {
+    const mat = this.meshes[i]!.material as THREE.MeshBasicMaterial;
+    mat.color.setHex(color);
+    mat.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    mat.map = map;
+    mat.opacity = opacity;
+    mat.needsUpdate = true;
+  }
+
+  spawn(x: number, y: number, z: number, n?: number, look?: PaperBurstFx, burst: HitBurstKind = 'paper') {
     const cfg = look ?? crowdFx('colleague-a-m').hit.paper;
     const count = Math.max(0, n ?? cfg.count);
+    if (burst === 'spark') {
+      this.spawnSpark(x, y, z, count, cfg);
+      return;
+    }
+    if (burst === 'shard') {
+      this.spawnShard(x, y, z, count, cfg);
+      return;
+    }
+    if (burst === 'badge') {
+      this.spawnBadge(x, y, z, count, cfg);
+      return;
+    }
+    if (burst === 'poof') {
+      this.spawnPoof(x, y, z, count, cfg);
+      return;
+    }
+    this.spawnPaperish(x, y, z, count, cfg, burst);
+  }
+
+  private spawnPaperish(x: number, y: number, z: number, count: number, cfg: PaperBurstFx, burst: HitBurstKind) {
     const span = Math.max(0, cfg.lifeMax - cfg.lifeMin);
-    for (let k = 0; k < count; k++) {
-      const i = this.cursor;
-      this.cursor = (this.cursor + 1) % this.meshes.length;
-      this.life[i] = cfg.lifeMin + Math.random() * span;
-      this.vx[i] = (Math.random() - 0.5) * cfg.speed;
-      this.vy[i] = cfg.upMin + Math.random() * Math.max(0, cfg.upMax - cfg.upMin);
-      this.vz[i] = (Math.random() - 0.5) * cfg.speed;
-      this.spin[i] = (Math.random() - 0.5) * 14;
-      const m = this.meshes[i];
-      (m.material as THREE.MeshBasicMaterial).color.setHex(cfg.color);
+    const isNote = burst === 'note';
+    const geo = this.geos[burst] ?? this.geos.paper;
+    const nCount = isNote ? Math.max(count, 10) : count;
+    const base = isNote ? Math.min(cfg.width, cfg.height) * 0.85 : cfg.width;
+    const baseY = isNote ? base : cfg.height;
+    for (let k = 0; k < nCount; k++) {
+      const i = this.takeSlot();
+      this.life[i] = isNote ? 0.55 + Math.random() * 0.45 : cfg.lifeMin + Math.random() * span;
+      this.maxLife[i] = this.life[i];
+      this.vx[i] = (Math.random() - 0.5) * cfg.speed * (isNote ? 1.1 : 1);
+      this.vy[i] = (cfg.upMin + Math.random() * Math.max(0, cfg.upMax - cfg.upMin)) * (isNote ? 0.85 : 1);
+      this.vz[i] = (Math.random() - 0.5) * cfg.speed * (isNote ? 1.1 : 1);
+      this.spin[i] = (Math.random() - 0.5) * (isNote ? 18 : 14);
+      this.gravity[i] = cfg.gravity * (isNote ? 0.75 : 1);
+      this.mode[i] = BURST_MODE.normal;
+      this.grow0[i] = 1;
+      this.stretch[i] = 1;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.set(base * (0.7 + Math.random() * 0.55), baseY * (0.7 + Math.random() * 0.55), 1);
+      this.paint(i, burstTint(burst, cfg.color), false, null, 1);
       m.visible = true;
       m.position.set(x, y, z);
       m.rotation.set(Math.random(), Math.random(), Math.random());
     }
   }
 
+  private spawnPoof(x: number, y: number, z: number, count: number, cfg: PaperBurstFx) {
+    const nCount = Math.max(count, 10);
+    const geo = this.geos.poof;
+    for (let k = 0; k < nCount; k++) {
+      const i = this.takeSlot();
+      this.life[i] = 0.22 + Math.random() * 0.28;
+      this.maxLife[i] = this.life[i];
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 1.2 + Math.random() * 2.4;
+      this.vx[i] = Math.cos(ang) * spd;
+      this.vz[i] = Math.sin(ang) * spd;
+      this.vy[i] = 0.8 + Math.random() * 1.6;
+      this.spin[i] = (Math.random() - 0.5) * 4;
+      this.gravity[i] = 1.2;
+      this.mode[i] = BURST_MODE.poof;
+      this.grow0[i] = (0.28 + Math.random() * 0.35) * Math.max(cfg.width, 0.16) * 4;
+      this.stretch[i] = 1;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.setScalar(this.grow0[i] * 0.35);
+      this.paint(i, burstTint('poof', cfg.color), true, this.glow, 0.55);
+      m.visible = true;
+      m.position.set(x + (Math.random() - 0.5) * 0.35, y * 0.55 + Math.random() * 0.4, z + (Math.random() - 0.5) * 0.35);
+      m.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI);
+    }
+  }
+
+  /** 曳光：软光斑沿速度拉长，短促闪过 */
+  private spawnSpark(x: number, y: number, z: number, count: number, cfg: PaperBurstFx) {
+    const streaks = Math.max(6, Math.min(14, count + 2));
+    const geo = this.geos.spark;
+    for (let k = 0; k < 2; k++) {
+      const i = this.takeSlot();
+      this.life[i] = 0.12 + Math.random() * 0.1;
+      this.maxLife[i] = this.life[i];
+      this.vx[i] = 0;
+      this.vy[i] = 0;
+      this.vz[i] = 0;
+      this.spin[i] = 0;
+      this.gravity[i] = 0;
+      this.mode[i] = BURST_MODE.ring;
+      this.grow0[i] = 0.35 + k * 0.25;
+      this.stretch[i] = 0.12;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.set(this.grow0[i], this.grow0[i] * this.stretch[i], 1);
+      this.paint(i, k === 0 ? 0xffffff : 0xffe080, true, this.glow, 0.85);
+      m.visible = true;
+      m.position.set(x, y * 0.7, z);
+      m.rotation.set(-Math.PI / 2, 0, 0);
+    }
+    for (let k = 0; k < streaks; k++) {
+      const i = this.takeSlot();
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 4.5 + Math.random() * 7;
+      this.life[i] = 0.18 + Math.random() * 0.22;
+      this.maxLife[i] = this.life[i];
+      this.vx[i] = Math.cos(ang) * spd;
+      this.vz[i] = Math.sin(ang) * spd;
+      this.vy[i] = 1.2 + Math.random() * 3.5;
+      this.spin[i] = 0;
+      this.gravity[i] = 6;
+      this.mode[i] = BURST_MODE.spark;
+      this.grow0[i] = 0.08 + Math.random() * 0.1;
+      this.stretch[i] = 2.2 + Math.random() * 2.8;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.set(this.grow0[i], this.grow0[i] * this.stretch[i], 1);
+      this.paint(i, burstTint('spark', cfg.color), true, this.streak, 0.95);
+      m.visible = true;
+      m.position.set(x, y * 0.75 + Math.random() * 0.2, z);
+      _burstAim.set(this.vx[i], this.vy[i], this.vz[i]).normalize();
+      m.quaternion.setFromUnitVectors(_burstUp, _burstAim);
+    }
+  }
+
+  /** 裂光：冲击环 + 沿径向拉长的玻璃闪片 */
+  private spawnShard(x: number, y: number, z: number, count: number, cfg: PaperBurstFx) {
+    const shards = Math.max(7, Math.min(12, count + 1));
+    const geo = this.geos.shard;
+    for (let k = 0; k < 2; k++) {
+      const i = this.takeSlot();
+      this.life[i] = 0.28 + k * 0.08;
+      this.maxLife[i] = this.life[i];
+      this.vx[i] = 0;
+      this.vy[i] = 0;
+      this.vz[i] = 0;
+      this.spin[i] = (Math.random() - 0.5) * 2;
+      this.gravity[i] = 0;
+      this.mode[i] = BURST_MODE.ring;
+      this.grow0[i] = 0.4 + k * 0.35;
+      this.stretch[i] = 0.08;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.set(this.grow0[i], this.grow0[i] * this.stretch[i], 1);
+      this.paint(i, k === 0 ? 0xffffff : 0xb8d8ff, true, this.glow, 0.7);
+      m.visible = true;
+      m.position.set(x, 0.08 + k * 0.04, z);
+      m.rotation.set(-Math.PI / 2, 0, Math.random());
+    }
+    for (let k = 0; k < shards; k++) {
+      const i = this.takeSlot();
+      const ang = (k / shards) * Math.PI * 2 + Math.random() * 0.2;
+      const spd = 3.2 + Math.random() * 4.5;
+      this.life[i] = 0.28 + Math.random() * 0.28;
+      this.maxLife[i] = this.life[i];
+      this.vx[i] = Math.cos(ang) * spd;
+      this.vz[i] = Math.sin(ang) * spd;
+      this.vy[i] = 0.6 + Math.random() * 2.2;
+      this.spin[i] = (Math.random() - 0.5) * 10;
+      this.gravity[i] = 8;
+      this.mode[i] = BURST_MODE.shard;
+      this.grow0[i] = 0.06 + Math.random() * 0.08;
+      this.stretch[i] = 2.4 + Math.random() * 2.2;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.set(this.grow0[i], this.grow0[i] * this.stretch[i], 1);
+      this.paint(i, burstTint('shard', cfg.color), true, this.streak, 0.9);
+      m.visible = true;
+      m.position.set(x, y * 0.65, z);
+      _burstAim.set(this.vx[i], this.vy[i] * 0.35, this.vz[i]).normalize();
+      m.quaternion.setFromUnitVectors(_burstUp, _burstAim);
+    }
+  }
+
+  /** 闪签：脉冲环 + 软光压扁闪一下 */
+  private spawnBadge(x: number, y: number, z: number, count: number, cfg: PaperBurstFx) {
+    const glints = Math.max(4, Math.min(8, count));
+    const geo = this.geos.badge;
+    for (let k = 0; k < 3; k++) {
+      const i = this.takeSlot();
+      this.life[i] = 0.32 + k * 0.06;
+      this.maxLife[i] = this.life[i];
+      this.vx[i] = 0;
+      this.vy[i] = 0.15;
+      this.vz[i] = 0;
+      this.spin[i] = 1.2 + k * 0.4;
+      this.gravity[i] = 0;
+      this.mode[i] = BURST_MODE.ring;
+      this.grow0[i] = 0.45 + k * 0.4;
+      this.stretch[i] = 0.1;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.set(this.grow0[i], this.grow0[i] * this.stretch[i], 1);
+      this.paint(i, k === 0 ? 0xffffff : burstTint('badge', cfg.color), true, this.glow, 0.8 - k * 0.15);
+      m.visible = true;
+      m.position.set(x, 0.06 + k * 0.05, z);
+      m.rotation.set(-Math.PI / 2, 0, 0);
+    }
+    for (let k = 0; k < glints; k++) {
+      const i = this.takeSlot();
+      const ang = Math.random() * Math.PI * 2;
+      this.life[i] = 0.2 + Math.random() * 0.25;
+      this.maxLife[i] = this.life[i];
+      this.vx[i] = Math.cos(ang) * (0.6 + Math.random() * 1.4);
+      this.vz[i] = Math.sin(ang) * (0.6 + Math.random() * 1.4);
+      this.vy[i] = 0.4 + Math.random() * 1.2;
+      this.spin[i] = (Math.random() - 0.5) * 8;
+      this.gravity[i] = 3;
+      this.mode[i] = BURST_MODE.badge;
+      this.grow0[i] = 0.18 + Math.random() * 0.16;
+      this.stretch[i] = 0.55 + Math.random() * 0.35;
+      const m = this.meshes[i]!;
+      m.geometry = geo;
+      m.scale.set(this.grow0[i], this.grow0[i] * this.stretch[i], 1);
+      this.paint(i, burstTint('badge', cfg.color), true, this.glow, 0.9);
+      m.visible = true;
+      m.position.set(x + Math.cos(ang) * 0.15, y * 0.7, z + Math.sin(ang) * 0.15);
+      m.rotation.set(Math.random() * 0.6 - 0.3, Math.random() * Math.PI, Math.random() * 0.4);
+    }
+  }
+
   update(dt: number) {
-    const g = crowdFx('colleague-a-m').hit.paper.gravity;
     for (let i = 0; i < this.meshes.length; i++) {
       if (this.life[i] <= 0) continue;
       this.life[i] -= dt;
+      const m = this.meshes[i]!;
       if (this.life[i] <= 0) {
-        this.meshes[i].visible = false;
+        m.visible = false;
+        const mat = m.material as THREE.MeshBasicMaterial;
+        if (mat.map) {
+          mat.map = null;
+          mat.needsUpdate = true;
+        }
         continue;
       }
-      this.vy[i] -= g * dt;
-      const m = this.meshes[i];
+      const t = 1 - this.life[i] / (this.maxLife[i] || 1);
+      const mat = m.material as THREE.MeshBasicMaterial;
+      const mode = this.mode[i];
+
+      if (mode === BURST_MODE.ring) {
+        const s = this.grow0[i] * (1 + t * 2.8);
+        m.scale.set(s, s * this.stretch[i], 1);
+        m.position.y += this.vy[i] * dt;
+        m.rotation.z += this.spin[i] * dt;
+        mat.opacity = Math.max(0, 0.75 * (1 - t) ** 1.4);
+        continue;
+      }
+
+      this.vy[i] -= this.gravity[i] * dt;
       m.position.x += this.vx[i] * dt;
       m.position.y += this.vy[i] * dt;
       m.position.z += this.vz[i] * dt;
+
+      if (mode === BURST_MODE.spark || mode === BURST_MODE.shard) {
+        const spd = Math.hypot(this.vx[i], this.vy[i], this.vz[i]);
+        if (spd > 0.05) {
+          _burstAim.set(this.vx[i], this.vy[i], this.vz[i]).multiplyScalar(1 / spd);
+          m.quaternion.setFromUnitVectors(_burstUp, _burstAim);
+        }
+        const squash = mode === BURST_MODE.spark ? 1 + t * 0.8 : 1 + Math.sin(t * Math.PI) * 0.35;
+        const thin = this.grow0[i] * (1 - t * 0.35);
+        m.scale.set(thin, thin * this.stretch[i] * squash, 1);
+        mat.opacity = Math.max(0, (mode === BURST_MODE.spark ? 0.95 : 0.85) * (1 - t) ** 1.15);
+        if (mode === BURST_MODE.shard) mat.opacity *= 0.65 + 0.35 * Math.sin(t * 28);
+        this.vx[i] *= 1 - 0.9 * dt;
+        this.vz[i] *= 1 - 0.9 * dt;
+        continue;
+      }
+
+      if (mode === BURST_MODE.badge) {
+        const pulse = 1 + Math.sin(t * Math.PI) * 0.85;
+        const squash = 1 - Math.sin(t * Math.PI) * 0.45;
+        m.scale.set(this.grow0[i] * pulse, this.grow0[i] * this.stretch[i] * squash, 1);
+        m.rotation.y += this.spin[i] * dt;
+        mat.opacity = Math.max(0, 0.9 * (1 - t) ** 1.3);
+        continue;
+      }
+
+      if (mode === BURST_MODE.poof) {
+        const s = this.grow0[i] * (0.35 + t * 1.85);
+        m.scale.setScalar(s);
+        mat.opacity = Math.max(0, 0.55 * (1 - t) ** 1.6);
+        this.vx[i] *= 1 - 1.8 * dt;
+        this.vz[i] *= 1 - 1.8 * dt;
+        continue;
+      }
+
       m.rotation.x += this.spin[i] * dt;
       m.rotation.z += this.spin[i] * 0.6 * dt;
       if (m.position.y < 0.04) {
@@ -2200,7 +2569,7 @@ export class PaperBurst {
         this.vx[i] *= 0.6;
         this.vz[i] *= 0.6;
       }
-      (m.material as THREE.MeshBasicMaterial).opacity = Math.min(1, this.life[i] * 2);
+      mat.opacity = Math.min(1, this.life[i] * 2);
     }
   }
 
@@ -2210,7 +2579,7 @@ export class PaperBurst {
       (m.material as THREE.Material).dispose();
     }
     this.meshes.length = 0;
-    this.geo.dispose();
+    for (const g of Object.values(this.geos)) g.dispose();
   }
 }
 
@@ -2425,8 +2794,40 @@ export class ImpactMist {
 
 export function spawnHitFx(papers: PaperBurst, mist: ImpactMist, x: number, z: number, look?: HitFx) {
   const hit = look ?? crowdFx('colleague-a-m').hit;
-  papers.spawn(x, hit.paper.spawnY, z, hit.paper.count, hit.paper);
-  mist.spawn(x, z, hit.mist);
+  papers.spawn(x, hit.paper.spawnY, z, hit.paper.count, hit.paper, hit.burst);
+  if (hit.burst === 'poof') {
+    mist.spawn(x, z, {
+      ...hit.mist,
+      enabled: true,
+      count: Math.max(hit.mist.count, 8),
+      life: Math.min(hit.mist.life, 0.32),
+      size: hit.mist.size * 1.15,
+      grow: Math.max(hit.mist.grow, 2.4),
+      rise: hit.mist.rise * 1.2,
+      spread: Math.max(hit.mist.spread, 0.7),
+      flatten: Math.min(hit.mist.flatten, 0.45),
+      additive: true,
+      opacity: Math.max(hit.mist.opacity, 0.4),
+      color: hit.mist.color === 0xffe4b8 ? 0xd0d8e4 : hit.mist.color,
+    });
+  } else if (hit.burst === 'spark' || hit.burst === 'shard' || hit.burst === 'badge') {
+    mist.spawn(x, z, {
+      ...hit.mist,
+      enabled: true,
+      count: Math.min(Math.max(hit.mist.count, 4), 7),
+      life: 0.22,
+      size: hit.mist.size * 0.85,
+      grow: 2.2,
+      rise: 0.5,
+      spread: 0.55,
+      flatten: 0.35,
+      additive: true,
+      opacity: 0.38,
+      color: hit.burst === 'shard' ? 0xb8d8ff : hit.burst === 'badge' ? 0xffe8a8 : 0xffd090,
+    });
+  } else {
+    mist.spawn(x, z, hit.mist);
+  }
 }
 
 function hexCss(n: number) {

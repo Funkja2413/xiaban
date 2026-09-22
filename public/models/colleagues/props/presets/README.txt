@@ -2,6 +2,10 @@
 
 Kenney (https://kenney.nl) · CC0
   prop-cup.glb      Food Kit · cup-coffee
+                    （同事手持 + 喝咖啡污渍中心倒杯）
+  prop-bento.glb    Food Kit · Styrofoam Dinner
+                    https://poly.pizza/m/ZolilLk3ft
+                    （外卖汤污渍中心 · 减面约 19KB）
   prop-pot.glb      Food Kit · pot stew
   prop-pizza.glb    Food Kit · pizza
   prop-laptop.glb   Furniture Kit · laptop
@@ -18,6 +22,8 @@ loafbrr via OpenGameArt · CC0
                     （Diffuse 贴图压到 512）
 
 Quaternius (https://quaternius.com) · CC0
+  prop-bucket.glb   Bucket  https://poly.pizza/m/83obI9bNun
+                    （泼脏水污渍中心铝桶色 · 减面约 22KB）
   prop-pack.glb     Survival / RPG · backpack（壳体改浅蓝色）
   prop-paper.glb    Paper
   prop-award.glb    Parchment
@@ -26,10 +32,16 @@ Quaternius (https://quaternius.com) · CC0
   prop-heart.glb    Heart  https://poly.pizza/m/1yCRUwFnwX
   prop-oil.glb      Bottle  https://poly.pizza/m/FAHsHFXfTf
 
+J-Toastie via Poly Pizza · CC-BY 3.0（须署名）
+  prop-poop.glb     Dog Poop  https://poly.pizza/m/NwQhRNwk62
+                    （破罐破摔污渍中心 · 减面约 10KB）
+
 CreativeTrio (https://creativetrio.art) · CC0
   prop-trophy.glb   Trophy
   prop-clock.glb    Alarm Clock
   prop-stop.glb     Stop Sign Shield  https://poly.pizza/m/W4QrPNv8XK
+  prop-mouse.glb    Computer Mouse  https://poly.pizza/m/V2Ebx3pvo4
+                    （横飞鼠标技能投掷皮）
 
 自有
   prop-mic.glb      Breaking Tea 手持话筒 1k（圆顶网罩贴图 + 红色台标字贴图）

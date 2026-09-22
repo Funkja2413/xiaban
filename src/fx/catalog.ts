@@ -1,7 +1,7 @@
 /** 特效目录：按冲刺属性 / 主动技能 × 等级管理。游戏和编辑器读同一份。 */
 
 import type { EnemySkillId } from '../catalog';
-import type { HazardKind, HazardTune } from '../levels';
+import type { HazardKind, HazardTune, WeekdayId } from '../levels';
 
 export type { EnemySkillId, HazardKind };
 
@@ -27,6 +27,24 @@ export interface PaperBurstFx {
   height: number;
 }
 
+/** 倒地/撞物爆开样式：纸片是默认，道具攻击可另选 */
+export const HIT_BURST_IDS = ['paper', 'shard', 'spark', 'note', 'badge', 'poof'] as const;
+export type HitBurstKind = (typeof HIT_BURST_IDS)[number];
+
+export const HIT_BURST_META: { id: HitBurstKind; name: string; blurb: string }[] = [
+  { id: 'paper', name: '纸片', blurb: 'A4 横飞' },
+  { id: 'shard', name: '裂光', blurb: '玻璃裂闪 + 冲击环' },
+  { id: 'spark', name: '曳光', blurb: '拉长光迹闪过' },
+  { id: 'note', name: '便利贴', blurb: '彩色便签飞散' },
+  { id: 'badge', name: '闪签', blurb: '脉冲光环 + 软闪' },
+  { id: 'poof', name: '烟散', blurb: '砰地化烟消失' },
+];
+
+export function normalizeHitBurst(id: unknown): HitBurstKind {
+  if (typeof id === 'string' && (HIT_BURST_IDS as readonly string[]).includes(id)) return id as HitBurstKind;
+  return 'paper';
+}
+
 export interface ImpactMistFx {
   enabled: boolean;
   color: number;
@@ -42,6 +60,8 @@ export interface ImpactMistFx {
 }
 
 export interface HitFx {
+  /** 爆开粒子样式 */
+  burst: HitBurstKind;
   paper: PaperBurstFx;
   mist: ImpactMistFx;
 }
@@ -269,24 +289,31 @@ export interface ReboundLevel {
   shockImpulse: number;
 }
 
-/** 补卡冲：一段结束后窗口内再按第二段 */
+/** 补卡冲：撞到后随机挂闹钟，全场改追；满级闹钟到期小范围炸飞 */
 export interface ReclockLevel {
-  window: number;
-  /** 第二段时长相对 hit.time 的倍率 */
-  segmentScale: number;
-  /** 第二段命中退冷却 */
-  hitRefund: number;
-  /** 两段都命中后是否再自动滑一步 */
-  autoThird: boolean;
+  /** 闹钟持续 / 全场改追时长 */
+  duration: number;
+  /** 到期爆炸半径，0 = 不炸（LV1/2） */
+  blastRadius: number;
+  /** 爆炸冲量 */
+  blastImpulse: number;
 }
 
-/** 甩锅冲：命中第一个人，周围改追他 */
+/** 甩锅冲：命中挂锅减速；满级挂锅者依次小范围爆炸 */
 export interface BlameLevel {
+  /** 锅 / 减速持续 */
   duration: number;
-  radius: number;
-  count: number;
-  /** 空挥时脚下随机甩锅半径，0 = 必须撞到人 */
-  groundRadius: number;
+  /** 速度倍率，越小越慢 */
+  factor: number;
+  /** 单次冲刺最多挂几口锅 */
+  maxPots: number;
+  /** 爆炸半径，0 = 不炸（LV1/2） */
+  blastRadius: number;
+  blastImpulse: number;
+  /** 挂上后多久开始第一爆 */
+  blastDelay: number;
+  /** 两口锅爆炸间隔 */
+  blastGap: number;
 }
 
 export const DASH_REACT_IDS = ['none', 'knock', 'stun', 'slow', 'shove'] as const;
@@ -328,6 +355,15 @@ export interface DecoyLevel {
   duration: number;
   blastRadius: number;
   blastImpulse: number;
+  /** 爆炸放倒时的倒地反馈样式 */
+  hitBurst: HitBurstKind;
+  /** 玩家定格分身视觉 */
+  opacity: number;
+  color: number;
+  glowStyle: ThrowGlowStyle;
+  glowColor: number;
+  glowOpacity: number;
+  glowSize: number;
 }
 
 export const THROW_GLOW_STYLE_IDS = ['off', 'soft', 'ring', 'core', 'flare'] as const;
@@ -354,6 +390,8 @@ export interface KeyboardLevel {
   width: number;
   hitImpulse: number;
   knockImpulse: number;
+  /** 命中放倒时的倒地反馈样式 */
+  hitBurst: HitBurstKind;
   /** 飞出物视觉：按技能等级各自一份（鼠标/键盘/电脑/回旋镖换皮共用这套） */
   scale: number;
   color: number;
@@ -479,6 +517,9 @@ type DeepPartial<T> = {
   [K in keyof T]?: NonNullable<T[K]> extends object ? DeepPartial<NonNullable<T[K]>> : T[K];
 };
 
+/** 同一技能族按关各存一份颜色。喝咖啡 / 泼脏水 / 外卖汤 / 破罐破摔互不覆盖。 */
+export type DayCoffeeColors = Record<Lv, number>;
+
 export interface FxCatalog {
   version: 3;
   common: {
@@ -490,6 +531,10 @@ export interface FxCatalog {
   } & Record<CrowdActorId, ActorPassiveFx>;
   lines: Record<DashKey, Levels<DashLevelFx>>;
   skills: Record<SkillKey, Levels<SkillLevelFx>>;
+  /** 按关外观。玩法数值仍在 skills，颜色改这里。 */
+  dayLooks: {
+    coffee: Record<WeekdayId, DayCoffeeColors>;
+  };
   hazards: Record<HazardKind, HazardFx>;
   enemySkills: Record<EnemySkillId, EnemySkillFx>;
 }
@@ -548,14 +593,28 @@ const MIST: ImpactMistFx = {
   additive: true,
 };
 
-function hitOf(over: Partial<{ paper: Partial<PaperBurstFx>; mist: Partial<ImpactMistFx> }> = {}): HitFx {
+function hitOf(
+  over: Partial<{ burst: HitBurstKind; paper: Partial<PaperBurstFx>; mist: Partial<ImpactMistFx> }> = {}
+): HitFx {
   return {
+    burst: normalizeHitBurst(over.burst),
     paper: mergeDeep(clone(PAPER), over.paper),
     mist: mergeDeep(clone(MIST), over.mist),
   };
 }
 
+/** 倒地反馈：在受害者默认 hit 上叠攻击方选的爆开样式 */
+export function mergeHitFx(base: HitFx, over?: Partial<HitFx> | null): HitFx {
+  if (!over) return base;
+  return {
+    burst: over.burst != null ? normalizeHitBurst(over.burst) : base.burst,
+    paper: over.paper ? mergeDeep(clone(base.paper), over.paper) : base.paper,
+    mist: over.mist ? mergeDeep(clone(base.mist), over.mist) : base.mist,
+  };
+}
+
 const HIT_OBJECT = hitOf({
+  burst: 'shard',
   paper: { count: 4, heavyCount: 4, color: 0xc4b49a, width: 0.14, height: 0.16, speed: 3.2, upMin: 1.4, upMax: 3.2 },
   mist: { color: 0x8a7a66, opacity: 0.32, count: 5, flatten: 0.22, rise: 0.45 },
 });
@@ -844,6 +903,23 @@ function ringFromUnknown(raw: unknown): PlayerRingFx {
   };
 }
 
+const COFFEE_DAYS: WeekdayId[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+/** 误把破罐破摔涂绿时写进共用槽的颜色。迁移时只还给周五。 */
+const COFFEE_GREEN = 1407260;
+/** 涂绿之前，喝咖啡三档的渍色。 */
+const COFFEE_SAVED: DayCoffeeColors = { 1: 3352618, 2: 4853016, 3: 4853016 };
+
+function coffeeLooksFilled(color: number): Record<WeekdayId, DayCoffeeColors> {
+  const row: DayCoffeeColors = { 1: color, 2: color, 3: color };
+  return {
+    monday: { ...row },
+    tuesday: { ...row },
+    wednesday: { ...row },
+    thursday: { ...row },
+    friday: { ...row },
+  };
+}
+
 export const DEFAULT_FX: FxCatalog = {
   version: 3,
   common: {
@@ -962,43 +1038,109 @@ export const DEFAULT_FX: FxCatalog = {
         { ...NONE_HIT, time: 0.14, speed: 14, impulse: 360 },
         0x57d9c4,
         {
-          reclock: { window: 0.35, segmentScale: 0.85, hitRefund: 0, autoThird: false },
+          reclock: { duration: 1, blastRadius: 0, blastImpulse: 0 },
           react: crowdReact(reactOf('knock'), reactOf('none', { bounce: true })),
         }
       ),
       {
-        reclock: { window: 0.45, segmentScale: 0.9, hitRefund: 0.25, autoThird: false },
+        reclock: { duration: 1, blastRadius: 0, blastImpulse: 0 },
         hit: { time: 0.15, speed: 14.5 },
       },
       {
-        reclock: { window: 0.5, segmentScale: 0.95, hitRefund: 0.25, autoThird: true },
+        reclock: { duration: 2, blastRadius: 2.4, blastImpulse: 520 },
         hit: { time: 0.16, speed: 15, impulse: 420 },
       }
     ),
     blame: levels(
       dash(
-        { ...NONE_HIT, impulse: 320 },
+        { ...NONE_HIT, impulse: 0 },
         0xd4a017,
         {
-          blame: { duration: 1.2, radius: 3.2, count: 2, groundRadius: 0 },
-          react: crowdReact(reactOf('shove', { impulse: 320, stun: 0.2 }), reactOf('none', { bounce: true })),
+          blame: {
+            duration: 1.4,
+            factor: 0.48,
+            maxPots: 8,
+            blastRadius: 0,
+            blastImpulse: 0,
+            blastDelay: 0.35,
+            blastGap: 0.22,
+          },
+          react: crowdReact(
+            reactOf('slow', { impulse: 0, duration: 1.4, factor: 0.48, radius: 0.01 }),
+            reactOf('slow', { impulse: 0, duration: 1.4, factor: 0.55, radius: 0.01 })
+          ),
         }
       ),
       {
-        blame: { duration: 1.8, radius: 3.8, count: 3, groundRadius: 0 },
-        hit: { impulse: 380 },
+        blame: {
+          duration: 1.8,
+          factor: 0.42,
+          maxPots: 8,
+          blastRadius: 0,
+          blastImpulse: 0,
+          blastDelay: 0.35,
+          blastGap: 0.22,
+        },
+        hit: { impulse: 0 },
+        react: crowdReact(
+          reactOf('slow', { impulse: 0, duration: 1.8, factor: 0.42, radius: 0.01 }),
+          reactOf('slow', { impulse: 0, duration: 1.8, factor: 0.5, radius: 0.01 })
+        ),
       },
       {
-        blame: { duration: 2.2, radius: 4.2, count: 4, groundRadius: 2.4 },
-        hit: { impulse: 420 },
+        blame: {
+          duration: 1.6,
+          factor: 0.4,
+          maxPots: 8,
+          blastRadius: 1.35,
+          blastImpulse: 480,
+          blastDelay: 0.4,
+          blastGap: 0.22,
+        },
+        hit: { impulse: 0 },
+        react: crowdReact(
+          reactOf('slow', { impulse: 0, duration: 1.6, factor: 0.4, radius: 0.01 }),
+          reactOf('slow', { impulse: 0, duration: 1.6, factor: 0.48, radius: 0.01 })
+        ),
       }
     ),
   },
   skills: {
     decoy: levels(
-      { decoy: { cooldown: 9, duration: 4, blastRadius: 0, blastImpulse: 0 } },
-      { decoy: { duration: 6 } },
-      { decoy: { blastRadius: 2.6, blastImpulse: 340 } }
+      {
+        decoy: {
+          cooldown: 9,
+          duration: 4,
+          blastRadius: 0,
+          blastImpulse: 0,
+          hitBurst: 'spark' as HitBurstKind,
+          opacity: 0.48,
+          color: 0xffffff,
+          glowStyle: 'soft' as ThrowGlowStyle,
+          glowColor: 0x57d98f,
+          glowOpacity: 0.5,
+          glowSize: 1.9,
+        } satisfies DecoyLevel,
+      },
+      {
+        decoy: {
+          duration: 6,
+          opacity: 0.52,
+          glowStyle: 'ring',
+          glowOpacity: 0.55,
+          glowSize: 1.7,
+        },
+      },
+      {
+        decoy: {
+          blastRadius: 2.6,
+          blastImpulse: 340,
+          opacity: 0.55,
+          glowStyle: 'core',
+          glowOpacity: 0.58,
+          glowSize: 2.0,
+        },
+      }
     ),
     keyboard: levels(
       {
@@ -1009,6 +1151,7 @@ export const DEFAULT_FX: FxCatalog = {
           width: 0.75,
           hitImpulse: 340,
           knockImpulse: 300,
+          hitBurst: 'note' as HitBurstKind,
           scale: 1,
           color: 0xffffff,
           glowStyle: 'soft' as ThrowGlowStyle,
@@ -1041,6 +1184,9 @@ export const DEFAULT_FX: FxCatalog = {
       { coffee: { radius: 1.2, life: 3.6, range: 2.1 } },
       { coffee: { count: 3, splashRadius: 1.8, splashLife: 3.2 } }
     ),
+  },
+  dayLooks: {
+    coffee: coffeeLooksFilled(0x4a2d18),
   },
   hazards: {
     wet: { color: 0x7ec8e8, opacity: 0.5, radius: 0.85, duration: 1.2, factor: 0.55 },
@@ -1134,6 +1280,7 @@ export function mergeFx(base: FxCatalog, over: unknown): FxCatalog {
       }
       if (pack.scale == null) pack.scale = fb.scale;
       if (pack.color == null) pack.color = fb.color;
+      pack.hitBurst = normalizeHitBurst(pack.hitBurst ?? fb.hitBurst);
       pack.glowStyle = normalizeThrowGlowStyle(pack.glowStyle, pack.glow);
       delete pack.glow;
       if (pack.glowColor == null) pack.glowColor = fb.glowColor;
@@ -1141,7 +1288,38 @@ export function mergeFx(base: FxCatalog, over: unknown): FxCatalog {
       if (pack.glowSize == null) pack.glowSize = fb.glowSize;
     }
   }
+  ensureDayLooks(merged, o);
+  if (!merged.skills.decoy) merged.skills.decoy = clone(DEFAULT_FX.skills.decoy);
+  else {
+    for (const lv of [1, 2, 3] as Lv[]) {
+      const pack = merged.skills.decoy[lv]?.decoy as (DecoyLevel & { glow?: boolean }) | undefined;
+      const fb = DEFAULT_FX.skills.decoy[lv].decoy!;
+      if (!pack) {
+        merged.skills.decoy[lv] = clone(DEFAULT_FX.skills.decoy[lv]);
+        continue;
+      }
+      if (pack.opacity == null) pack.opacity = fb.opacity;
+      if (pack.color == null) pack.color = fb.color;
+      pack.hitBurst = normalizeHitBurst(pack.hitBurst ?? fb.hitBurst);
+      pack.glowStyle = normalizeThrowGlowStyle(pack.glowStyle, pack.glow);
+      delete pack.glow;
+      if (pack.glowColor == null) pack.glowColor = fb.glowColor;
+      if (pack.glowOpacity == null) pack.glowOpacity = fb.glowOpacity;
+      if (pack.glowSize == null) pack.glowSize = fb.glowSize;
+    }
+  }
+  ensureHitBursts(merged);
   return merged;
+}
+
+function ensureHitBursts(merged: FxCatalog) {
+  for (const id of CROWD_ACTOR_IDS) {
+    const hit = merged.actors[id]?.hit;
+    if (!hit) continue;
+    hit.burst = normalizeHitBurst(hit.burst);
+  }
+  const obj = merged.common?.hitObject;
+  if (obj) obj.burst = normalizeHitBurst(obj.burst ?? 'shard');
 }
 
 function ensureDashReact(merged: FxCatalog) {
@@ -1158,8 +1336,35 @@ function ensureDashReact(merged: FxCatalog) {
       const fallback = DEFAULT_FX.lines[key][lv];
       if (!pack.react) pack.react = clone(fallback.react ?? crowdReact(reactOf('knock'), reactOf('none')));
       if (fallback.rebound && !pack.rebound) pack.rebound = clone(fallback.rebound);
-      if (fallback.reclock && !pack.reclock) pack.reclock = clone(fallback.reclock);
-      if (fallback.blame && !pack.blame) pack.blame = clone(fallback.blame);
+      if (fallback.reclock) {
+        const cur = pack.reclock as (ReclockLevel & { window?: number }) | undefined;
+        // 旧档是二段窗口字段，整段换成闹钟改追
+        if (!cur || cur.window != null || cur.duration == null) pack.reclock = clone(fallback.reclock);
+        else {
+          pack.reclock = {
+            duration: cur.duration,
+            blastRadius: cur.blastRadius ?? fallback.reclock.blastRadius,
+            blastImpulse: cur.blastImpulse ?? fallback.reclock.blastImpulse,
+          };
+        }
+      }
+      if (fallback.blame) {
+        const cur = pack.blame as (BlameLevel & { radius?: number; count?: number; groundRadius?: number }) | undefined;
+        // 旧档是改追字段，整段换成挂锅减速
+        if (!cur || cur.radius != null || cur.count != null || cur.factor == null || cur.maxPots == null) {
+          pack.blame = clone(fallback.blame);
+        } else {
+          pack.blame = {
+            duration: cur.duration,
+            factor: cur.factor,
+            maxPots: cur.maxPots,
+            blastRadius: cur.blastRadius ?? fallback.blame.blastRadius,
+            blastImpulse: cur.blastImpulse ?? fallback.blame.blastImpulse,
+            blastDelay: cur.blastDelay ?? fallback.blame.blastDelay,
+            blastGap: cur.blastGap ?? fallback.blame.blastGap,
+          };
+        }
+      }
       for (const id of CROWD_ACTOR_IDS) {
         const base = fallback.react?.[id] ?? (id === 'heavy' ? reactOf('none') : reactOf('knock'));
         const cur = pack.react[id];
@@ -1273,6 +1478,40 @@ export function skillFx(id: SkillKey, lv = 1): SkillLevelFx {
   return current.skills[id][clampLv(lv)];
 }
 
+/** 这一关的咖啡族渍色。破罐破摔、喝咖啡、泼脏水、外卖汤各读各的。 */
+export function coffeeColorOnDay(day: WeekdayId, lv = 1): number {
+  const level = clampLv(lv);
+  const own = current.dayLooks?.coffee?.[day]?.[level];
+  if (typeof own === 'number') return own;
+  return current.skills.coffee[level]?.coffee?.color ?? 0x4a2d18;
+}
+
+function ensureDayLooks(merged: FxCatalog, over: Record<string, unknown>) {
+  const shared = (lv: Lv) => merged.skills.coffee[lv]?.coffee?.color ?? 0x4a2d18;
+  const paintedAllGreen = ([1, 2, 3] as Lv[]).every((lv) => shared(lv) === COFFEE_GREEN);
+  const fallback = (lv: Lv) => (paintedAllGreen ? COFFEE_SAVED[lv] : shared(lv));
+  if (paintedAllGreen) {
+    for (const lv of [1, 2, 3] as Lv[]) {
+      const pack = merged.skills.coffee[lv]?.coffee;
+      if (pack) pack.color = COFFEE_SAVED[lv];
+    }
+  }
+  const overCoffee =
+    isRec(over.dayLooks) && isRec(over.dayLooks.coffee) ? over.dayLooks.coffee : {};
+  const coffee = {} as Record<WeekdayId, DayCoffeeColors>;
+  for (const day of COFFEE_DAYS) {
+    const row = isRec(overCoffee[day]) ? overCoffee[day] : {};
+    const pick = (lv: Lv) => {
+      const raw = row[lv] ?? row[String(lv)];
+      if (typeof raw === 'number') return raw;
+      if (day === 'friday' && paintedAllGreen) return COFFEE_GREEN;
+      return fallback(lv);
+    };
+    coffee[day] = { 1: pick(1), 2: pick(2), 3: pick(3) };
+  }
+  merged.dayLooks = { coffee };
+}
+
 export function hazardFx(id: HazardKind): HazardFx {
   return current.hazards[id] ?? DEFAULT_FX.hazards[id];
 }
@@ -1336,8 +1575,9 @@ export function parseHex(s: string) {
   return Number.isFinite(n) ? n >>> 0 : 0;
 }
 
-function hitFromLegacy(paper: Record<string, unknown>, mist: Record<string, unknown>): HitFx {
+function hitFromLegacy(paper: Record<string, unknown>, mist: Record<string, unknown>, burst?: unknown): HitFx {
   return hitOf({
+    burst: normalizeHitBurst(burst),
     paper: paper as Partial<PaperBurstFx>,
     mist: mist as Partial<ImpactMistFx>,
   });
@@ -1483,9 +1723,40 @@ function migrateLegacy(raw: Record<string, unknown>): Partial<FxCatalog> {
     },
     skills: {
       decoy: levels(
-        { decoy: { cooldown: Number(decoy.cooldown) || 9, duration: Number(decoy.duration) || 4, blastRadius: 0, blastImpulse: 0 } },
-        { decoy: { duration: Number(decoy.durationLv2) || 6 } },
-        { decoy: { blastRadius: Number(decoy.blastRadius) || 2.6, blastImpulse: Number(decoy.blastImpulse) || 340 } }
+        {
+          decoy: {
+            cooldown: Number(decoy.cooldown) || 9,
+            duration: Number(decoy.duration) || 4,
+            blastRadius: 0,
+            blastImpulse: 0,
+            hitBurst: 'spark',
+            opacity: Number(decoy.opacity) || 0.48,
+            color: Number(decoy.color) || 0xffffff,
+            glowStyle: normalizeThrowGlowStyle(decoy.glowStyle, decoy.glow !== false),
+            glowColor: Number(decoy.glowColor) || 0x57d98f,
+            glowOpacity: Number(decoy.glowOpacity) || 0.5,
+            glowSize: Number(decoy.glowSize) || 1.9,
+          },
+        },
+        {
+          decoy: {
+            duration: Number(decoy.durationLv2) || 6,
+            opacity: 0.52,
+            glowStyle: 'ring',
+            glowOpacity: 0.55,
+            glowSize: 1.7,
+          },
+        },
+        {
+          decoy: {
+            blastRadius: Number(decoy.blastRadius) || 2.6,
+            blastImpulse: Number(decoy.blastImpulse) || 340,
+            opacity: 0.55,
+            glowStyle: 'core',
+            glowOpacity: 0.58,
+            glowSize: 2.0,
+          },
+        }
       ),
       keyboard: levels(
         {
@@ -1496,6 +1767,7 @@ function migrateLegacy(raw: Record<string, unknown>): Partial<FxCatalog> {
             width: Number(keyboard.width) || 0.75,
             hitImpulse: Number(keyboard.hitImpulse) || 340,
             knockImpulse: Number(keyboard.knockImpulse) || 300,
+            hitBurst: 'note',
             scale: Number(keyboard.scale) || 1,
             color: Number(keyboard.color) || 0xffffff,
             glowStyle: normalizeThrowGlowStyle(keyboard.glowStyle, keyboard.glow !== false),

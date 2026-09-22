@@ -229,7 +229,7 @@ function lockHeadScale(locals: THREE.Matrix4[], restScale: THREE.Vector3) {
   }
 }
 
-function bakeSkinned(mesh: THREE.SkinnedMesh, snapGround = true): { geometry: THREE.BufferGeometry; snapY: number } {
+export function bakeSkinned(mesh: THREE.SkinnedMesh, snapGround = true): { geometry: THREE.BufferGeometry; snapY: number } {
   mesh.updateMatrixWorld(true);
   mesh.skeleton.update();
   const geo = mesh.geometry.clone();
@@ -834,6 +834,52 @@ export function setFigureGait(fig: HumanoidFigure, moving: boolean, dt = 0) {
     fig.run.timeScale = moving ? 1.15 : 1;
   }
   fig.mixer.update(dt || 1 / 60);
+}
+
+/** 把人偶当前蒙皮姿态烘焙成静态 mesh（世界→人偶根局部），给分身/残影用。 */
+export function bakeFigureLocalSnapshot(fig: HumanoidFigure): THREE.Group {
+  const root = fig.group;
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const out = new THREE.Group();
+  const halo = fig.playerHalo?.group ?? null;
+
+  const underHalo = (o: THREE.Object3D) => {
+    let p: THREE.Object3D | null = o;
+    while (p) {
+      if (p === halo) return true;
+      p = p.parent;
+    }
+    return false;
+  };
+
+  root.traverse((o) => {
+    if (!o.visible || underHalo(o)) return;
+    const skinned = o as THREE.SkinnedMesh;
+    if (skinned.isSkinnedMesh) {
+      skinned.skeleton?.update();
+      const { geometry } = bakeSkinned(skinned, false);
+      geometry.applyMatrix4(inv);
+      const src = skinned.material;
+      const mat = ((Array.isArray(src) ? src[0] : src) as THREE.Material).clone();
+      out.add(new THREE.Mesh(geometry, mat));
+      return;
+    }
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    let p: THREE.Object3D | null = mesh.parent;
+    while (p) {
+      if ((p as THREE.SkinnedMesh).isSkinnedMesh) return;
+      p = p.parent;
+    }
+    const geo = mesh.geometry.clone();
+    geo.applyMatrix4(mesh.matrixWorld);
+    geo.applyMatrix4(inv);
+    const src = mesh.material;
+    const mat = ((Array.isArray(src) ? src[0] : src) as THREE.Material).clone();
+    out.add(new THREE.Mesh(geo, mat));
+  });
+  return out;
 }
 
 export function clonePlayerFigure(kit: HumanoidKit, slot?: PlayerSlotId): HumanoidFigure {
