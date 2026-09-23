@@ -134,6 +134,8 @@ class BgmPlayer {
   private volume = 0.336;
   private homeVolume = 0.266;
   private playKicks = 0;
+  /** 点击里先起播、进关前把音量压住，避免加载时先听到下一关。 */
+  private held = false;
 
   constructor() {
     const resume = () => {
@@ -166,14 +168,40 @@ class BgmPlayer {
     if (this.wanted) this.play(this.wanted);
   }
 
+  /** 借这次点击把手势用掉：曲子先以 0 音量播，进关后再 release。 */
+  prime(id: BgmId) {
+    this.held = true;
+    this.start(id);
+  }
+
+  isPrimed(id: BgmId) {
+    return this.held && this.wanted === id;
+  }
+
+  release() {
+    if (!this.held) return;
+    this.held = false;
+    if (this.el && this.wanted) this.el.volume = this.volumeFor(this.wanted);
+  }
+
   play(id: BgmId) {
+    this.held = false;
+    this.start(id);
+  }
+
+  private volumeFor(id: BgmId) {
+    if (this.held) return 0;
+    return id === 'home' ? this.homeVolume : this.volume;
+  }
+
+  private start(id: BgmId) {
     this.wanted = id;
     if (!this.enabled()) {
       this.el?.pause();
       return;
     }
     if (this.id === id && this.el) {
-      this.el.volume = id === 'home' ? this.homeVolume : this.volume;
+      this.el.volume = this.volumeFor(id);
       this.tryPlay();
       return;
     }
@@ -182,7 +210,7 @@ class BgmPlayer {
     el.loop = true;
     el.preload = 'auto';
     el.autoplay = true;
-    el.volume = id === 'home' ? this.homeVolume : this.volume;
+    el.volume = this.volumeFor(id);
     el.setAttribute('playsinline', '');
     el.addEventListener('canplay', () => {
       if (this.el === el) this.tryPlay();

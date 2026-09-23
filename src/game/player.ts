@@ -101,6 +101,32 @@ export class Player {
     scene.add(this.group);
   }
 
+  /** 同页换角色：换成这一套玩家模型，刚体留着。 */
+  rebindKit(kit: HumanoidKit) {
+    if (this.rag) this.finishRagdoll(true);
+    const parent = this.group.parent;
+    const visible = this.group.visible;
+    this.mixer?.stopAllAction();
+    this.group.removeFromParent();
+    this.kit = kit;
+    this.phasedNow = false;
+    const nextY = 0.66 * (kit.playerScale > 0 ? kit.playerScale : 1);
+    if (Math.abs(nextY - this.standY) > 0.02) {
+      this.standY = nextY;
+      this.world.removeCollider(this.collider, true);
+      this.collider = this.makeCollider(this.body);
+    }
+    const fig = clonePlayerFigure(kit, kit.playerSlot);
+    this.fig = fig;
+    this.group = fig.group;
+    this.ghostMats = fig.ghostMats;
+    this.mixer = fig.mixer;
+    this.idleAct = fig.idle;
+    this.runAct = fig.run;
+    this.group.visible = visible;
+    parent?.add(this.group);
+  }
+
   private makeBody(x: number, z: number) {
     return this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setTranslation(x, this.standY, z).lockRotations().setLinearDamping(4)

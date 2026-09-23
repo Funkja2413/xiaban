@@ -21,22 +21,28 @@ game.onSettled = (kind, info) => showResult(kind, info.day, info.sub, game.playe
 bindPlay((day, player) => {
   rememberPlayerSlot(player);
   rememberLastPlayed(day);
-  bgm.play(day);
   sfx.unlock();
-  if (game.playerSlot !== player) {
-    location.assign(playUrl(day, player));
-    return;
-  }
-  const show = () => {
-    history.replaceState(null, '', playUrl(day, player));
+  const switching = game.day !== day || game.playerSlot !== player;
+  history.replaceState(null, '', playUrl(day, player));
+  if (!switching) {
+    bgm.play(day);
+    game.beginPlay();
     setMode('play');
-  };
-  if (game.day !== day) {
-    void game.switchDay(day).then(show);
     return;
   }
-  game.beginPlay();
-  show();
+  bgm.prime(day);
+  bootProgress.reset('正在进入办公室…');
+  setMode('loading');
+  void game.switchDay(day, player, bootProgress).then(() => {
+    bgm.release();
+    setMode('play');
+  }).catch((err) => {
+    bgm.release();
+    setMode('loading');
+    const el = document.querySelector('#loading .sub');
+    if (el) el.textContent = '进入失败：' + bootError(err);
+    console.error(err);
+  });
 });
 
 bindHome(() => game.enterMenu());

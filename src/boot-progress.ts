@@ -5,6 +5,8 @@ export type BootProgress = {
   /** 开始下一段真实工作。读条只前进，Three 加载器的文件进度填满这一段。 */
   phase(label: string, until: number): void;
   finish(label?: string): void;
+  /** 换关再走一遍读条。 */
+  reset(label?: string): void;
 };
 
 export function bindBootProgress(): BootProgress {
@@ -53,6 +55,15 @@ export function bindBootProgress(): BootProgress {
     finish(nextLabel = '即将进入') {
       label = nextLabel;
       paint(1, nextLabel);
+    },
+    reset(nextLabel = '正在进入办公室…') {
+      shown = 0;
+      from = 0;
+      to = 0.04;
+      label = nextLabel;
+      three = { loaded: 0, total: 0 };
+      threeAtPhase = { loaded: 0, total: 0 };
+      paint(0.01, nextLabel);
     },
   };
 }

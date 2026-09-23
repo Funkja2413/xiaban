@@ -521,6 +521,22 @@ function resultArtFile(kind: 'won' | 'lost' | 'finale', player: PlayerSlotId) {
   return female ? 'result-lose-f.png' : 'result-lose.png';
 }
 
+const prefetchedResultArt = new Set<string>();
+
+/** 进关时把这一角色会用到的结算图先下好，结算音就能和画面同一帧出来。 */
+export function prefetchResultArt(player: PlayerSlotId, day: WeekdayId) {
+  const kinds: Array<'won' | 'lost' | 'finale'> = ['won', 'lost'];
+  if (day === 'friday') kinds.push('finale');
+  for (const kind of kinds) {
+    const url = assetUrl(`ui/${resultArtFile(kind, player)}`);
+    if (prefetchedResultArt.has(url)) continue;
+    prefetchedResultArt.add(url);
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+  }
+}
+
 export function showResult(
   kind: 'won' | 'lost',
   day: WeekdayId,
@@ -573,6 +589,7 @@ export function showResult(
   }
 
   const reveal = () => {
+    sfx.playResult(kind);
     setMode('result');
     playResultIn();
   };

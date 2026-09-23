@@ -101,6 +101,13 @@ export class DashMounts {
     this.kit = await DashMountKit.from(cat);
   }
 
+  /** 换角色后右手挂件还别在旧模型上。 */
+  detachHand() {
+    this.handRoot?.removeFromParent();
+    this.handRoot = null;
+    this.handLine = null;
+  }
+
   mark(i: number, line: LineId, duration: number) {
     const slot = this.kit?.slot(line, 'head');
     const template = slot ? this.kit?.visual(slot.propId) : null;
