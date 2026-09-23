@@ -63,7 +63,7 @@ export const SKILLS: Record<SkillId, Meta> = {
   },
   coffee: {
     name: '喝咖啡', glyph: '☕', color: '#c98a4b',
-    descs: ['朝前泼一滩，踩到滑倒', '渍更大更持久', '连泼三滩再溅一大摊'],
+    descs: ['朝前泼一滩，最多放倒 2 人', '渍更大，最多放倒 3 人', '连泼再溅，最多放倒 4 人'],
   },
 };
 

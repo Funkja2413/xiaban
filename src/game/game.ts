@@ -93,7 +93,7 @@ export class Game {
   private dayId: WeekdayId = 'monday';
   private playerSlotId: PlayerSlotId = 'player';
   /** 胜负交给产品壳，不再直接弹旧 overlay */
-  onSettled: ((kind: 'won' | 'lost', info: { day: WeekdayId; title: string; sub: string }) => void) | null = null;
+  onSettled: ((kind: 'won' | 'lost', info: { day: WeekdayId; title: string; sub: string; clockMin?: number }) => void) | null = null;
   private elapsed = 0;
   private elevatorCalled = false;
   private elevatorTimer = 0;
@@ -262,6 +262,7 @@ export class Game {
       spawnHitFx(this.papers, this.mist, x, z, mergeHitFx(crowdFx(crowdActorOf(type, gender)).hit, hitOver));
       sfx.play('knockdown');
     };
+    this.enemies.onCrowdScore = () => this.cards.addBadges(1);
     this.slicks = new Slicks(this.scene);
     this.pulses = new SlowPulse(this.scene);
     this.chains = new SkillChains(this.scene);
@@ -315,9 +316,10 @@ export class Game {
         this.skillShout.burst(x, SHOUT_Y, z, p.x, SHOUT_Y, p.z, pack.color, pack.opacity, pack.waves ?? 3, pack.waveGap ?? 0.14);
       }
     };
-    this.skills = new Skills(this.scene, this.world, (x, z, r, life, look) => {
-      this.slicks.spawn(x, z, r, life, look);
+    this.skills = new Skills(this.scene, this.world, (x, z, r, life, look, budget) => {
+      this.slicks.spawn(x, z, r, life, look, budget);
     }, () => this.player.figure, () => this.kit);
+    this.skills.onSoftScore = () => this.cards.addBadges(1);
     this.skills.setDay(day);
     this.papers = new PaperBurst(this.scene);
     this.dashTrail = new DashTrail(this.scene);
@@ -451,6 +453,80 @@ export class Game {
     this.beginReadyCamera();
     this.syncReadyCount();
     bgm.play(this.dayId);
+    bgm.kick();
+  }
+
+  /**
+   * 换关留在当前页，这样进关那一下点击里的 bgm.play() 不会被整页刷新丢掉。
+   * 换男女模型仍走刷新。
+   */
+  async switchDay(day: WeekdayId) {
+    if (!this.level || !this.world || !this.player || !this.renderer) return;
+    if (day === this.dayId) {
+      this.beginPlay();
+      return;
+    }
+    setPlayDayHint(day);
+    const [days, humans, looks] = await Promise.all([
+      loadLevelCatalog(),
+      loadHumanoidKit(this.playerSlotId, day),
+      loadCatalog(),
+    ]);
+    const def = levelById(days, day);
+    const next = await Level.create(def);
+    this.enemies.clearAll();
+    this.skills.reset();
+    this.slicks.clear();
+    this.chairs.dispose(this.world);
+    this.level.dispose(this.world);
+    this.scene.remove(this.level.group);
+    this.scene.remove(this.lights.fill, this.lights.hemi, this.lights.overheadGroup);
+
+    this.dayId = day;
+    this.kit = humans;
+    this.enemies.rebindKit(humans);
+    this.enemies.skillOf = (id) => lookForSlot(looks, id)?.enemySkill ?? null;
+    this.level = next;
+    this.scene.add(this.level.group);
+    this.level.buildPhysics(this.world);
+    this.look = def.atmosphere;
+    this.lights = createLights(def.atmosphere, def.pointLights);
+    addLightsToScene(this.scene, this.lights);
+    applyAtmosphere(this.scene, this.renderer, this.lights, def.atmosphere, def.pointLights);
+
+    const { map, playerStart, elevatorPoint } = this.level;
+    this.flow = new FlowField(map.minX, map.minZ, map.maxX, map.maxZ, 0.5);
+    this.level.applyToFlow(this.flow);
+    this.flow.rebuild(playerStart.x, playerStart.z);
+    this.player.nav = this.flow;
+    this.enemies.bindFlow(this.flow);
+
+    this.elevFlow = new FlowField(map.minX, map.minZ, map.maxX, map.maxZ, 0.5);
+    this.level.applyToFlow(this.elevFlow);
+    this.elevFlow.rebuild(elevatorPoint.x, elevatorPoint.z);
+
+    this.interceptFlow = new FlowField(map.minX, map.minZ, map.maxX, map.maxZ, 0.5);
+    this.level.applyToFlow(this.interceptFlow);
+    const firstCut = this.elevFlow.nextGateAlong(playerStart.x, playerStart.z) ?? {
+      x: playerStart.x,
+      z: playerStart.z,
+    };
+    this.interceptGateX = firstCut.x;
+    this.interceptGateZ = firstCut.z;
+    this.interceptFlow.rebuild(firstCut.x, firstCut.z);
+    this.enemies.interceptFlow = this.interceptFlow;
+    this.enemies.interceptAtX = firstCut.x;
+    this.enemies.interceptAtZ = firstCut.z;
+
+    this.menuFlow = new FlowField(map.minX, map.minZ, map.maxX, map.maxZ, 0.5);
+    this.level.applyToFlow(this.menuFlow);
+
+    this.chairs = new Chairs(this.scene, this.world, this.level.chairSpawns, this.level.pushables);
+    const loadout = dayPlayerLoadout(day);
+    this.cards.setDayKit(day, loadout.dashes, loadout.skills);
+    this.skills.setDay(day);
+    this.hazards.load(def, this.level.group);
+    this.beginPlay();
   }
 
   /** 镜头先停在终点电梯，3 秒内滑翔回出生点，方便观察路线 */
@@ -532,7 +608,7 @@ export class Game {
 
     const time = timeMs / 1000;
     this.enemies.syncVisuals(time);
-    this.chairs.syncVisuals();
+    this.chairs.syncVisuals(dt);
     this.player.syncVisual();
     this.dashMounts.update(dt);
     if (this.player.dashing) {
@@ -825,6 +901,7 @@ export class Game {
     this.aiming = false;
     this.player.update(h, 0, 0, false, this.enemies);
     if (!sfx.armed()) sfx.unlock();
+    bgm.kick();
     this.readyLeft -= h;
     this.glideT += h;
     this.syncReadyCount();
@@ -953,10 +1030,12 @@ export class Game {
     this.phase = 'won';
     sfx.playResult('won');
     this.hud.setElevatorTimer(null);
-    const mm = Math.floor(this.elapsed / 60);
-    const ss = Math.floor(this.elapsed % 60);
+    const seconds = Math.max(0, Math.floor(this.elapsed));
+    const mm = Math.floor(seconds / 60);
+    const ss = seconds % 60;
+    const clockMin = Math.floor(18 * 60 + this.hud.overtimeMin);
     const sub = `逃亡用时 ${mm}:${String(ss).padStart(2, '0')}<br>最终下班时间 ${this.hud.deadlineText}`;
-    this.onSettled?.('won', { day: this.dayId, title: '成功下班！', sub });
+    this.onSettled?.('won', { day: this.dayId, title: '成功下班！', sub, clockMin });
   }
 
   private lose() {

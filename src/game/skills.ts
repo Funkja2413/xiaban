@@ -7,7 +7,7 @@ import { SOLID_RAY_GROUPS } from '../sim/physics';
 import { Enemies, EState } from './enemies';
 import type { SkillId } from './cards';
 import {
-  decoyLookOf,
+  decoyLookForDay,
   decoySkinOnDay,
   disposeDecoyGhost,
   disposeDecoyRunner,
@@ -72,7 +72,14 @@ export class Skills {
   constructor(
     private scene: THREE.Scene,
     private world: RAPIER.World,
-    private pourCoffee: (x: number, z: number, r: number, life: number, look: SlickLook) => void,
+    private pourCoffee: (
+      x: number,
+      z: number,
+      r: number,
+      life: number,
+      look: SlickLook,
+      budget?: { left: number } | null
+    ) => void,
     private playerFig: () => HumanoidFigure | null = () => null,
     private playerKit: () => HumanoidKit | null = () => null
   ) {}
@@ -119,13 +126,16 @@ export class Skills {
     sfx.setDecoy(false);
   }
 
+  /** 打不倒人的技能成功放出时记一枚工牌，避免整局零积分。 */
+  onSoftScore: (() => void) | null = null;
+
   cast(id: SkillId, lv: number, px: number, pz: number, dirX: number, dirZ: number): boolean {
     if (this.cd > 0) return false;
     const pack = skillFx(id, lv);
     if (id === 'decoy') {
       this.cd = pack.decoy?.cooldown ?? 9;
       this.clearDecoys();
-      const look = decoyLookOf(pack.decoy);
+      const look = decoyLookForDay(this.day, pack.decoy);
       const skin = decoySkinOnDay(this.day);
       const fig = this.playerFig();
       const kit = this.playerKit();
@@ -166,6 +176,7 @@ export class Skills {
         });
       }
       sfx.play('decoy');
+      if ((d.blastRadius ?? 0) <= 0.05) this.onSoftScore?.();
     } else if (id === 'keyboard') {
       this.cd = pack.keyboard?.cooldown ?? 5.5;
       if (this.kb) this.scene.remove(this.kb.mesh);
@@ -199,12 +210,14 @@ export class Skills {
       const n = Math.max(1, c.count | 0);
       const sideX = -dirZ;
       const sideZ = dirX;
+      const cap = c.maxVictims > 0 ? c.maxVictims : lv >= 3 ? 4 : lv >= 2 ? 3 : 2;
+      const budget = { left: cap };
       for (let k = 0; k < n; k++) {
         const dist = c.range + k * c.spacing + (Math.random() - 0.5) * 0.18;
         const jx = sideX * (Math.random() - 0.5) * 0.38 + (Math.random() - 0.5) * 0.12;
         const jz = sideZ * (Math.random() - 0.5) * 0.38 + (Math.random() - 0.5) * 0.12;
         const rk = c.radius * (0.84 + Math.random() * 0.32);
-        this.pourCoffee(px + dirX * dist + jx, pz + dirZ * dist + jz, rk, c.life, look);
+        this.pourCoffee(px + dirX * dist + jx, pz + dirZ * dist + jz, rk, c.life, look, budget);
       }
       sfx.play('coffee');
       if (c.splashRadius > 0.05) {
@@ -216,7 +229,8 @@ export class Skills {
           pz + dirZ * dist + jz,
           c.splashRadius * (0.88 + Math.random() * 0.22),
           c.splashLife || c.life,
-          look
+          look,
+          budget
         );
       }
     }

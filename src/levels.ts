@@ -2083,7 +2083,7 @@ export function seedThursday(): LevelDef {
     heavyAnchors: [
       spawn('hv-1', 10.75, 21.75),
       spawn('hv-2', 13.25, 16.25),
-      spawn('hv-3', 14.25, 8.25),
+      spawn('hv-3', 0, -20),
       spawn('hv-4', 6.75, 2.25),
     ],
     interceptorSpawns: [spawn('ic-1', 0.2, -25.4)],

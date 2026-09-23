@@ -1984,7 +1984,8 @@
           "radius": 0.75,
           "life": 8,
           "splashRadius": 0,
-          "splashLife": 0
+          "splashLife": 0,
+          "maxVictims": 2
         }
       },
       "2": {
@@ -1998,7 +1999,8 @@
           "radius": 1.1,
           "life": 3.5,
           "splashRadius": 0,
-          "splashLife": 0
+          "splashLife": 0,
+          "maxVictims": 3
         }
       },
       "3": {
@@ -2012,7 +2014,8 @@
           "radius": 1.1,
           "life": 3.5,
           "splashRadius": 2.2,
-          "splashLife": 3.2
+          "splashLife": 3.2,
+          "maxVictims": 4
         }
       }
     }
@@ -2043,6 +2046,23 @@
         "1": 1407260,
         "2": 1407260,
         "3": 1407260
+      }
+    },
+    "decoy": {
+      "monday": {
+        "glowColor": 5757327
+      },
+      "tuesday": {
+        "glowColor": 5757327
+      },
+      "wednesday": {
+        "glowColor": 5757327
+      },
+      "thursday": {
+        "glowColor": 14856538
+      },
+      "friday": {
+        "glowColor": 10901977
       }
     }
   },

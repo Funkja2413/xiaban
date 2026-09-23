@@ -211,6 +211,7 @@ export class Level {
   private faceMaps = new Map<string, THREE.Texture>();
   private wallMats = new Map<string, THREE.MeshPhongMaterial>();
   private posterMats = new Map<string, THREE.MeshPhongMaterial>();
+  private physicsBodies: RAPIER.RigidBody[] = [];
 
   private constructor(def: LevelDef) {
     this.def = def;
@@ -554,6 +555,7 @@ export class Level {
     const hz = Math.max(40, (this.map.maxZ - this.map.minZ) / 2 + 10);
     const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.1, 0));
     world.createCollider(RAPIER.ColliderDesc.cuboid(hx, 0.1, hz).setFriction(0.9), ground);
+    this.physicsBodies.push(ground);
 
     for (const o of this.obstacles) {
       const cx = (o.minX + o.maxX) / 2;
@@ -569,6 +571,7 @@ export class Level {
       }
       const body = world.createRigidBody(desc);
       world.createCollider(RAPIER.ColliderDesc.cuboid(hx, collH, hz).setFriction(0.2), body);
+      this.physicsBodies.push(body);
     }
     for (const raw of this.def.voids ?? []) {
       if (isRectVoid(raw)) continue;
@@ -579,7 +582,20 @@ export class Level {
       if (!desc) continue;
       const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, 0));
       world.createCollider(desc.setFriction(0.2), body);
+      this.physicsBodies.push(body);
     }
+  }
+
+  /** 换关时拆掉这一关的静态碰撞和网格。 */
+  dispose(world: RAPIER.World) {
+    for (const body of this.physicsBodies) world.removeRigidBody(body);
+    this.physicsBodies.length = 0;
+    this.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry?.dispose();
+    });
+    this.group.clear();
   }
 
   applyToFlow(flow: FlowField) {

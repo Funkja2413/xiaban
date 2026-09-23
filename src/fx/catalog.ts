@@ -412,6 +412,8 @@ export interface CoffeeLevel {
   life: number;
   splashRadius: number;
   splashLife: number;
+  /** 这一泼最多放倒几人。渍还在，人数满了就只剩地面 */
+  maxVictims: number;
 }
 
 export interface SkillLevelFx {
@@ -520,6 +522,11 @@ type DeepPartial<T> = {
 /** 同一技能族按关各存一份颜色。喝咖啡 / 泼脏水 / 外卖汤 / 破罐破摔互不覆盖。 */
 export type DayCoffeeColors = Record<Lv, number>;
 
+/** 分身光晕按关各存一份。工位马甲 / 我是NPC / 假人下班互不覆盖。 */
+export interface DayDecoyLook {
+  glowColor: number;
+}
+
 export interface FxCatalog {
   version: 3;
   common: {
@@ -534,6 +541,7 @@ export interface FxCatalog {
   /** 按关外观。玩法数值仍在 skills，颜色改这里。 */
   dayLooks: {
     coffee: Record<WeekdayId, DayCoffeeColors>;
+    decoy: Record<WeekdayId, DayDecoyLook>;
   };
   hazards: Record<HazardKind, HazardFx>;
   enemySkills: Record<EnemySkillId, EnemySkillFx>;
@@ -920,6 +928,21 @@ function coffeeLooksFilled(color: number): Record<WeekdayId, DayCoffeeColors> {
   };
 }
 
+/** 工位马甲绿、我是NPC 稻草金、假人下班紫。共用槽里的紫不再铺到每一关。 */
+const DECOY_GLOW_DEFAULT: Record<WeekdayId, number> = {
+  monday: 0x57d98f,
+  tuesday: 0x57d98f,
+  wednesday: 0x57d98f,
+  thursday: 0xe2b15a,
+  friday: 0xa659d9,
+};
+
+function decoyLooksFilled(): Record<WeekdayId, DayDecoyLook> {
+  const out = {} as Record<WeekdayId, DayDecoyLook>;
+  for (const day of COFFEE_DAYS) out[day] = { glowColor: DECOY_GLOW_DEFAULT[day] };
+  return out;
+}
+
 export const DEFAULT_FX: FxCatalog = {
   version: 3,
   common: {
@@ -1180,13 +1203,14 @@ export const DEFAULT_FX: FxCatalog = {
       }
     ),
     coffee: levels(
-      { coffee: { cooldown: 6.5, range: 1.7, count: 1, spacing: 0.7, color: 0x4a2d18, opacity: 0.55, radius: 0.85, life: 2.4, splashRadius: 0, splashLife: 0 } },
-      { coffee: { radius: 1.2, life: 3.6, range: 2.1 } },
-      { coffee: { count: 3, splashRadius: 1.8, splashLife: 3.2 } }
+      { coffee: { cooldown: 6.5, range: 1.7, count: 1, spacing: 0.7, color: 0x4a2d18, opacity: 0.55, radius: 0.85, life: 2.4, splashRadius: 0, splashLife: 0, maxVictims: 2 } },
+      { coffee: { radius: 1.2, life: 3.6, range: 2.1, maxVictims: 3 } },
+      { coffee: { count: 3, splashRadius: 1.8, splashLife: 3.2, maxVictims: 4 } }
     ),
   },
   dayLooks: {
     coffee: coffeeLooksFilled(0x4a2d18),
+    decoy: decoyLooksFilled(),
   },
   hazards: {
     wet: { color: 0x7ec8e8, opacity: 0.5, radius: 0.85, duration: 1.2, factor: 0.55 },
@@ -1267,6 +1291,7 @@ export function mergeFx(base: FxCatalog, over: unknown): FxCatalog {
   ensureDashReact(merged);
   liftSharedImpulse(merged);
   ensureActorStates(merged, o);
+  ensureCoffeeCaps(merged);
   merged.hazards = mergeDeep(clone(DEFAULT_FX.hazards), merged.hazards);
   merged.enemySkills = mergeDeep(clone(DEFAULT_FX.enemySkills), merged.enemySkills);
   if (!merged.skills.keyboard) merged.skills.keyboard = clone(DEFAULT_FX.skills.keyboard);
@@ -1439,8 +1464,19 @@ function slickToCoffee(slick: Record<string, unknown>, extra: Partial<CoffeeLeve
     life: Number(slick.life) || 2.4,
     splashRadius: Number(slick.endRadius) || 0,
     splashLife: Number(slick.endLife) || 0,
+    maxVictims: Number(slick.maxVictims) || 2,
     ...extra,
   };
+}
+
+const COFFEE_VICTIM_CAP: Record<Lv, number> = { 1: 2, 2: 3, 3: 4 };
+
+function ensureCoffeeCaps(merged: FxCatalog) {
+  for (const lv of [1, 2, 3] as Lv[]) {
+    const pack = merged.skills.coffee?.[lv]?.coffee;
+    if (!pack) continue;
+    if (!(pack.maxVictims > 0)) pack.maxVictims = COFFEE_VICTIM_CAP[lv];
+  }
 }
 
 /** 旧版「咖啡冲刺」→ 主动技能咖啡 + 冲刺属性倦怠 */
@@ -1486,6 +1522,13 @@ export function coffeeColorOnDay(day: WeekdayId, lv = 1): number {
   return current.skills.coffee[level]?.coffee?.color ?? 0x4a2d18;
 }
 
+/** 这一关的分身光晕。工位马甲、我是NPC、假人下班各读各的。 */
+export function decoyGlowOnDay(day: WeekdayId): number {
+  const own = current.dayLooks?.decoy?.[day]?.glowColor;
+  if (typeof own === 'number') return own;
+  return DECOY_GLOW_DEFAULT[day] ?? 0x57d98f;
+}
+
 function ensureDayLooks(merged: FxCatalog, over: Record<string, unknown>) {
   const shared = (lv: Lv) => merged.skills.coffee[lv]?.coffee?.color ?? 0x4a2d18;
   const paintedAllGreen = ([1, 2, 3] as Lv[]).every((lv) => shared(lv) === COFFEE_GREEN);
@@ -1509,7 +1552,14 @@ function ensureDayLooks(merged: FxCatalog, over: Record<string, unknown>) {
     };
     coffee[day] = { 1: pick(1), 2: pick(2), 3: pick(3) };
   }
-  merged.dayLooks = { coffee };
+  const overDecoy = isRec(over.dayLooks) && isRec(over.dayLooks.decoy) ? over.dayLooks.decoy : {};
+  const decoy = {} as Record<WeekdayId, DayDecoyLook>;
+  for (const day of COFFEE_DAYS) {
+    const row = isRec(overDecoy[day]) ? overDecoy[day] : {};
+    const raw = row.glowColor;
+    decoy[day] = { glowColor: typeof raw === 'number' ? raw : DECOY_GLOW_DEFAULT[day] };
+  }
+  merged.dayLooks = { coffee, decoy };
 }
 
 export function hazardFx(id: HazardKind): HazardFx {

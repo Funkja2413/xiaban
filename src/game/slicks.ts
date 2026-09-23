@@ -21,6 +21,8 @@ interface Patch {
   sz: number;
   grow: number;
   baseOp: number;
+  /** 同一泼共用的剩余放倒名额。空着表示不限（编辑器预览）。 */
+  budget: { left: number } | null;
 }
 
 const MAX_PATCHES = 32;
@@ -214,11 +216,12 @@ export class Slicks {
         sz: 1,
         grow: 1,
         baseOp: 0.55,
+        budget: null,
       });
     }
   }
 
-  spawn(x: number, z: number, r: number, life: number, look?: SlickLook) {
+  spawn(x: number, z: number, r: number, life: number, look?: SlickLook, budget?: { left: number } | null) {
     const slot = this.patches.find((p) => !p.mesh.visible) ?? this.patches.reduce((a, b) => (a.life < b.life ? a : b));
     const slick = look ?? skillFx('coffee', 1).coffee;
     const propId = look?.prop ?? 'cup';
@@ -231,6 +234,7 @@ export class Slicks {
     slot.sx = 0.78 + this.rng() * 0.5;
     slot.sz = 0.68 + this.rng() * 0.42;
     slot.baseOp = look?.opacity ?? slick?.opacity ?? 0.55;
+    slot.budget = budget ?? null;
     slot.mat.map = this.maps[(this.rng() * SPLAT_VARIANTS) | 0]!;
     slot.mat.color.setHex(look?.color ?? slick?.color ?? 0x4a2d18);
     slot.mat.opacity = slot.baseOp;
@@ -296,11 +300,13 @@ export class Slicks {
       p.mat.opacity = p.baseOp * fade;
       if (p.prop.visible) setPropFade(p.prop, fade);
 
+      if (p.budget && p.budget.left <= 0) continue;
       for (let i = 0; i < enemies.cap; i++) {
+        if (p.budget && p.budget.left <= 0) break;
         if (enemies.state[i] !== EState.Chase) continue;
         const dx = enemies.posX[i] - p.x;
         const dz = enemies.posZ[i] - p.z;
-        if (dx * dx + dz * dz < p.r * p.r) enemies.slip(i);
+        if (dx * dx + dz * dz < p.r * p.r && enemies.slip(i) && p.budget) p.budget.left--;
       }
     }
   }

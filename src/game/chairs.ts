@@ -15,9 +15,23 @@ export interface LoosePropBody {
   yaw: number;
 }
 
+type SlamChair = {
+  group: THREE.Group;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  life: number;
+};
+
 /** 动态可冲倒物：椅子 + 绿植/垃圾桶/咖啡机/打印机。高速撞飞同事。 */
 export class Chairs {
   private items: { body: RAPIER.RigidBody; group: THREE.Group; mass: number; hitR: number }[] = [];
+  private readonly scene: THREE.Scene;
+  /** 拍桌时在施法者周围炸开的椅子，和特效编辑器同一套弹道。 */
+  private bursts: SlamChair[] = [];
 
   constructor(
     scene: THREE.Scene,
@@ -25,6 +39,7 @@ export class Chairs {
     spawns: { x: number; z: number; style?: ChairStyle; rotY?: number; tone?: FurnitureTone; color?: string }[],
     loose: LoosePropBody[] = []
   ) {
+    this.scene = scene;
     for (const s of spawns) {
       const yaw = s.rotY ?? 0;
       const body = world.createRigidBody(
@@ -123,9 +138,50 @@ export class Chairs {
       body.applyImpulse({ x: nx * p, y: lift * fall, z: nz * p }, true);
       body.applyTorqueImpulse({ x: (Math.random() - 0.5) * p * 0.03, y: (Math.random() - 0.5) * p * 0.04, z: (Math.random() - 0.5) * p * 0.03 }, true);
     }
+    this.spawnSlamChairs(x, z, radius, impulse, lift);
   }
 
-  syncVisuals() {
+  /** 编辑器里拍桌会在施法者脚边摆四把椅子再弹飞。关卡椅子常常不在半径里，这里用同一套落点和速度。 */
+  private spawnSlamChairs(x: number, z: number, radius: number, impulse: number, lift: number) {
+    const r = Math.min(1.15, Math.max(0.7, radius * 0.48));
+    const spots = [
+      { x: x - r, z: z + 0.12 },
+      { x: x + r, z: z - 0.18 },
+      { x: x + 0.28, z: z + r * 0.72 },
+      { x: x - 0.22, z: z - r * 0.7 },
+    ];
+    const k = (impulse / 420) * 4.4;
+    const hop = (lift / 32) * 3.8;
+    for (const s of spots) {
+      const dx = s.x - x;
+      const dz = s.z - z;
+      const len = Math.hypot(dx, dz) || 0.2;
+      const group = addOfficeChair(this.scene, Math.random() * Math.PI * 2, 'task', 'dark');
+      group.position.set(s.x, SLAM_CHAIR_Y, s.z);
+      this.bursts.push({
+        group,
+        x: s.x,
+        y: 0,
+        z: s.z,
+        vx: (dx / len) * k,
+        vy: hop,
+        vz: (dz / len) * k,
+        life: 2.4,
+      });
+    }
+  }
+
+  dispose(world: RAPIER.World) {
+    for (const { body, group } of this.items) {
+      world.removeRigidBody(body);
+      group.removeFromParent();
+    }
+    this.items.length = 0;
+    for (const burst of this.bursts) dropChairMesh(burst.group);
+    this.bursts.length = 0;
+  }
+
+  syncVisuals(dt = 1 / 60) {
     for (const { body, group } of this.items) {
       const t = body.translation();
       const r = body.rotation();
@@ -134,5 +190,39 @@ export class Chairs {
       const v = body.linvel();
       if (Math.hypot(v.x, v.z) > 2.2) sfx.play('chair_roll');
     }
+    for (let i = this.bursts.length - 1; i >= 0; i--) {
+      const p = this.bursts[i]!;
+      p.vy -= 18 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.z += p.vz * dt;
+      p.vx *= Math.max(0, 1 - 1.15 * dt);
+      p.vz *= Math.max(0, 1 - 1.15 * dt);
+      if (p.y < 0) {
+        p.y = 0;
+        p.vy *= -0.22;
+        p.vx *= 0.55;
+        p.vz *= 0.55;
+        if (Math.abs(p.vy) < 0.35) p.vy = 0;
+      }
+      p.life -= dt;
+      p.group.position.set(p.x, p.y + SLAM_CHAIR_Y, p.z);
+      p.group.rotation.x += p.vz * dt * 0.7;
+      p.group.rotation.z -= p.vx * dt * 0.7;
+      if (p.life <= 0) {
+        dropChairMesh(p.group);
+        this.bursts.splice(i, 1);
+      }
+    }
   }
+}
+
+const SLAM_CHAIR_Y = 0.5;
+
+function dropChairMesh(group: THREE.Object3D) {
+  group.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    mesh.geometry?.dispose();
+  });
+  group.removeFromParent();
 }

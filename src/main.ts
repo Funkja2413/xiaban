@@ -16,18 +16,27 @@ sfx.unlock();
 const qPlayer = new URLSearchParams(location.search).get('player');
 const bootPlayer = auto?.player ?? (isPlayerSlotId(qPlayer) ? qPlayer : loadPlayerSlot());
 const game = new Game();
-game.onSettled = (kind, info) => showResult(kind, info.day, info.sub, game.playerSlot);
+game.onSettled = (kind, info) => showResult(kind, info.day, info.sub, game.playerSlot, info.clockMin);
 
 bindPlay((day, player) => {
   rememberPlayerSlot(player);
   rememberLastPlayed(day);
   bgm.play(day);
-  if (game.day === day && game.playerSlot === player) {
-    game.beginPlay();
-    setMode('play');
+  sfx.unlock();
+  if (game.playerSlot !== player) {
+    location.assign(playUrl(day, player));
     return;
   }
-  location.assign(playUrl(day, player));
+  const show = () => {
+    history.replaceState(null, '', playUrl(day, player));
+    setMode('play');
+  };
+  if (game.day !== day) {
+    void game.switchDay(day).then(show);
+    return;
+  }
+  game.beginPlay();
+  show();
 });
 
 bindHome(() => game.enterMenu());

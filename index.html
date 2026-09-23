@@ -435,16 +435,16 @@
       top: 0;
       width: calc(100% * 207 / 750);
       height: calc(100% * 73 / 77);
-      overflow: hidden;
+      overflow: visible;
     }
     #overlay[data-kind="won"] #resultNext img {
       position: absolute;
-      width: 107.31%;
-      height: 120.55%;
+      width: 100%;
+      height: 100%;
       max-width: none;
-      left: -4.38%;
-      top: -6.85%;
-      object-fit: cover;
+      left: 0;
+      top: 0;
+      object-fit: fill;
     }
     #overlay[data-kind="lost"] .resultImgBtn:active,
     #overlay[data-kind="won"] .resultImgBtn:active,
@@ -614,10 +614,16 @@
     }
     .levelsSub {
       margin: calc(100cqh * 18 / 1334) 0 0;
-      padding: 0 calc(100cqw * 8 / 750);
-      font-size: clamp(12px, 2.67cqi, 20px);
+      padding: 0;
+      width: max-content;
+      max-width: calc(100cqw * 710 / 750);
+      position: relative;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: min(18px, 3.05cqi);
       font-weight: 600;
-      line-height: 1.35;
+      line-height: 1.2;
       color: #fcd7cb;
       letter-spacing: 0.2px;
     }
@@ -671,7 +677,20 @@
       font-weight: 700;
       letter-spacing: 0.3px;
       line-height: 1.2;
+    }
+    .levelStatus {
+      display: flex;
+      align-items: baseline;
       justify-self: end;
+      gap: 0.7em;
+    }
+    .levelBest {
+      font-size: clamp(13px, 2.67cqi, 20px);
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+      color: #f6eee4;
     }
     .levelTag[data-state="beaten"] { color: #e47d9d; }
     .levelTag[data-state="open"] { color: #2bf9a7; }
@@ -1182,7 +1201,7 @@
       <div class="osub"></div>
       <div class="resultActions">
         <button id="resultNext" type="button" class="ghost resultImgBtn" aria-label="下一关">
-          <img alt="" src="%BASE_URL%ui/result-win-btn-next.png" width="626" height="248" />
+          <img alt="" src="%BASE_URL%ui/result-win-btn-next.png" width="414" height="146" />
           <span>下一关</span>
         </button>
         <button id="resultHome" type="button" class="ghost resultImgBtn" aria-label="回主页">

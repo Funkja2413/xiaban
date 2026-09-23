@@ -1,11 +1,13 @@
 import { WEEKDAYS, nextWeekday, weekdaySlot, type WeekdayId } from './levels';
 import {
   continueDay,
+  formatBest,
   isUnlocked,
   loadPlayerSlot,
   loadProgress,
   loadSettings,
   markBeaten,
+  recordBest,
   rememberLastPlayed,
   rememberPlayerSlot,
   resetProgress,
@@ -183,13 +185,18 @@ function renderLevels() {
     const beaten = p.beaten.includes(slot.id);
     const state = !open ? 'locked' : beaten ? 'beaten' : 'open';
     const tag = state === 'locked' ? '锁定' : state === 'beaten' ? '已下班' : '可闯关';
+    const bestSec = beaten ? p.bests?.[slot.id] : undefined;
+    const best = bestSec != null ? formatBest(bestSec) : '';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'levelCard' + (open ? '' : ' locked');
     btn.disabled = !open;
     btn.innerHTML =
       `<span class="levelDay">${escapeText(slot.title)}</span>` +
+      `<span class="levelStatus">` +
+      (best ? `<span class="levelBest">${escapeText(best)}</span>` : '') +
       `<span class="levelTag" data-state="${state}">${tag}</span>` +
+      `</span>` +
       `<span class="levelThumb"><img alt="" src="${escapeText(assetUrl(`ui/levels-day-${slot.id}.png`))}" width="1250" height="328"></span>`;
     btn.addEventListener('click', () => askAvatar(slot.id, 'levels'));
     list.appendChild(btn);
@@ -518,7 +525,8 @@ export function showResult(
   kind: 'won' | 'lost',
   day: WeekdayId,
   sub: string,
-  player: PlayerSlotId = loadPlayerSlot()
+  player: PlayerSlotId = loadPlayerSlot(),
+  clockMin?: number
 ) {
   const overlay = document.getElementById('overlay')!;
   const stamp = overlay.querySelector('.resultStampMark')!;
@@ -553,7 +561,7 @@ export function showResult(
   nextBtn.style.display = '';
 
   if (kind === 'won') {
-    const nxt = markBeaten(day);
+    const nxt = clockMin != null ? recordBest(day, clockMin) : markBeaten(day);
     if (finale || !nxt) {
       nextBtn.style.display = 'none';
     } else {

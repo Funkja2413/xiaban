@@ -169,7 +169,7 @@ export class Enemies {
   /** 与 poseSets 同槽；无裙则为 null */
   private skirtPoseSets: (THREE.InstancedMesh[] | null)[] = [];
   private tmpHair = new THREE.Matrix4();
-  private blobMesh: THREE.InstancedMesh;
+  private blobMesh!: THREE.InstancedMesh;
   private lastPose: Uint8Array;
   private lastSet: Uint8Array;
   private hidden: Uint8Array;
@@ -193,6 +193,11 @@ export class Enemies {
   onTaskDelivered: ((type: EType, x: number, z: number, gender: number) => void) | null = null;
   /** 每次同事被放倒（进入布娃娃）时回调，用于掉落工牌 */
   onKnockdown: ((type: EType, x: number, z: number, gender: number, hitFx?: Partial<HitFx> | null) => void) | null = null;
+  /** 减速 / 眩晕 / 推开这类打不倒的命中，也记工牌 */
+  onCrowdScore: (() => void) | null = null;
+  private crowdScoreAt = new Float64Array(96);
+  private crowdWindow = 0;
+  private crowdGiven = 0;
 
   constructor(
     private scene: THREE.Scene,
@@ -254,16 +259,50 @@ export class Enemies {
     this.hidden = new Uint8Array(capacity);
     this.lastBody = Array.from({ length: capacity }, () => new THREE.Matrix4());
 
+    this.mountVisuals(kit);
+  }
+
+  /** 换关后换成这一天的同事皮（拍桌帝等），旧实例网格拆掉。 */
+  rebindKit(kit: HumanoidKit) {
+    this.dropVisuals();
+    this.kit = kit;
+    this.mountVisuals(kit);
+  }
+
+  private dropVisuals() {
+    const meshes: THREE.InstancedMesh[] = [
+      ...this.poseSets.flat(),
+      ...this.hairMeshes.filter((m): m is THREE.InstancedMesh => !!m),
+      ...this.hatMeshes.filter((m): m is THREE.InstancedMesh => !!m),
+      ...this.heldMeshes.filter((m): m is THREE.InstancedMesh => !!m),
+      ...this.backMeshes.filter((m): m is THREE.InstancedMesh => !!m),
+      ...this.kitHairMeshes.filter((m): m is THREE.InstancedMesh => !!m),
+      ...this.skirtPoseSets.flatMap((set) => set ?? []),
+    ];
+    if (this.blobMesh) meshes.push(this.blobMesh);
+    for (const mesh of meshes) {
+      this.scene.remove(mesh);
+      mesh.dispose();
+    }
+    this.poseSets = [];
+    this.hairMeshes = [];
+    this.hatMeshes = [];
+    this.heldMeshes = [];
+    this.backMeshes = [];
+    this.kitHairMeshes = [];
+    this.skirtPoseSets = [];
+    this.dirty.clear();
+  }
+
+  private mountVisuals(kit: HumanoidKit) {
     const blobGeo = new THREE.CircleGeometry(0.34, 14);
     blobGeo.rotateX(-Math.PI / 2);
-
     const blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false });
-
     const poseMats = [kit.maleMat, kit.femaleMat, kit.heavyMat, kit.interceptorMat];
     for (let s = 0; s < poseMats.length; s++) {
       const geos = kit.slotGeos[s]?.length ? kit.slotGeos[s] : [kit.geometry, ...kit.walkGeos];
       const poses: THREE.InstancedMesh[] = [];
-      for (const geo of geos) poses.push(new THREE.InstancedMesh(geo, poseMats[s], capacity));
+      for (const geo of geos) poses.push(new THREE.InstancedMesh(geo, poseMats[s], this.cap));
       this.poseSets.push(poses);
     }
 
@@ -273,7 +312,7 @@ export class Enemies {
           dest.push(null);
           continue;
         }
-        dest.push(new THREE.InstancedMesh(item.geometry, item.material, capacity));
+        dest.push(new THREE.InstancedMesh(item.geometry, item.material, this.cap));
       }
     };
     fillAttach(kit.slotHair, this.hairMeshes);
@@ -289,10 +328,10 @@ export class Enemies {
         this.skirtPoseSets.push(null);
         continue;
       }
-      this.skirtPoseSets.push(geos.map((geo) => new THREE.InstancedMesh(geo, mat, capacity)));
+      this.skirtPoseSets.push(geos.map((geo) => new THREE.InstancedMesh(geo, mat, this.cap)));
     }
 
-    this.blobMesh = new THREE.InstancedMesh(blobGeo, blobMat, capacity);
+    this.blobMesh = new THREE.InstancedMesh(blobGeo, blobMat, this.cap);
 
     const attachLive = [...this.hairMeshes, ...this.hatMeshes, ...this.heldMeshes, ...this.backMeshes, ...this.kitHairMeshes].filter(
       (m): m is THREE.InstancedMesh => !!m
@@ -303,13 +342,13 @@ export class Enemies {
       mesh.receiveShadow = true;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
-      scene.add(mesh);
+      this.scene.add(mesh);
     }
     this.blobMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    scene.add(this.blobMesh);
+    this.scene.add(this.blobMesh);
 
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
-    for (let i = 0; i < capacity; i++) {
+    for (let i = 0; i < this.cap; i++) {
       for (const mesh of this.poseSets.flat()) mesh.setMatrixAt(i, zero);
       for (const mesh of this.hairMeshes) mesh?.setMatrixAt(i, zero);
       for (const mesh of this.hatMeshes) mesh?.setMatrixAt(i, zero);
@@ -537,6 +576,7 @@ export class Enemies {
     this.state[i] = EState.Knock;
     this.knockT[i] = Math.max(this.knockT[i], dur);
     this.stunFxT[i] = Math.max(this.stunFxT[i], dur);
+    this.grantCrowd(i);
   }
 
   stunLeft(i: number) {
@@ -547,16 +587,17 @@ export class Enemies {
     return this.slowT[i];
   }
 
-  /** 咖啡渍滑倒：只对追击中且在移动的普通/拦截者生效 */
+  /** 咖啡渍滑倒：只对追击中且在移动的普通/拦截者生效。返回是否真的放倒。 */
   slip(i: number) {
-    if (this.state[i] !== EState.Chase || this.types[i] === EType.C) return;
+    if (this.state[i] !== EState.Chase || this.types[i] === EType.C) return false;
     const b = this.bodies[i];
-    if (!b) return;
+    if (!b) return false;
     const v = b.linvel();
     const sp = Math.hypot(v.x, v.z);
-    if (sp < 1.2) return;
+    if (sp < 1.2) return false;
     sfx.play('slick_slip');
     this.toRagdoll(i, v.x / sp, v.z / sp, 150 + sp * 30);
+    return true;
   }
 
   /** 倦怠：追击中的同事减速。默认不管主管。 */
@@ -566,6 +607,7 @@ export class Enemies {
     if (this.types[i] === EType.C && !allowHeavy) return;
     this.slowT[i] = Math.max(this.slowT[i], duration);
     this.slowMul[i] = Math.min(this.slowMul[i] || 1, factor);
+    this.grantCrowd(i);
   }
 
   slowAround(
@@ -716,6 +758,26 @@ export class Enemies {
     if (!b) return;
     this.clearChannel(i);
     b.applyImpulse({ x: dirX * impulse, y: 0, z: dirZ * impulse }, true);
+    this.grantCrowd(i);
+  }
+
+  bindFlow(flow: FlowField) {
+    this.flow = flow;
+  }
+
+  /** 打不倒也记分：同一人 4.5 秒内只记一次，同一次出手最多 3 人。 */
+  private grantCrowd(i: number) {
+    if (i < 0 || i >= this.crowdScoreAt.length) return;
+    const now = performance.now();
+    if (now - this.crowdScoreAt[i] < 4500) return;
+    if (now - this.crowdWindow > 450) {
+      this.crowdWindow = now;
+      this.crowdGiven = 0;
+    }
+    if (this.crowdGiven >= 3) return;
+    this.crowdScoreAt[i] = now;
+    this.crowdGiven++;
+    this.onCrowdScore?.();
   }
 
   /** 主页运镜：全体同事改追给定点，忽略守门/拦截 */
@@ -1255,6 +1317,7 @@ export class Enemies {
     this.alarmT = Math.max(0.05, cfg.duration);
     this.alarmBlastR = Math.max(0, cfg.blastRadius);
     this.alarmBlastImpulse = Math.max(0, cfg.blastImpulse);
+    this.grantCrowd(i);
     return i;
   }
 

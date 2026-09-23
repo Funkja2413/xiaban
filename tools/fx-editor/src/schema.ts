@@ -626,6 +626,7 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
   if (track.group === 'dash') return dashSections(track.id as DashKey, track.hasLevel ? lv : 1);
   if (track.id === 'decoy') {
     const p = `skills.decoy.${lv}`;
+    const day = kit?.day ?? 'tuesday';
     const glowStyle = (fx().skills.decoy[lv]?.decoy?.glowStyle ?? 'soft') as ThrowGlowStyle;
     const lookFields: Field[] = [
       {
@@ -641,7 +642,12 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
     ];
     if (glowStyle !== 'off') {
       lookFields.push(
-        { path: `${p}.decoy.glowColor`, label: '光晕色', kind: 'color' },
+        {
+          path: `dayLooks.decoy.${day}.glowColor`,
+          label: '光晕色',
+          kind: 'color',
+          hint: '只改这一关。工位马甲、我是NPC、假人下班互不影响。',
+        },
         { path: `${p}.decoy.glowOpacity`, label: '光晕透明', kind: 'range', min: 0.05, max: 1, step: 0.02 },
         { path: `${p}.decoy.glowSize`, label: '光晕大小', kind: 'range', min: 0.8, max: 2.8, step: 0.05 }
       );
@@ -679,6 +685,7 @@ export function fieldSections(track: TrackDef, lv: Lv, kit?: DayPlayKit): FieldS
           { path: `${p}.coffee.life`, label: '持续', kind: 'range', min: 0.6, max: 8, step: 0.1 },
           { path: `${p}.coffee.splashRadius`, label: '溅摊半径', kind: 'range', min: 0, max: 4, step: 0.1, hint: '0 = 不溅' },
           { path: `${p}.coffee.splashLife`, label: '溅摊持续', kind: 'range', min: 0, max: 8, step: 0.1 },
+          { path: `${p}.coffee.maxVictims`, label: '最多放倒', kind: 'int', min: 1, max: 8, step: 1, hint: '这一泼（含溅摊）合计放倒的人数。满了渍还在，但不再滑倒。' },
         ],
       },
     ];

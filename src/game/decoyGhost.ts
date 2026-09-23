@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import type { DecoyLevel, ThrowGlowStyle } from '../fx/catalog';
-import { normalizeThrowGlowStyle } from '../fx/catalog';
+import { decoyGlowOnDay, normalizeThrowGlowStyle } from '../fx/catalog';
 import type { WeekdayId } from '../levels';
 import type { HumanoidFigure, HumanoidKit } from './humanoid';
 import { bakeFigureLocalSnapshot, clonePlayerFigure, setFigureGait } from './humanoid';
@@ -35,20 +35,25 @@ const SCARECROW_FIT = 1.72;
 let scarecrowTemplate: THREE.Group | null = null;
 let scarecrowLoad: Promise<void> | null = null;
 
-/** 预载稻草人分身；缺文件时静默失败，施放时回退玩家定格。 */
+/** 预载稻草人分身。加载失败会打日志，施放时再试一次。 */
 export async function preloadDecoyScarecrow() {
-  if (scarecrowTemplate || scarecrowLoad) return scarecrowLoad ?? Promise.resolve();
+  if (scarecrowTemplate) return;
+  if (scarecrowLoad) return scarecrowLoad;
   scarecrowLoad = (async () => {
+    let last: unknown = null;
     for (const url of [SCARECROW_GLB, SCARECROW_FBX]) {
       try {
-        scarecrowTemplate = await loadPropVisual(url, SCARECROW_FIT);
+        const visual = await loadPropVisual(url, SCARECROW_FIT);
+        if (!visual.children.length) throw new Error('empty mesh');
+        scarecrowTemplate = visual;
         return;
-      } catch {
-        /* try next */
+      } catch (err) {
+        last = err;
       }
     }
-    console.warn('[decoy] scarecrow model missing — put prop-scarecrow.glb next to SCARECROW_README.txt');
+    console.warn('[decoy] scarecrow model failed', SCARECROW_GLB, last);
     scarecrowTemplate = null;
+    scarecrowLoad = null;
   })();
   return scarecrowLoad;
 }
@@ -66,6 +71,13 @@ export function decoyLookOf(pack?: Partial<DecoyLevel> & { glow?: boolean } | nu
     glowOpacity: Math.min(1, Math.max(0, pack?.glowOpacity ?? DEFAULT_DECOY_LOOK.glowOpacity)),
     glowSize: Math.max(0.8, pack?.glowSize ?? DEFAULT_DECOY_LOOK.glowSize),
   };
+}
+
+/** 光晕色走当天皮，不读三关共用的那一条。 */
+export function decoyLookForDay(day: WeekdayId, pack?: Partial<DecoyLevel> & { glow?: boolean } | null): DecoyLook {
+  const look = decoyLookOf(pack);
+  look.glowColor = decoyGlowOnDay(day);
+  return look;
 }
 
 function glowLook(look: DecoyLook): ThrowLook {
@@ -103,6 +115,7 @@ export function makeDecoy(
   if (skin === 'scarecrow') {
     const scare = makeDecoyScarecrow(look);
     if (scare) return scare;
+    void preloadDecoyScarecrow();
   }
   if (fig) return makeDecoyGhost(fig, look);
   return makeDecoyFallback(look);
@@ -200,8 +213,10 @@ export function makeDecoyFallback(look: DecoyLook = DEFAULT_DECOY_LOOK): THREE.G
 }
 
 export function applyDecoyLook(root: THREE.Object3D, look: DecoyLook) {
+  const scare = root.userData.decoyScarecrow === true;
   const tint = look.color;
-  const mul = tint === 0xffffff;
+  const mul = tint === 0xffffff || scare;
+  const bodyOpacity = scare ? 1 : look.opacity;
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || mesh.userData.throwGlow) return;
@@ -209,9 +224,9 @@ export function applyDecoyLook(root: THREE.Object3D, look: DecoyLook) {
     for (const raw of mats) {
       const mat = raw as THREE.MeshPhongMaterial | THREE.MeshLambertMaterial | THREE.MeshBasicMaterial;
       if (!mat || !('opacity' in mat)) continue;
-      mat.transparent = true;
-      mat.depthWrite = false;
-      mat.opacity = look.opacity;
+      mat.transparent = bodyOpacity < 0.98;
+      mat.depthWrite = scare;
+      mat.opacity = bodyOpacity;
       if ('color' in mat && mat.color) {
         if (mesh.userData.baseColor == null) mesh.userData.baseColor = mat.color.getHex();
         const base = mesh.userData.baseColor as number;
@@ -224,9 +239,11 @@ export function applyDecoyLook(root: THREE.Object3D, look: DecoyLook) {
   });
 
   clearThrowGlow(root);
-  const glow = buildThrowGlow(look.glowStyle, glowLook(look));
+  const glowLookTuned = glowLook(look);
+  if (scare) glowLookTuned.glowSize = Math.min(glowLookTuned.glowSize, 1.15);
+  const glow = buildThrowGlow(look.glowStyle, glowLookTuned);
   if (glow) {
-    glow.position.y = 0.85;
+    glow.position.y = scare ? 0.06 : 0.85;
     root.add(glow);
   }
 }

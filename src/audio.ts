@@ -143,6 +143,7 @@ class BgmPlayer {
     window.addEventListener('pointerdown', resume, { passive: true });
     window.addEventListener('keydown', resume);
     window.addEventListener('touchend', resume, { passive: true });
+    document.addEventListener('WeixinJSBridgeReady', resume, false);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') {
         this.el?.pause();
@@ -211,17 +212,31 @@ class BgmPlayer {
     if (!this.on || !this.el || !this.wanted) return;
     if (document.visibilityState !== 'visible') return;
     const el = this.el;
+    if (!el.paused && el.currentTime > 0.05) return;
     const p = el.play();
     if (!p) return;
     void p.then(() => {
       this.playKicks = 0;
     }).catch(() => {
-      if (this.el !== el || !this.wanted || this.playKicks >= 6) return;
+      if (this.el !== el || !this.wanted || this.playKicks >= 24) return;
       this.playKicks += 1;
       window.setTimeout(() => {
         if (this.el === el) this.tryPlay();
-      }, 500);
+      }, 400);
     });
+  }
+
+  /** 进关倒计时里反复试播。手机换页会丢掉上一次点击的手势。 */
+  kick() {
+    this.tryPlay();
+    const bridge = (window as unknown as { WeixinJSBridge?: { invoke: (n: string, p: object, cb: () => void) => void } }).WeixinJSBridge;
+    if (bridge?.invoke && this.playKicks < 2) {
+      try {
+        bridge.invoke('getNetworkType', {}, () => this.tryPlay());
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   private dispose() {

@@ -15,7 +15,7 @@ import {
 import { coffeePropOnDay, decoyCountOnDay, decoyRunDirs, decoyRunOnDay, skillNameOnDay } from '../../../src/fx/days';
 import type { WeekdayId } from '../../../src/levels';
 import {
-  decoyLookOf,
+  decoyLookForDay,
   decoySkinOnDay,
   disposeDecoyGhost,
   disposeDecoyRunner,
@@ -1224,7 +1224,7 @@ export class FxPreview {
   private placeDecoy() {
     this.clearDecoys();
     this.bakePlayerPose();
-    const look = decoyLookOf(skillFx('decoy', this.skillLv).decoy);
+    const look = decoyLookForDay(this.day, skillFx('decoy', this.skillLv).decoy);
     const skin = decoySkinOnDay(this.day);
     const count = decoyCountOnDay(this.day, this.skillLv);
     const run = decoyRunOnDay(this.day);
