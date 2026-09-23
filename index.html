@@ -872,6 +872,7 @@
     }
     #settings .settingsOpt[data-opt="music"] { top: calc(100% * 449 / 1334); }
     #settings .settingsOpt[data-opt="sfx"] { top: calc(100% * 545 / 1334); }
+    #settings .settingsOpt[data-opt="fps"] { top: calc(100% * 641 / 1334); }
     #settings .settingsOptLabel {
       position: absolute;
       left: 0;
@@ -936,11 +937,6 @@
       -webkit-tap-highlight-color: transparent;
     }
     #settings .settingsReset:active { color: rgba(252, 215, 203, 0.7); }
-    #settings .settingsDebug {
-      position: absolute;
-      width: 1px; height: 1px;
-      opacity: 0; pointer-events: none;
-    }
     /* 角色选择：Figma 750×1334「请问你是？」；3D 棚在画布，壳只叠 UI */
     #avatar {
       position: absolute; inset: 0; z-index: 80;
@@ -1310,7 +1306,14 @@
         <img class="on" alt="" src="%BASE_URL%ui/settings-check-on.png" width="183" height="182" />
       </span>
     </label>
-    <input id="optDebug" class="settingsDebug" type="checkbox" tabindex="-1" aria-hidden="true" />
+    <label class="settingsOpt" data-opt="fps">
+      <span class="settingsOptLabel">帧率</span>
+      <input id="optDebug" class="settingsCheck" type="checkbox" />
+      <span class="settingsCheckArt" aria-hidden="true">
+        <img class="off" alt="" src="%BASE_URL%ui/settings-check-off.png" width="183" height="181" />
+        <img class="on" alt="" src="%BASE_URL%ui/settings-check-on.png" width="183" height="182" />
+      </span>
+    </label>
     <button type="button" class="settingsReset" id="optReset">重置闯关进度</button>
     <div class="settingsCredits" aria-hidden="true">
       <img alt="" src="%BASE_URL%ui/settings-credits.png" width="788" height="276" />

@@ -552,6 +552,9 @@ function bleedAlphaRgb(px: Uint8ClampedArray, w: number, h: number, passes: numb
   }
 }
 
+/** 俯视镜头下墙面海报长边 1024 就够，再大会占显存，进关时的逐像素渗色也会变慢。 */
+const FACE_POSTER_MAX = 1024;
+
 /** 墙面海报：吃掉近透明脏点，并把颜色渗进透明边，避免黑边。 */
 export function prepareFacePosterMap(src: THREE.Texture): THREE.Texture {
   const size = textureImageSize(src);
@@ -564,9 +567,13 @@ export function prepareFacePosterMap(src: THREE.Texture): THREE.Texture {
     face.needsUpdate = true;
     return face;
   }
+  const edge = Math.max(size.w, size.h);
+  const scale = edge > FACE_POSTER_MAX ? FACE_POSTER_MAX / edge : 1;
+  const dw = Math.max(1, Math.round(size.w * scale));
+  const dh = Math.max(1, Math.round(size.h * scale));
   const c = document.createElement('canvas');
-  c.width = size.w;
-  c.height = size.h;
+  c.width = dw;
+  c.height = dh;
   const ctx = c.getContext('2d', { willReadFrequently: true });
   if (!ctx) {
     const face = src.clone();
@@ -574,7 +581,7 @@ export function prepareFacePosterMap(src: THREE.Texture): THREE.Texture {
     face.needsUpdate = true;
     return face;
   }
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img, 0, 0, dw, dh);
   const data = ctx.getImageData(0, 0, c.width, c.height);
   const px = data.data;
   for (let i = 3; i < px.length; i += 4) {

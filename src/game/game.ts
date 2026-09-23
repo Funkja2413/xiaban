@@ -33,6 +33,14 @@ import { Hazards } from './hazards';
 import { bgm, sfx } from '../audio';
 import type { BootProgress } from '../boot-progress';
 
+/** 桌面视网膜保持 1.5；手机短边更窄，1.25 能少大约三成片段着色。 */
+function releasePixelRatio() {
+  const dpr = window.devicePixelRatio || 1;
+  const shortSide = Math.min(window.screen.width, window.screen.height);
+  const cap = shortSide <= 900 ? 1.25 : 1.5;
+  return Math.min(dpr, cap);
+}
+
 const FIXED_DT = 1 / 60;
 const ENEMY_CAP = 80;
 const FLOW_REBUILD = 0.15;
@@ -157,7 +165,7 @@ export class Game {
     this.world = await initPhysics();
 
     this.renderer = new THREE.WebGPURenderer({ antialias: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(releasePixelRatio());
     const size = getStageSize();
     this.renderer.setSize(size.w, size.h);
     this.renderer.shadowMap.enabled = false;
@@ -341,6 +349,7 @@ export class Game {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.studio?.setAspect(w, h);
+      this.renderer.setPixelRatio(releasePixelRatio());
       this.renderer.setSize(w, h);
       if (this.picking) this.syncAvatarNameLayout();
     });

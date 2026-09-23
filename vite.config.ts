@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -136,6 +137,47 @@ function catalogPrunePlugin(): Plugin {
   };
 }
 
+/** 发布包里的关卡墙贴缩到长边 1024。源图不动，场景编辑器仍用原分辨率。 */
+function shrinkLevelTexturesPlugin(): Plugin {
+  return {
+    name: 'shrink-level-textures',
+    apply: 'build',
+    closeBundle() {
+      const dir = path.join(root, 'dist/levels');
+      if (!fs.existsSync(dir)) return;
+      const script = `
+import os, sys
+from PIL import Image
+root, max_edge = sys.argv[1], 1024
+n = saved = 0
+for dirpath, _, files in os.walk(root):
+    for name in files:
+        if not name.lower().endswith('.png'):
+            continue
+        p = os.path.join(dirpath, name)
+        before = os.path.getsize(p)
+        im = Image.open(p)
+        w, h = im.size
+        if max(w, h) <= max_edge:
+            continue
+        scale = max_edge / max(w, h)
+        im = im.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.Resampling.LANCZOS)
+        im.save(p, optimize=True, compress_level=9)
+        n += 1
+        saved += before - os.path.getsize(p)
+print(f'shrink-level-textures {n} files, saved {saved/1e6:.1f} MB')
+`;
+      const run = spawnSync('python3', ['-c', script, dir], { encoding: 'utf8' });
+      if (run.status !== 0) {
+        console.warn('[shrink-level-textures] skipped:', (run.stderr || run.stdout || '').trim());
+        return;
+      }
+      const line = (run.stdout || '').trim().split('\n').pop();
+      if (line) console.log(line);
+    },
+  };
+}
+
 function editorRedirectPlugin(): Plugin {
   return {
     name: 'editor-redirect',
@@ -220,7 +262,7 @@ export default defineConfig(({ command }) => ({
       ignored: ['**/public/fx/catalog.json'],
     },
   },
-  plugins: [editorRedirectPlugin(), fxLivePlugin(), catalogPrunePlugin()],
+  plugins: [editorRedirectPlugin(), fxLivePlugin(), catalogPrunePlugin(), shrinkLevelTexturesPlugin()],
   build: {
     rollupOptions: {
       input: path.join(root, 'index.html'),
